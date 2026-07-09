@@ -205,6 +205,7 @@ function toast(msg,actionLabel,actionFn){
 function planEff(){
   if(!WS)return 'free';
   if(WS.plan==='pro')return 'pro';
+  if(WS.plan==='basic')return 'basic';
   if(WS.plan==='trial'&&WS.trial_ends>=saDate())return 'pro';
   return 'free';
 }
@@ -851,7 +852,7 @@ function settingsView(){
       <label>Name</label><input id="st-name" value="${esc(WS.name)}" ${canManage()?'':'disabled'}>
       <label>Plan</label>
       <div style="display:flex;align-items:center;gap:9px">
-        <span class="pill" style="background:${planEff()==='pro'?'var(--ok)':'var(--muted)'}">${WS.plan==='trial'?`Trial · ${trialDaysLeft()} days left`:WS.plan==='pro'?'Pro':'Free'}</span>
+        <span class="pill" style="background:${planEff()!=='free'?'var(--ok)':'var(--muted)'}">${WS.plan==='trial'?`Trial · ${trialDaysLeft()} days left`:WS.plan==='pro'?'Pro':WS.plan==='basic'?'Basic — AI available on Pro':'Free'}</span>
         ${planEff()==='free'?'<span style="font-size:12px;color:var(--muted)">1 board · 3 members · powered by Brand Expert</span>':''}
       </div>
       ${canManage()?`<div class="row" style="justify-content:flex-start"><button class="btn accent sm" onclick="saveWsName()">Save name</button></div>`:''}
