@@ -1040,7 +1040,7 @@ function contentView(){
   ${planEff()==='pro'?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
-      <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();const el=document.getElementById('soc-strip');if(el)el.innerHTML=(_socAccounts||[]).map(a=>`<span class=\"chip\" style=\"cursor:default\"><span class=\"pill\" style=\"background:${(PLAT[a.platform]||PLAT.other)[1]};padding:2px 8px;font-size:10px\">${(PLAT[a.platform]||PLAT.other)[0]}</span> ${esc(a.user||'')}</span>`).join(' ')||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
+      <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
       <span style="flex:1"></span>
       ${canManage()?['instagram','facebook','youtube','tiktok','linkedin'].map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join(''):''}
     </div>
@@ -1166,7 +1166,23 @@ function socListHtml(){
     <span class="pill" style="background:${(PLAT[a.platform]||PLAT.other)[1]}">${(PLAT[a.platform]||PLAT.other)[0]}</span>
     <span style="flex:1;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.user||'connected account')}</span>
     <span style="font-size:11px;color:var(--ok);font-weight:700;flex:none">● live</span>
+    ${canManage()?`<button class="btn ghost sm" style="color:var(--danger);flex:none;padding:3px 9px" title="Disconnect this account" onclick="disconnectSocial('${a.id}')">✕</button>`:''}
   </div>`).join('');
+}
+function socStripChips(){
+  return (_socAccounts||[]).map(a=>`<span class="chip" style="cursor:default"><span class="pill" style="background:${(PLAT[a.platform]||PLAT.other)[1]};padding:2px 8px;font-size:10px">${(PLAT[a.platform]||PLAT.other)[0]}</span> ${esc(a.user||'')}${canManage()?` <b style="cursor:pointer;color:var(--muted);margin-left:2px;font-weight:800" title="Disconnect" onclick="disconnectSocial('${a.id}')">✕</b>`:''}</span>`).join(' ');
+}
+async function disconnectSocial(id){
+  const a=(_socAccounts||[]).find(x=>x.id===id); if(!a)return;
+  if(!confirm(`Disconnect ${a.user||a.platform} from this board? Auto-posting to it stops immediately. You can reconnect any time.`))return;
+  try{
+    const j=await socialApi({action:'disconnect',board_id:S.board,account_id:id});
+    if(j.error){toast(j.message||j.error);return;}
+    await loadSocials();
+    const strip=$('soc-strip');
+    if(strip)strip.innerHTML=socStripChips()||'<span style="font-size:12.5px;color:var(--muted)">nothing yet — connect below</span>';
+    toast(`Disconnected ${j.user||a.user||a.platform}`);
+  }catch(e){fail(e);}
 }
 async function connectSocial(platform){
   try{
