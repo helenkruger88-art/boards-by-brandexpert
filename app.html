@@ -225,11 +225,13 @@ function toast(msg,actionLabel,actionFn){
 /* plan */
 function planEff(){
   if(!WS)return 'free';
+  if(WS.plan==='agency')return 'agency';
   if(WS.plan==='pro')return 'pro';
   if(WS.plan==='basic')return 'basic';
   if(WS.plan==='trial'&&WS.trial_ends>=saDate())return 'pro';
   return 'free';
 }
+const paidAI=()=>['pro','agency'].includes(planEff());
 function trialDaysLeft(){
   if(!WS||WS.plan!=='trial')return 0;
   return Math.max(0,Math.round((new Date(WS.trial_ends)-new Date(saDate()))/86400000));
@@ -336,7 +338,7 @@ function render(){
     <span style="flex:1"></span>
     ${WS.plan!=='basic'&&_credits!==null?`<span class="pill" style="background:var(--accent);cursor:pointer" title="AI credits — tap for billing" onclick="go('settings')">✦ ${_credits}</span>`:''}
     ${WS.plan==='trial'&&planEff()==='pro'?`<span class="pill" style="background:var(--warn)" title="Full features free for the trial period">Trial · ${trialDaysLeft()}d left</span>`:''}
-    ${planEff()==='pro'&&WS.plan==='pro'?`<span class="pill">Pro</span>`:''}
+    ${WS.plan==='pro'?`<span class="pill">Pro</span>`:''}${WS.plan==='agency'?`<span class="pill">Agency</span>`:''}
     <span onclick="go('settings')" style="cursor:pointer">${avatar(MEM)}</span>
   </div>
   <main>${{today:todayView,boards:boardsView,board:boardView,content:contentView,money:moneyView,team:teamView,settings:settingsView}[S.view]()}</main>
@@ -556,7 +558,7 @@ async function createBoard(){
   const name=$('nb-name').value.trim(); if(!name){toast('Give the board a name');return;}
   try{
     const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),color:gridColor('nb-col','#C75B12'),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id}).select().single();
-    if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 board — upgrade for unlimited boards.');throw error;}
+    if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 board — upgrade for more.');if(/PRO_LIMIT_BOARDS/.test(error.message))throw new Error('Pro includes 10 boards — move to Agency for unlimited.');throw error;}
     if($('nb-std').checked){
       const cats=['Planning','Content','Design','Suppliers','Admin','Billing'];
       await sb.from('bbe_columns').insert(cats.map((n,i)=>({workspace_id:WS.id,board_id:data.id,name:n,color:CYCLE[i%CYCLE.length],position:i})));
@@ -904,14 +906,15 @@ function settingsView(){
       <label>Name</label><input id="st-name" value="${esc(WS.name)}" ${canManage()?'':'disabled'}>
       <label>Plan</label>
       <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
-        <span class="pill" style="background:${planEff()!=='free'?'var(--ok)':'var(--muted)'}">${WS.plan==='trial'?`Trial · ${trialDaysLeft()} days left`:WS.plan==='pro'?'Pro':WS.plan==='basic'?'Basic — AI available on Pro':'Free'}</span>
+        <span class="pill" style="background:${planEff()!=='free'?'var(--ok)':'var(--muted)'}">${WS.plan==='trial'?`Trial · ${trialDaysLeft()} days left`:WS.plan==='pro'?'Pro':WS.plan==='agency'?'Agency':WS.plan==='basic'?'Basic — AI available on Pro':'Free'}</span>
         ${planEff()==='free'?'<span style="font-size:12px;color:var(--muted)">1 board · 3 members · powered by Brand Expert</span>':''}
       </div>
       <label>AI credits</label>
       <div id="cred-line">${(()=>{if(WS.plan!=='basic')setTimeout(loadCredits,60);return creditsHtml();})()}</div>
       ${canManage()?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-        ${WS.plan!=='pro'&&WS.plan!=='basic'?`<button class="btn accent sm" onclick="checkout('pro')">Upgrade to Pro — R299/month</button>`:''}
-        ${planEff()==='pro'?`<button class="btn ghost sm" onclick="checkout('topup')">Top up — R99 for 120 credits</button>`:''}
+        ${!['pro','agency','basic'].includes(WS.plan)?`<button class="btn accent sm" onclick="checkout('pro')">Upgrade to Pro — R399/month</button>`:''}
+        ${WS.plan!=='agency'&&WS.plan!=='basic'?`<button class="btn ${WS.plan==='pro'?'accent':'ghost'} sm" onclick="checkout('agency')">${WS.plan==='pro'?'Move to':'Or'} Agency — R799/month</button>`:''}
+        ${paidAI()?`<button class="btn ghost sm" onclick="checkout('topup')">Top up — R99 for 120 credits</button>`:''}
       </div>`:''}
       ${canManage()?`<div class="row" style="justify-content:flex-start"><button class="btn accent sm" onclick="saveWsName()">Save name</button></div>`:''}
       ${MYWS.length>1?`<label>Switch workspace</label><select onchange="localStorage.setItem('bbe_ws',this.value);refresh()">${MYWS.map(m=>`<option value="${m.workspace_id}" ${m.workspace_id===WS.id?'selected':''}>${m.workspace_id===WS.id?esc(WS.name):'Workspace '+m.workspace_id.slice(0,6)}</option>`).join('')}</select>`:''}
@@ -925,8 +928,8 @@ function settingsView(){
     <div class="card">
       <h3 style="font-size:15px;margin-bottom:4px">Content boards</h3>
       <p style="font-size:12px;color:var(--muted);margin:6px 0 10px">Socials connect per board — open a board's Content tab to connect its accounts (one account per platform per board).</p>
-      <div style="font-size:13.5px;font-weight:600">${planEff()==='pro'?`Using <b>${_cbUsed}</b> of <b>${_cbAllowed}</b> content board${_cbAllowed>1?'s':''}</b>`:'Auto-posting is a Pro feature.'}</div>
-      ${planEff()==='pro'&&canManage()?`<div class="row" style="justify-content:flex-start;margin-top:12px"><button class="btn ghost sm" onclick="checkout('extraboard')">＋ Add a content board — R149/month</button></div>`:''}
+      <div style="font-size:13.5px;font-weight:600">${paidAI()?`Using <b>${_cbUsed}</b> of <b>${_cbAllowed}</b> content board${_cbAllowed>1?'s':''}</b>`:'Auto-posting is a Pro feature.'}</div>
+      ${paidAI()&&canManage()?`<div class="row" style="justify-content:flex-start;margin-top:12px"><button class="btn ghost sm" onclick="checkout('extraboard')">＋ Add a content board — R149/month</button></div>`:''}
     </div>
     <div class="card">
       <h3 style="font-size:15px;margin-bottom:4px">You</h3>
@@ -1037,7 +1040,7 @@ function contentView(){
     </select>
     <span class="sub">this board's calendar & accounts</span>
     <span style="flex:1"></span><button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button></div>
-  ${planEff()==='pro'?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
+  ${paidAI()?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
       <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
@@ -1082,7 +1085,7 @@ function postModal(id,dateStr){
   openModal(`<h3>${p?'Edit post':'New post'} <span style="font-weight:500;font-size:12.5px;color:var(--muted)">· ${esc(_pb?_pb.name:'')}</span></h3>
     <label>Platform</label>
     <select id="po-plat">${Object.entries(PLAT).map(([k,[n]])=>`<option value="${k}" ${p&&p.platform===k?'selected':''}>${n}</option>`).join('')}</select>
-    <label>Caption ${planEff()==='pro'?`<button type="button" style="float:right;color:var(--accent);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0" onclick="draftAI()">✦ Draft with AI</button>`:''}</label>
+    <label>Caption ${paidAI()?`<button type="button" style="float:right;color:var(--accent);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0" onclick="draftAI()">✦ Draft with AI</button>`:''}</label>
     <textarea id="po-cap" rows="6" placeholder="Write it yourself — or tell the AI what the post is about and press ✦">${p?esc(p.caption):''}</textarea>
     <label>Media note (what image/video goes with it)</label>
     <input id="po-media" value="${p?esc(p.media_note||''):''}" placeholder="e.g. medal design photo, 1080x1080">
@@ -1099,7 +1102,7 @@ function postModal(id,dateStr){
     <div class="row">
       ${p?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="delPost('${p.id}')">${ic('trash',13)}</button>`:''}
       ${p?`<button class="btn ghost" onclick="copyCaption('${p.id}')">Copy caption</button>`:''}
-      ${p&&planEff()==='pro'&&p.status!=='posted'&&p.platform!=='other'?`<button class="btn" onclick="publishPost('${p.id}')">⏱ Auto-post</button>`:''}
+      ${p&&paidAI()&&p.status!=='posted'&&p.platform!=='other'?`<button class="btn" onclick="publishPost('${p.id}')">⏱ Auto-post</button>`:''}
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
       <button class="btn accent" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save':'Add to calendar'}</button>
     </div>`);
@@ -1215,7 +1218,7 @@ async function loadCredits(){
 function creditsHtml(){
   if(WS.plan==='basic')return '<span style="font-size:12px;color:var(--muted)">AI is not part of this plan.</span>';
   if(_credits===null)return '<span style="font-size:12px;color:var(--muted)">Checking credits…</span>';
-  return `<b style="font-size:20px">${_credits}</b> <span style="font-size:12px;color:var(--muted)">AI credits left${planEff()==='pro'?' · 100 refill monthly':' · taster credits'}</span>`;
+  return `<b style="font-size:20px">${_credits}</b> <span style="font-size:12px;color:var(--muted)">AI credits left${planEff()==='agency'?' · 300 refill monthly':planEff()==='pro'?' · 100 refill monthly':' · taster credits'}</span>`;
 }
 async function checkout(kind){
   try{
