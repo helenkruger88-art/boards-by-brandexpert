@@ -1103,6 +1103,8 @@ function billingReturnCheck(){
     setTimeout(()=>toast('💳 Payment received — your plan updates within a minute'),800);}
   if(q.get('billing')==='cancelled'){history.replaceState(null,'',location.pathname);
     setTimeout(()=>toast('Payment cancelled — nothing was charged'),800);}
+  if(q.get('connected')){const p=q.get('connected');history.replaceState(null,'',location.pathname);
+    setTimeout(()=>{toast('🎉 '+p.charAt(0).toUpperCase()+p.slice(1)+' connected — approved posts can now publish themselves');if(typeof go==='function')go('settings');},900);}
 }
 
 /* ============ AI ASSIST (notes chat + day brief) ============ */
