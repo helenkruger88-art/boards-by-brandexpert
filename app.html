@@ -1046,8 +1046,8 @@ function socListHtml(){
   if(!_socAccounts.length)return '<div class="empty">Nothing connected yet — pick a platform below. A window opens where you sign in and approve; then it posts on your behalf.</div>';
   return _socAccounts.map(a=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid var(--line)">
     <span class="pill" style="background:${(PLAT[a.platform]||PLAT.other)[1]}">${(PLAT[a.platform]||PLAT.other)[0]}</span>
-    <span style="flex:1;font-size:13px;color:var(--muted)">connected</span>
-    <span style="font-size:11px;color:var(--ok);font-weight:700">● live</span>
+    <span style="flex:1;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.user||'connected account')}</span>
+    <span style="font-size:11px;color:var(--ok);font-weight:700;flex:none">● live</span>
   </div>`).join('');
 }
 async function connectSocial(platform){
