@@ -908,8 +908,63 @@ async function setTheme(preset){
 }
 /* ============ CONTENT (social calendar) ============ */
 const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],linkedin:['LinkedIn','#0F6E8E'],other:['Other','#8a887e']};
-let _calMonth=null;
+let _calMonth=null,_contentAll=false,_allPosts=[];
+const BOARD_HUES=['#0F6E56','#C75B12','#534AB7','#185FA5','#993556','#BA7517','#3B6D11','#0E7490','#72243E'];
+const boardHue=id=>{const i=BOARDS.findIndex(b=>b.id===id);return BOARD_HUES[(i<0?0:i)%BOARD_HUES.length];};
+async function loadAllPosts(){
+  const {data}=await sb.from('bbe_posts').select('*').eq('workspace_id',WS.id).order('post_date');
+  _allPosts=data||[];
+}
+
+function allBoardsView(){
+  if(!_calMonth)_calMonth=saDate().slice(0,7);
+  const [Y,M]=_calMonth.split('-').map(Number);
+  const first=new Date(Date.UTC(Y,M-1,1));
+  const startDow=(first.getUTCDay()+6)%7;
+  const daysIn=new Date(Date.UTC(Y,M,0)).getUTCDate();
+  const today=saDate();
+  const byDate={}; _allPosts.forEach(p=>{(byDate[p.post_date]=byDate[p.post_date]||[]).push(p);});
+  let cells='';
+  for(let i=0;i<startDow;i++)cells+='<div></div>';
+  for(let d=1;d<=daysIn;d++){
+    const ds=`${Y}-${String(M).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dp=byDate[ds]||[];
+    cells+=`<div style="min-height:74px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:5px 6px;${ds===today?'outline:2px solid var(--accent);outline-offset:-2px;':''}">
+      <div style="font-size:10.5px;font-weight:700;color:var(--muted)">${d}</div>
+      ${dp.slice(0,3).map(p=>{const bn=BOARDS.find(b=>b.id===p.board_id);
+        return `<div onclick="openPostFromAll('${p.id}','${p.board_id}')" title="${esc((bn?bn.name+' · ':'')+p.caption.slice(0,70))}" style="cursor:pointer;font-size:9.5px;font-weight:700;color:#fff;background:${boardHue(p.board_id)};border-radius:5px;padding:2px 5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${p.status==='posted'?'opacity:.45;':''}">${p.status==='scheduled'?'⏱ ':p.status==='approved'?'✓ ':''}${(PLAT[p.platform]||PLAT.other)[0]}</div>`;}).join('')}
+      ${dp.length>3?`<div style="font-size:9px;color:var(--muted);font-weight:700;margin-top:2px">+${dp.length-3}</div>`:''}
+    </div>`;
+  }
+  const monthLbl=first.toLocaleDateString('en-ZA',{month:'long',year:'numeric',timeZone:'UTC'});
+  return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2>
+    <select onchange="switchContentBoard(this.value)" style="width:auto;padding:7px 12px;font-weight:600;font-size:13px">
+      ${BOARDS.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}
+      <option value="__all" selected>▦ All boards</option>
+    </select>
+    <span class="sub">every board's posts in one view · pick a board to add or edit</span></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    ${BOARDS.map(b=>`<span class="chip" style="cursor:pointer" onclick="switchContentBoard('${b.id}')"><span style="width:10px;height:10px;border-radius:3px;background:${boardHue(b.id)};display:inline-block"></span> ${esc(b.name)}</span>`).join('')}
+  </div>
+  <div class="card" style="padding:14px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <button class="btn ghost sm" onclick="calShift(-1)">‹</button>
+      <b style="flex:1;text-align:center;font-size:14.5px">${monthLbl}</b>
+      <button class="btn ghost sm" onclick="calShift(1)">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:10px;font-weight:800;color:var(--muted);text-align:center;margin-bottom:5px">
+      <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${cells}</div>
+  </div>`;
+}
+async function openPostFromAll(postId,boardId){
+  _contentAll=false;
+  S.board=boardId;localStorage.setItem('bbe_board_'+WS.id,boardId);
+  await loadBoard();render();
+  setTimeout(()=>postModal(postId),120);
+}
 function contentView(){
+  if(_contentAll)return allBoardsView();
   const b=BOARDS.find(x=>x.id===S.board);
   if(!b)return `<div class="empty" style="text-align:center;padding:60px 20px">Choose a board first.<br><br><button class="btn accent" onclick="go('boards')">Boards</button></div>`;
   if(!_calMonth)_calMonth=saDate().slice(0,7);
@@ -935,7 +990,8 @@ function contentView(){
   const upcoming=posts.filter(p=>p.post_date>=today&&p.status!=='posted').slice(0,8);
   return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2>
     <select onchange="switchContentBoard(this.value)" style="width:auto;padding:7px 12px;font-weight:600;font-size:13px">
-      ${BOARDS.map(x=>`<option value="${x.id}" ${x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}
+      ${BOARDS.map(x=>`<option value="${x.id}" ${!_contentAll&&x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}
+      ${BOARDS.length>1?`<option value="__all" ${_contentAll?'selected':''}>▦ All boards</option>`:''}
     </select>
     <span class="sub">this board's calendar & accounts</span>
     <span style="flex:1"></span><button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button></div>
@@ -968,6 +1024,8 @@ function contentView(){
   </div>`;
 }
 async function switchContentBoard(id){
+  if(id==='__all'){_contentAll=true;await loadAllPosts();render();return;}
+  _contentAll=false;
   S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;
   await loadBoard();render();
 }
