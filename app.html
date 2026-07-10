@@ -154,7 +154,28 @@ const PRESETS={
   ocean:{accent:'#185FA5',soft:'#E9F1F9'},
   slate:{accent:'#444441',soft:'#EFEEE9'},
 };
-const CYCLE=['#0F6E56','#C75B12','#534AB7','#185FA5','#993556','#BA7517','#3B6D11','#444441','#0E7490'];
+const PALETTE=['#0F6E56','#1D9E75','#3B6D11','#639922','#0E7490','#185FA5','#378ADD','#534AB7','#7F77DD','#993556','#C4006B','#D4537E','#C6453D','#D85A30','#C75B12','#BA7517','#C49A2E','#8C6A47','#6B4A2E','#444441','#23241f','#5F5E5A','#8a887e','#B4B2A9'];
+const CYCLE=PALETTE.filter((_,i)=>i%3===0);
+function swatchGrid(id,current){
+  return `<div class="swatches" id="${id}" style="max-width:420px">${PALETTE.map(c=>`<button type="button" style="background:${c};width:28px;height:28px" class="${c.toLowerCase()===(current||'').toLowerCase()?'sel':''}" onclick="pickSwatch(this)" data-c="${c}"></button>`).join('')}</div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+    <input id="${id}-hex" value="${esc(current||'')}" placeholder="#C4006B" style="width:110px;font-family:monospace;font-size:13px" oninput="hexPick('${id}',this.value)">
+    <span style="font-size:11.5px;color:var(--muted)">or type any hex — perfect for client brand colours</span>
+  </div>`;
+}
+function hexPick(gridId,v){
+  if(!/^#?[0-9a-fA-F]{6}$/.test(v.trim()))return;
+  const hex=v.trim().startsWith('#')?v.trim():'#'+v.trim();
+  const g=$(gridId); if(!g)return;
+  g.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.c.toLowerCase()===hex.toLowerCase()));
+  g.dataset.custom=hex;
+}
+function gridColor(id,fallback){
+  const g=$(id); if(!g)return fallback;
+  const hexEl=$(id+'-hex');
+  if(hexEl&&/^#?[0-9a-fA-F]{6}$/.test(hexEl.value.trim())){const v=hexEl.value.trim();return v.startsWith('#')?v:'#'+v;}
+  const sel=g.querySelector('.sel'); return sel?sel.dataset.c:fallback;
+}
 let SESSION=null, WS=null, MEM=null, MEMBERS=[], BOARDS=[], MYWS=[];
 let S={view:'today',board:null,col:null};
 let cur={cols:[],notes:[],msgs:[],invs:[],pins:[],posts:[]};
@@ -497,7 +518,7 @@ function statsFor(notes,colId){
 function boardsView(){
   return `<div class="view-title"><h2>${ic('home',18)} ${esc(WS.name)}</h2><span class="sub">${BOARDS.length} board${BOARDS.length!==1?'s':''}</span></div>
   <div class="boards-grid">
-    ${BOARDS.map(b=>`<div class="board-card" onclick="openBoard('${b.id}')">
+    ${BOARDS.map(b=>`<div class="board-card" style="border-top-color:${b.color||'var(--accent)'}" onclick="openBoard('${b.id}')">
       <h3>${b.private_to?ic('lock',13)+' ':''}${esc(b.name)}</h3>
       <div class="meta">${ic('calendar',11)} ${esc(b.date_label||'no date')}</div>
       <div class="prog"><i id="bp-${b.id}" style="width:0%"></i></div>
@@ -522,6 +543,7 @@ function newBoardModal(){
   openModal(`<h3>New board</h3>
     <label>Board name</label><input id="nb-name" placeholder="e.g. Spring Launch 2026">
     <label>Date label (optional)</label><input id="nb-date" placeholder="e.g. Sep 2026">
+    <label>Board colour</label>${swatchGrid('nb-col','#C75B12')}
     <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer">
       <input type="checkbox" id="nb-priv" style="width:auto"> ${ic('lock',12)} Private — only you (share it later)</label>
     <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;margin-top:8px">
@@ -533,7 +555,7 @@ function newBoardModal(){
 async function createBoard(){
   const name=$('nb-name').value.trim(); if(!name){toast('Give the board a name');return;}
   try{
-    const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id}).select().single();
+    const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),color:gridColor('nb-col','#C75B12'),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id}).select().single();
     if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 board — upgrade for unlimited boards.');throw error;}
     if($('nb-std').checked){
       const cats=['Planning','Content','Design','Suppliers','Admin','Billing'];
@@ -550,7 +572,7 @@ function boardView(){
   if(!cur.cols.find(c=>c.id===S.col))S.col=cur.cols[0]?cur.cols[0].id:null;
   const c=cur.cols.find(x=>x.id===S.col);
   return `<div class="view-title">
-    <h2>${b.private_to?ic('lock',15)+' ':''}${esc(b.name)}</h2>
+    <h2><span style="display:inline-block;width:13px;height:13px;border-radius:4px;background:${b.color||'var(--accent)'};margin-right:3px"></span>${b.private_to?ic('lock',15)+' ':''}${esc(b.name)}</h2>
     <span class="sub">${esc(b.date_label||'')}</span>
     <span class="pill" style="background:var(--ok)">${s.p}%</span>
     <span style="flex:1"></span>
@@ -656,20 +678,38 @@ async function addCol(){
   try{const {error}=await sb.from('bbe_columns').insert({workspace_id:WS.id,board_id:S.board,name:name.trim(),color:CYCLE[cur.cols.length%CYCLE.length],position:cur.cols.length});
   if(error)throw error;await loadBoard();render();}catch(e){fail(e);}
 }
-async function renameCol(id){
-  const c=cur.cols.find(x=>x.id===id);const n=prompt('Rename category:',c.name);if(!n)return;
-  try{await sb.from('bbe_columns').update({name:n.trim()}).eq('id',id);await loadBoard();render();}catch(e){fail(e);}
+function renameCol(id){
+  const c=cur.cols.find(x=>x.id===id);
+  openModal(`<h3>Edit category</h3>
+    <label>Name</label><input id="cc-name" value="${esc(c.name)}">
+    <label>Colour</label>${swatchGrid('cc-col',c.color)}
+    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn accent" onclick="saveCol('${id}')">Save</button></div>`);
+}
+async function saveCol(id){
+  const c=cur.cols.find(x=>x.id===id);
+  const name=$('cc-name').value.trim()||c.name;
+  const color=gridColor('cc-col',c.color);
+  try{await sb.from('bbe_columns').update({name,color}).eq('id',id);closeModal();await loadBoard();render();toast('Category updated');}catch(e){fail(e);}
 }
 async function delCol(id){
   const c=cur.cols.find(x=>x.id===id);
   if(!confirm(`Delete “${c.name}” and its tasks?`))return;
   try{await sb.from('bbe_columns').delete().eq('id',id);S.col=null;await loadBoard();render();}catch(e){fail(e);}
 }
-async function renameBoard(){
+function renameBoard(){
   const b=BOARDS.find(x=>x.id===S.board);
-  const name=prompt('Board name:',b.name);if(name===null)return;
-  const date=prompt('Date label:',b.date_label||'');if(date===null)return;
-  try{await sb.from('bbe_boards').update({name:name.trim()||b.name,date_label:date.trim()}).eq('id',b.id);await loadWs();render();}catch(e){fail(e);}
+  openModal(`<h3>Edit board</h3>
+    <label>Name</label><input id="bb-name" value="${esc(b.name)}">
+    <label>Date label</label><input id="bb-date" value="${esc(b.date_label||'')}">
+    <label>Board colour</label>${swatchGrid('bb-col',b.color||'#C75B12')}
+    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn accent" onclick="saveBoardEdit('${b.id}')">Save</button></div>`);
+}
+async function saveBoardEdit(id){
+  const b=BOARDS.find(x=>x.id===id);
+  const patch={name:$('bb-name').value.trim()||b.name,date_label:$('bb-date').value.trim(),color:gridColor('bb-col',b.color||'#C75B12')};
+  try{await sb.from('bbe_boards').update(patch).eq('id',id);closeModal();await loadWs();render();toast('Board updated');}catch(e){fail(e);}
 }
 async function delBoard(){
   const b=BOARDS.find(x=>x.id===S.board);
@@ -804,7 +844,8 @@ function inviteModal(){
     <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
     <button class="btn accent" id="im-go" onclick="sendInvite()">Add member</button></div>`);
 }
-function pickSwatch(el){el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');}
+function pickSwatch(el){el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');
+  const hexEl=$(el.parentElement.id+'-hex'); if(hexEl)hexEl.value=el.dataset.c;}
 async function sendInvite(){
   const name=$('im-name').value.trim(),email=$('im-email').value.trim(),pw=$('im-pw').value;
   if(!name||!email||pw.length<8){toast('Name, email and an 8-character password');return;}
@@ -877,9 +918,9 @@ function settingsView(){
     </div>
     <div class="card">
       <h3 style="font-size:15px;margin-bottom:4px">Theme</h3>
-      <label>Preset</label>
-      <div class="swatches">${Object.entries(PRESETS).map(([k,p])=>`<button type="button" title="${k}" style="background:${p.accent}" class="${(t.preset||'classic')===k?'sel':''}" onclick="setTheme('${k}')"></button>`).join('')}</div>
-      <p style="font-size:12px;color:var(--muted);margin-top:12px">The accent colours your buttons, highlights and progress bars. Category colours are set per category on each board.</p>
+      <label>Workspace accent</label>${swatchGrid('th-col',(t.accent||'#C75B12'))}
+      ${canManage()?`<div class="row" style="justify-content:flex-start"><button class="btn accent sm" onclick="saveAccent()">Apply accent</button></div>`:''}
+      <p style="font-size:12px;color:var(--muted);margin-top:12px">The accent colours buttons, highlights and progress bars — set it to your client's brand colour. Board colours are set per board (✎ on the board), category colours per category.</p>
     </div>
     <div class="card">
       <h3 style="font-size:15px;margin-bottom:4px">Content boards</h3>
@@ -901,16 +942,17 @@ async function saveWsName(){
   const name=$('st-name').value.trim(); if(!name)return;
   try{await sb.from('bbe_workspaces').update({name}).eq('id',WS.id);await loadWs();render();toast('Saved');}catch(e){fail(e);}
 }
-async function setTheme(preset){
+async function saveAccent(){
   if(!canManage()){toast('Only the owner or an admin can change the theme');return;}
-  try{const theme={...(WS.theme||{}),preset,accent:PRESETS[preset].accent};
-  await sb.from('bbe_workspaces').update({theme}).eq('id',WS.id);WS.theme=theme;applyTheme();render();}catch(e){fail(e);}
+  const accent=gridColor('th-col',(WS.theme&&WS.theme.accent)||'#C75B12');
+  try{const theme={...(WS.theme||{}),preset:'custom',accent};
+  await sb.from('bbe_workspaces').update({theme}).eq('id',WS.id);WS.theme=theme;applyTheme();render();toast('Accent applied');}catch(e){fail(e);}
 }
 /* ============ CONTENT (social calendar) ============ */
 const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],linkedin:['LinkedIn','#0F6E8E'],other:['Other','#8a887e']};
 let _calMonth=null,_contentAll=false,_allPosts=[];
 const BOARD_HUES=['#0F6E56','#C75B12','#534AB7','#185FA5','#993556','#BA7517','#3B6D11','#0E7490','#72243E'];
-const boardHue=id=>{const i=BOARDS.findIndex(b=>b.id===id);return BOARD_HUES[(i<0?0:i)%BOARD_HUES.length];};
+const boardHue=id=>{const b=BOARDS.find(x=>x.id===id);if(b&&b.color)return b.color;const i=BOARDS.findIndex(x=>x.id===id);return BOARD_HUES[(i<0?0:i)%BOARD_HUES.length];};
 async function loadAllPosts(){
   const {data}=await sb.from('bbe_posts').select('*').eq('workspace_id',WS.id).order('post_date');
   _allPosts=data||[];
