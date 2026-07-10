@@ -933,7 +933,11 @@ function contentView(){
   }
   const monthLbl=first.toLocaleDateString('en-ZA',{month:'long',year:'numeric',timeZone:'UTC'});
   const upcoming=posts.filter(p=>p.post_date>=today&&p.status!=='posted').slice(0,8);
-  return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2><span class="sub">${esc(b.name)} · plan, draft and post in one place</span>
+  return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2>
+    <select onchange="switchContentBoard(this.value)" style="width:auto;padding:7px 12px;font-weight:600;font-size:13px">
+      ${BOARDS.map(x=>`<option value="${x.id}" ${x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}
+    </select>
+    <span class="sub">this board's calendar & accounts</span>
     <span style="flex:1"></span><button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button></div>
   ${planEff()==='pro'?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -963,6 +967,10 @@ function contentView(){
     </div>`).join('')||'<div class="empty">Nothing scheduled — click a day on the calendar to plan a post.</div>'}
   </div>`;
 }
+async function switchContentBoard(id){
+  S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;
+  await loadBoard();render();
+}
 function calShift(n){
   const [Y,M]=_calMonth.split('-').map(Number);
   const d=new Date(Date.UTC(Y,M-1+n,1));
@@ -970,7 +978,8 @@ function calShift(n){
 }
 function postModal(id,dateStr){
   const p=id?(cur.posts||[]).find(x=>x.id===id):null;
-  openModal(`<h3>${p?'Edit post':'New post'}</h3>
+  const _pb=BOARDS.find(x=>x.id===S.board);
+  openModal(`<h3>${p?'Edit post':'New post'} <span style="font-weight:500;font-size:12.5px;color:var(--muted)">· ${esc(_pb?_pb.name:'')}</span></h3>
     <label>Platform</label>
     <select id="po-plat">${Object.entries(PLAT).map(([k,[n]])=>`<option value="${k}" ${p&&p.platform===k?'selected':''}>${n}</option>`).join('')}</select>
     <label>Caption ${planEff()==='pro'?`<button type="button" style="float:right;color:var(--accent);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0" onclick="draftAI()">✦ Draft with AI</button>`:''}</label>
