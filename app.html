@@ -313,6 +313,7 @@ function render(){
       <button class="${S.view==='settings'?'active':''}" onclick="go('settings')">${ic('gear',14)} Settings</button>
     </div>
     <span style="flex:1"></span>
+    ${WS.plan!=='basic'&&_credits!==null?`<span class="pill" style="background:var(--accent);cursor:pointer" title="AI credits — tap for billing" onclick="go('settings')">✦ ${_credits}</span>`:''}
     ${WS.plan==='trial'&&planEff()==='pro'?`<span class="pill" style="background:var(--warn)" title="Full features free for the trial period">Trial · ${trialDaysLeft()}d left</span>`:''}
     ${planEff()==='pro'&&WS.plan==='pro'?`<span class="pill">Pro</span>`:''}
     <span onclick="go('settings')" style="cursor:pointer">${avatar(MEM)}</span>
@@ -441,7 +442,15 @@ function todayView(){
       ${n?`<button class="btn ghost sm" onclick="tdOpen('${t.id}')">open</button>`:''}
       <button style="color:var(--muted);padding:3px" title="Not today" onclick="tdRemove('${t.id}')">${ic('x',13)}</button>
     </div>`;};
-  return `<div class="view-title"><h2>${ic('sun',18)} Today</h2>
+  const briefPanel=WS.plan!=='basic'?`<div class="card" style="margin-bottom:14px;border-left:4px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <b style="font-size:14px">✦ Your day, briefed</b><span style="flex:1"></span>
+      <button class="btn ghost sm" onclick="dayBrief(true)">↻</button>
+    </div>
+    <div id="brief-box" style="font-size:13.5px;line-height:1.65;white-space:pre-wrap;color:#4a483f">${(()=>{setTimeout(()=>{const k='bbe_brief_'+SESSION.user.id.slice(0,8)+'_'+saDate();const c=localStorage.getItem(k);const b=document.getElementById('brief-box');if(b&&c)b.textContent=c;},40);return localStorage.getItem('bbe_brief_'+SESSION.user.id.slice(0,8)+'_'+saDate())?'':'Tap ✦ Brief me and the AI reads every board and tells you what matters today.';})()}</div>
+    ${!localStorage.getItem('bbe_brief_'+SESSION.user.id.slice(0,8)+'_'+saDate())?`<button class="btn accent sm" style="margin-top:10px" onclick="dayBrief()">✦ Brief me (1 credit)</button>`:''}
+  </div>`:'';
+  return `${briefPanel}<div class="view-title"><h2>${ic('sun',18)} Today</h2>
     <span class="sub">${new Date().toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long'})}</span>
     <span style="flex:1"></span><span class="pill" style="background:var(--ok)">${done.length}/${items.length} done</span></div>
   ${open.map(row).join('')||'<div class="empty">Nothing on your list — pull tasks in with the ☀ on any card, or add a quick job below.</div>'}
@@ -593,6 +602,7 @@ function openColHtml(c){
             <button class="chk ${n.done?'on':''}" onclick="event.stopPropagation();toggleDone('${n.id}')">${n.done?'✓':''}</button>
             ${u?avatar(u):''}<span class="who">${u?esc(u.name.split(' ')[0]):'Unassigned'}</span>
             <button style="color:var(--muted);padding:0 2px" title="Add to my Today" onclick="event.stopPropagation();addToToday('${n.id}')">${ic('sun',13)}</button>
+            ${WS.plan!=='basic'?`<button style="color:var(--accent);font-weight:800;font-size:12px;padding:0 2px" title="AI assist on this task" onclick="event.stopPropagation();aiAssist('${n.id}')">✦</button>`:''}
           </div>
         </div>`;}).join('')||'<div class="empty">No tasks here yet — add one above.</div>'}
     </div>
@@ -691,6 +701,7 @@ function noteModal(id){
     <select id="f-done"><option value="0" ${!n.done?'selected':''}>To do</option><option value="1" ${n.done?'selected':''}>Done</option></select>
     <div class="row">
       <button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="closeModal();delNote('${id}')">${ic('trash',13)}</button>
+      ${WS.plan!=='basic'?`<button class="btn ghost" onclick="closeModal();aiAssist('${id}')">✦ Assist</button>`:''}
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
       <button class="btn accent" onclick="saveNote('${id}')">Save</button>
     </div>`);
@@ -1094,6 +1105,80 @@ function billingReturnCheck(){
     setTimeout(()=>toast('Payment cancelled — nothing was charged'),800);}
 }
 
+/* ============ AI ASSIST (notes chat + day brief) ============ */
+let _aiLog=[],_aiNote=null;
+async function aiApi(body){
+  const {data:{session}}=await sb.auth.getSession();
+  const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-ask`,{method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},
+    body:JSON.stringify({workspace_id:WS.id,...body})});
+  return await res.json();
+}
+function aiAssist(noteId){
+  const n=cur.notes.find(x=>x.id===noteId); if(!n)return;
+  _aiLog=[];_aiNote=noteId;
+  openModal(`<h3>✦ Assist · <span style="font-weight:500;font-size:14px">${esc(n.title)}</span></h3>
+    <div id="ai-r" style="display:none;max-height:44vh;overflow-y:auto;margin:8px 0"></div>
+    <label id="ai-lbl">Your brief — the AI knows this task, its board and your team. Keep chatting after each answer.</label>
+    <textarea id="ai-q" rows="3" placeholder="e.g. Draft the supplier follow-up email… / Break this into steps… / Research options for…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}"></textarea>
+    <div class="row">
+      <button class="btn ghost" onclick="closeModal()">Close</button>
+      <button class="btn ghost" id="ai-save" style="display:none" onclick="aiSave()">Save to task</button>
+      <button class="btn accent" id="ai-go" onclick="aiSend()">✦ Ask</button>
+    </div>`);
+  setTimeout(()=>{const e=$('ai-q');if(e)e.focus();},60);
+}
+function aiRender(thinking){
+  const r=$('ai-r'); if(!r)return;
+  r.style.display=(_aiLog.length||thinking)?'block':'none';
+  r.innerHTML=_aiLog.map(m=>m.role==='user'
+    ?`<div style="background:var(--bg);border-radius:11px 11px 3px 11px;padding:9px 12px;margin:8px 0 8px 40px;font-size:13px;white-space:pre-wrap">${esc(m.content)}</div>`
+    :`<div style="background:var(--accent-soft);border-radius:11px 11px 11px 3px;padding:10px 13px;margin:8px 40px 8px 0;font-size:13px;line-height:1.6;white-space:pre-wrap">${esc(m.content)}</div>`).join('')
+    +(thinking?'<div style="color:var(--muted);font-size:12.5px;padding:6px 2px">✦ Thinking…</div>':'');
+  r.scrollTop=r.scrollHeight;
+}
+async function aiSend(){
+  const q=$('ai-q').value.trim(); if(!q){toast('Type a brief first');return;}
+  const history=_aiLog.map(m=>({role:m.role,content:m.content}));
+  _aiLog.push({role:'user',content:q}); $('ai-q').value=''; aiRender(true);
+  const b=$('ai-go'); b.disabled=true;
+  try{
+    const j=await aiApi({mode:'note',note_id:_aiNote,brief:q,history});
+    if(j.error==='OUT_OF_CREDITS'){_aiLog.pop();$('ai-q').value=q;aiRender(false);toast(j.message);b.disabled=false;return;}
+    if(j.error)throw new Error(j.error);
+    _aiLog.push({role:'assistant',content:j.text});
+    if(typeof j.credits_left==='number')_credits=j.credits_left;
+    $('ai-save').style.display='';
+    const lbl=$('ai-lbl'); if(lbl)lbl.textContent=`Ask a follow-up — it remembers this conversation · ${j.credits_left} credits left`;
+    b.textContent='✦ Send';
+  }catch(e){_aiLog.push({role:'assistant',content:'⚠ '+(e.message||e)});}
+  aiRender(false); b.disabled=false;
+  const qa=$('ai-q'); if(qa)qa.focus();
+}
+async function aiSave(){
+  const last=[..._aiLog].reverse().find(m=>m.role==='assistant'); if(!last)return;
+  const n=cur.notes.find(x=>x.id===_aiNote); if(!n)return;
+  const desc=((n.description||'')+'\n\n✦ AI:\n'+last.content).trim();
+  try{await sb.from('bbe_notes').update({description:desc}).eq('id',_aiNote);n.description=desc;
+  closeModal();render();toast('Saved to the task');}catch(e){fail(e);}
+}
+/* day brief on Today */
+async function dayBrief(force){
+  const key='bbe_brief_'+SESSION.user.id.slice(0,8)+'_'+saDate();
+  const box=$('brief-box'); if(!box)return;
+  const cached=localStorage.getItem(key);
+  if(cached&&!force){box.textContent=cached;return;}
+  box.textContent='✦ Reading your boards… (1 credit)';
+  try{
+    const j=await aiApi({mode:'brief'});
+    if(j.error==='OUT_OF_CREDITS'){box.textContent=j.message;return;}
+    if(j.error){box.textContent='⚠ '+(j.message||j.error);return;}
+    localStorage.setItem(key,j.text);
+    box.textContent=j.text;
+    if(typeof j.credits_left==='number')_credits=j.credits_left;
+  }catch(e){box.textContent='⚠ '+(e.message||e);}
+}
+
 /* ============ MODAL / REALTIME / BOOT ============ */
 function openModal(html){$('modal').innerHTML=html;$('overlay').classList.add('open');}
 function closeModal(){$('overlay').classList.remove('open');}
@@ -1110,7 +1195,8 @@ function subscribeRealtime(){
 async function boot(){
   try{
     await loadWs();
-    if(WS){await loadBoard();await ensureToday();subscribeRealtime();}
+    if(WS){await loadBoard();await ensureToday();subscribeRealtime();
+      if(WS.plan!=='basic')loadCredits().then(render);}
     render();
   }catch(e){fail(e);render();}
 }
