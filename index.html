@@ -865,6 +865,14 @@ function settingsView(){
       <p style="font-size:12px;color:var(--muted);margin-top:12px">The accent colours your buttons, highlights and progress bars. Category colours are set per category on each board.</p>
     </div>
     <div class="card">
+      <h3 style="font-size:15px;margin-bottom:4px">Connected socials</h3>
+      <p style="font-size:12px;color:var(--muted);margin:6px 0 10px">${planEff()==='pro'?'Approved posts publish themselves at the scheduled time.':'Auto-posting is a Pro feature — on the free plan you plan and copy-paste.'}</p>
+      <div id="soc-list">${(()=>{if(planEff()==='pro')setTimeout(loadSocials,60);return '<div class="empty">Checking connections…</div>';})()}</div>
+      ${planEff()==='pro'&&canManage()?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px">
+        ${['instagram','facebook','youtube','tiktok','linkedin'].map(p=>`<button class="chip" onclick="connectSocial('${p}')">${ic('plus',11)} ${PLAT[p][0]}</button>`).join('')}
+      </div>`:''}
+    </div>
+    <div class="card">
       <h3 style="font-size:15px;margin-bottom:4px">You</h3>
       <div style="display:flex;align-items:center;gap:10px;margin:10px 0">${avatar(MEM)}<div><b style="font-size:14px">${esc(MEM.name)}</b><span style="display:block;font-size:11.5px;color:var(--muted)">${esc(MEM.email)} · ${MEM.role}</span></div></div>
       <div class="row" style="justify-content:flex-start">
@@ -904,7 +912,7 @@ function contentView(){
     const dp=byDate[ds]||[];
     cells+=`<div onclick="postModal(null,'${ds}')" style="min-height:74px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:5px 6px;cursor:pointer;${ds===today?'outline:2px solid var(--accent);outline-offset:-2px;':''}">
       <div style="font-size:10.5px;font-weight:700;color:var(--muted)">${d}</div>
-      ${dp.slice(0,3).map(p=>`<div onclick="event.stopPropagation();postModal('${p.id}')" title="${esc(p.caption.slice(0,80))}" style="font-size:9.5px;font-weight:700;color:#fff;background:${PLAT[p.platform][1]};border-radius:5px;padding:2px 5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${p.status==='posted'?'opacity:.45;':''}">${p.status==='approved'?'✓ ':''}${PLAT[p.platform][0]}</div>`).join('')}
+      ${dp.slice(0,3).map(p=>`<div onclick="event.stopPropagation();postModal('${p.id}')" title="${esc(p.caption.slice(0,80))}" style="font-size:9.5px;font-weight:700;color:#fff;background:${PLAT[p.platform][1]};border-radius:5px;padding:2px 5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${p.status==='posted'?'opacity:.45;':''}">${p.status==='approved'?'✓ ':p.status==='scheduled'?'⏱ ':''}${PLAT[p.platform][0]}</div>`).join('')}
       ${dp.length>3?`<div style="font-size:9px;color:var(--muted);font-weight:700;margin-top:2px">+${dp.length-3} more</div>`:''}
     </div>`;
   }
@@ -959,6 +967,7 @@ function postModal(id,dateStr){
     <div class="row">
       ${p?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="delPost('${p.id}')">${ic('trash',13)}</button>`:''}
       ${p?`<button class="btn ghost" onclick="copyCaption('${p.id}')">Copy caption</button>`:''}
+      ${p&&planEff()==='pro'&&p.status!=='posted'&&p.platform!=='other'?`<button class="btn" onclick="publishPost('${p.id}')">⏱ Auto-post</button>`:''}
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
       <button class="btn accent" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save':'Add to calendar'}</button>
     </div>`);
@@ -997,6 +1006,50 @@ async function delPost(id){
 async function copyCaption(id){
   const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
   try{await navigator.clipboard.writeText(p.caption);toast('Caption copied — paste it straight into the app');}catch(_){toast('Could not copy');}
+}
+
+/* ============ CONNECTED SOCIALS (PostPeer) ============ */
+let _socAccounts=null;
+async function socialApi(body){
+  const {data:{session}}=await sb.auth.getSession();
+  const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-social`,{method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},
+    body:JSON.stringify({workspace_id:WS.id,...body})});
+  return await res.json();
+}
+async function loadSocials(){
+  try{const j=await socialApi({action:'accounts'});
+  _socAccounts=j.ok?(j.accounts||[]):[];
+  const el=$('soc-list'); if(el)el.innerHTML=socListHtml();}catch(_){_socAccounts=[];}
+}
+function socListHtml(){
+  if(_socAccounts===null)return '<div class="empty">Checking connections…</div>';
+  if(!_socAccounts.length)return '<div class="empty">Nothing connected yet — pick a platform below. A window opens where you sign in and approve; then it posts on your behalf.</div>';
+  return _socAccounts.map(a=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid var(--line)">
+    <span class="pill" style="background:${(PLAT[a.platform]||PLAT.other)[1]}">${(PLAT[a.platform]||PLAT.other)[0]}</span>
+    <span style="flex:1;font-size:13px;color:var(--muted)">connected</span>
+    <span style="font-size:11px;color:var(--ok);font-weight:700">● live</span>
+  </div>`).join('');
+}
+async function connectSocial(platform){
+  try{
+    const j=await socialApi({action:'connect',platform});
+    if(j.error){toast(j.message||j.error);return;}
+    window.open(j.url,'_blank');
+    toast('Approve the connection in the new tab, then come back and refresh');
+  }catch(e){fail(e);}
+}
+async function publishPost(id){
+  const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
+  if(!confirm(`Send "${(p.caption.split('\n')[0]||'this post').slice(0,60)}" to ${(PLAT[p.platform]||PLAT.other)[0]} — ${p.post_date} at ${(p.post_time||'09:00').slice(0,5)}?`))return;
+  toast('Sending to the scheduler…');
+  try{
+    const j=await socialApi({action:'publish',post_id:id});
+    if(j.error==='NO_ACCOUNTS'){toast(j.message);return;}
+    if(j.error){toast('⚠ '+(j.message||j.error));return;}
+    closeModal();await loadBoard();render();
+    toast(j.scheduled?'⏱ Scheduled — it posts itself at the set time':'Posted! It is live now');
+  }catch(e){fail(e);}
 }
 
 /* ============ MODAL / REALTIME / BOOT ============ */
