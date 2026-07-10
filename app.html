@@ -882,12 +882,10 @@ function settingsView(){
       <p style="font-size:12px;color:var(--muted);margin-top:12px">The accent colours your buttons, highlights and progress bars. Category colours are set per category on each board.</p>
     </div>
     <div class="card">
-      <h3 style="font-size:15px;margin-bottom:4px">Connected socials</h3>
-      <p style="font-size:12px;color:var(--muted);margin:6px 0 10px">${planEff()==='pro'?'Approved posts publish themselves at the scheduled time.':'Auto-posting is a Pro feature — on the free plan you plan and copy-paste.'}</p>
-      <div id="soc-list">${(()=>{if(planEff()==='pro')setTimeout(loadSocials,60);return '<div class="empty">Checking connections…</div>';})()}</div>
-      ${planEff()==='pro'&&canManage()?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px">
-        ${['instagram','facebook','youtube','tiktok','linkedin'].map(p=>`<button class="chip" onclick="connectSocial('${p}')">${ic('plus',11)} ${PLAT[p][0]}</button>`).join('')}
-      </div>`:''}
+      <h3 style="font-size:15px;margin-bottom:4px">Content boards</h3>
+      <p style="font-size:12px;color:var(--muted);margin:6px 0 10px">Socials connect per board — open a board's Content tab to connect its accounts (one account per platform per board).</p>
+      <div style="font-size:13.5px;font-weight:600">${planEff()==='pro'?`Using <b>${_cbUsed}</b> of <b>${_cbAllowed}</b> content board${_cbAllowed>1?'s':''}</b>`:'Auto-posting is a Pro feature.'}</div>
+      ${planEff()==='pro'&&canManage()?`<div class="row" style="justify-content:flex-start;margin-top:12px"><button class="btn ghost sm" onclick="checkout('extraboard')">＋ Add a content board — R149/month</button></div>`:''}
     </div>
     <div class="card">
       <h3 style="font-size:15px;margin-bottom:4px">You</h3>
@@ -937,6 +935,14 @@ function contentView(){
   const upcoming=posts.filter(p=>p.post_date>=today&&p.status!=='posted').slice(0,8);
   return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2><span class="sub">${esc(b.name)} · plan, draft and post in one place</span>
     <span style="flex:1"></span><button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button></div>
+  ${planEff()==='pro'?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
+      <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();const el=document.getElementById('soc-strip');if(el)el.innerHTML=(_socAccounts||[]).map(a=>`<span class=\"chip\" style=\"cursor:default\"><span class=\"pill\" style=\"background:${(PLAT[a.platform]||PLAT.other)[1]};padding:2px 8px;font-size:10px\">${(PLAT[a.platform]||PLAT.other)[0]}</span> ${esc(a.user||'')}</span>`).join(' ')||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
+      <span style="flex:1"></span>
+      ${canManage()?['instagram','facebook','youtube','tiktok','linkedin'].map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join(''):''}
+    </div>
+  </div>`:''}
   <div class="card" style="padding:14px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <button class="btn ghost sm" onclick="calShift(-1)">‹</button>
@@ -1036,9 +1042,12 @@ async function socialApi(body){
     body:JSON.stringify({workspace_id:WS.id,...body})});
   return await res.json();
 }
+let _cbUsed=0,_cbAllowed=1;
 async function loadSocials(){
-  try{const j=await socialApi({action:'accounts'});
+  if(!S.board){_socAccounts=[];return;}
+  try{const j=await socialApi({action:'accounts',board_id:S.board});
   _socAccounts=j.ok?(j.accounts||[]):[];
+  if(j.content_boards_used!==undefined){_cbUsed=j.content_boards_used;_cbAllowed=j.content_boards_allowed;}
   const el=$('soc-list'); if(el)el.innerHTML=socListHtml();}catch(_){_socAccounts=[];}
 }
 function socListHtml(){
@@ -1052,7 +1061,7 @@ function socListHtml(){
 }
 async function connectSocial(platform){
   try{
-    const j=await socialApi({action:'connect',platform});
+    const j=await socialApi({action:'connect',platform,board_id:S.board});
     if(j.error){toast(j.message||j.error);return;}
     window.open(j.url,'_blank');
     toast('Approve the connection in the new tab, then come back and refresh');
