@@ -2,1136 +2,151 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Boards by Brand Expert</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boards by Brand Expert — plan it, board it, post it. Done.</title>
+<meta name="description" content="The South African workspace for teams that plan and market: task boards, deadlines, money tracking, a social content calendar with AI drafting, and auto-posting — one tool, one price, unlimited users.">
+<meta property="og:title" content="Boards by Brand Expert">
+<meta property="og:description" content="Task boards + social content calendar + AI, in one place. Free to start.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
-:root{
-  --accent:#C75B12; --accent-soft:#FBF1E8;
-  --bg:#F7F6F3; --card:#FFFFFF; --ink:#23241f; --muted:#8a887e;
-  --line:#E7E5DE; --line-strong:#D6D3C9;
-  --ok:#1D9E75; --danger:#C6453D; --warn:#BA7517;
-  --radius:12px;
-}
+:root{--accent:#C75B12;--ink:#23241f;--muted:#8a887e;--bg:#F7F6F3;--line:#E7E5DE}
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',system-ui,sans-serif}
-html,body{height:100%}
-body{background:var(--bg);color:var(--ink);font-size:15px;-webkit-font-smoothing:antialiased}
-button{cursor:pointer;border:none;background:none;font-family:inherit;color:inherit;font-size:13.5px}
-input,select,textarea{font-family:inherit;font-size:14px;border:1px solid var(--line-strong);border-radius:10px;padding:10px 12px;width:100%;background:#fff;color:var(--ink);outline:none}
-input:focus,select:focus,textarea:focus{border-color:var(--accent)}
-label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 5px}
-h1,h2,h3{font-weight:700;letter-spacing:-.01em}
-.btn{display:inline-flex;align-items:center;gap:7px;background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;font-size:13.5px;transition:opacity .15s}
-.btn:hover{opacity:.88}
-.btn.accent{background:var(--accent)}
-.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line-strong)}
-.btn.ghost:hover{background:var(--bg);opacity:1}
-.btn.sm{padding:6px 12px;font-size:12.5px;border-radius:8px}
-.chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line-strong);border-radius:16px;padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer}
-.pill{display:inline-flex;align-items:center;gap:5px;border-radius:12px;padding:3px 10px;font-size:11.5px;font-weight:700;color:#fff;background:var(--accent)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
-.avatar{width:30px;height:30px;border-radius:50%;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none}
-.topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top))}
-.wordmark{font-weight:800;font-size:16px;letter-spacing:-.02em;display:flex;align-items:baseline;gap:6px;cursor:pointer}
-.wordmark em{font-style:normal;color:var(--accent)}
-.wordmark small{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.04em}
-.tabs{display:none;gap:2px;margin-left:14px}
-.tabs button{padding:8px 13px;border-radius:9px;font-weight:600;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
-.tabs button.active{background:var(--accent-soft);color:var(--accent)}
-.tabs button:hover{color:var(--ink)}
-main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(safe-area-inset-bottom))}
-.bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px calc(8px + env(safe-area-inset-bottom))}
-.bottomnav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--muted);padding:4px 10px;border-radius:10px;position:relative}
-.bottomnav button.active{color:var(--accent)}
-.bottomnav .bdot{position:absolute;top:0;right:4px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px}
-.view-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 14px}
-.view-title h2{font-size:20px}
-.view-title .sub{font-size:12.5px;color:var(--muted);font-weight:500}
-.boards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px}
-.board-card{background:#fff;border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:var(--radius);padding:16px;cursor:pointer;transition:transform .12s,box-shadow .12s}
-.board-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(35,36,31,.08)}
-.board-card h3{font-size:15.5px;margin-bottom:3px}
-.board-card .meta{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-bottom:12px}
-.prog{height:7px;background:var(--bg);border-radius:5px;overflow:hidden}
-.prog i{display:block;height:100%;background:var(--accent);border-radius:5px;transition:width .3s}
-.prog-row{display:flex;justify-content:space-between;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:6px}
-.new-board{border:1px solid var(--line-strong);background:#FFFEFB;border-radius:var(--radius);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-weight:600;min-height:130px;cursor:pointer}
-.new-board:hover{color:var(--accent);border-color:var(--accent)}
-.catbar{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.catbar::-webkit-scrollbar{display:none}
-.catchip{flex:none;display:inline-flex;align-items:center;gap:7px;border-radius:18px;padding:8px 15px;font-size:12.5px;font-weight:700;color:#fff;opacity:.55;cursor:pointer;white-space:nowrap}
-.catchip.sel{opacity:1;box-shadow:0 3px 10px rgba(35,36,31,.18)}
-.catchip .cnt{font-size:10.5px;font-weight:800;background:rgba(255,255,255,.25);border-radius:9px;padding:1px 7px}
-.board-wrap{display:flex;gap:14px;align-items:flex-start}
-.rail{display:none;flex-direction:column;gap:7px;width:150px;flex:none}
-.rcol{display:flex;align-items:center;gap:7px;border-radius:10px;padding:10px 12px;color:#fff;font-weight:700;font-size:12.5px;opacity:.6;cursor:pointer;text-align:left}
-.rcol.sel{opacity:1;box-shadow:0 3px 10px rgba(35,36,31,.18)}
-.rcol .rname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rcol .rcount{font-size:10.5px;font-weight:800;background:rgba(255,255,255,.25);border-radius:9px;padding:1px 7px}
-.add-rail{border:1px solid var(--line-strong);background:#fff;border-radius:10px;padding:10px;font-weight:600;color:var(--muted);font-size:12px}
-.add-rail:hover{color:var(--accent);border-color:var(--accent)}
-.open-col{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
-.col-head{display:flex;align-items:center;gap:9px;padding:13px 16px;color:#fff}
-.col-head h3{flex:1;font-size:15px}
-.col-head button{color:#fff;opacity:.75;padding:3px}
-.col-head button:hover{opacity:1}
-.col-head .count{font-size:11.5px;font-weight:700;background:rgba(255,255,255,.22);border-radius:10px;padding:2px 9px}
-.quickadd{display:flex;gap:8px;margin:14px 16px 0}
-.quickadd input{border-radius:10px}
-.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:12px;padding:14px 16px 18px}
-.note{background:var(--note-bg,#fff);border:1px solid var(--line);border-left:4px solid var(--note-c,var(--accent));border-radius:10px;padding:12px 12px 10px;cursor:pointer;position:relative;transition:transform .1s,box-shadow .1s}
-.note:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(35,36,31,.09)}
-.note h4{font-size:13.5px;font-weight:700;line-height:1.35;margin-bottom:5px;padding-right:18px}
-.note p{font-size:12px;color:#6b695f;line-height:1.45;margin-bottom:7px;white-space:pre-wrap}
-.note.done{opacity:.5}
-.note .meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.note .who{font-size:10.5px;font-weight:700;color:var(--muted);flex:1}
-.note .avatar{width:21px;height:21px;font-size:9px}
-.note-del{position:absolute;top:7px;right:7px;color:#a3a094;opacity:0;transition:opacity .15s;padding:2px}
-.note:hover .note-del{opacity:.9}
-.note-del:hover{color:var(--danger)}
-@media(hover:none){.note-del{opacity:.5}}
-.due{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;border-radius:8px;padding:2px 8px;margin-bottom:6px}
-.chk{width:19px;height:19px;border-radius:6px;border:2px solid var(--line-strong);background:#fff;color:#fff;font-size:11px;display:inline-flex;align-items:center;justify-content:center;flex:none}
-.chk.on{background:var(--ok);border-color:var(--ok)}
-.task-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);border-left:4px solid var(--c,var(--accent));border-radius:10px;background:#fff;margin-bottom:8px}
-.task-row .t{flex:1;min-width:0}
-.task-row .t b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.task-row .t span{font-size:11px;font-weight:600;color:var(--muted)}
-.task-row.done{opacity:.55}
-.member-row{display:flex;align-items:center;gap:11px;padding:11px 4px;border-bottom:1px solid var(--line)}
-.member-row .m{flex:1;min-width:0}
-.member-row .m b{display:block;font-size:14px}
-.member-row .m span{font-size:11.5px;color:var(--muted)}
-.rolebadge{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:8px;padding:2px 8px;background:var(--accent-soft);color:var(--accent)}
-.overlay{position:fixed;inset:0;background:rgba(35,36,31,.45);z-index:50;display:none;align-items:flex-end;justify-content:center;padding:0}
-.overlay.open{display:flex}
-.modal{background:#fff;border-radius:18px 18px 0 0;padding:22px 20px calc(22px + env(safe-area-inset-bottom));width:100%;max-width:560px;max-height:88vh;overflow-y:auto}
-.modal h3{font-size:17px;margin-bottom:4px}
-.row{display:flex;gap:9px;justify-content:flex-end;margin-top:20px}
-.toast{position:fixed;bottom:calc(76px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:80;display:flex;gap:14px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:92vw}
-.toast button{color:#FFC98F;font-weight:800}
-.auth{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:22px}
-.auth-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px 24px;width:100%;max-width:400px}
-.auth-card h3{font-size:18px;margin-bottom:2px}
-.auth-card .sub{font-size:13px;color:var(--muted);margin-bottom:10px}
-.auth-err{background:#FDECEA;color:#A32D2D;border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:600;margin:10px 0 0;display:none}
-.cobrand{position:fixed;bottom:calc(64px + env(safe-area-inset-bottom));right:12px;z-index:15;background:#fff;border:1px solid var(--line);border-radius:20px;padding:6px 13px;font-size:11px;font-weight:700;color:var(--muted);box-shadow:0 4px 14px rgba(35,36,31,.08)}
-.cobrand b{color:var(--accent)}
-.swatches{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px}
-.swatches button{width:34px;height:34px;border-radius:50%;border:3px solid transparent}
-.swatches button.sel{border-color:var(--ink)}
-.settings-grid{display:grid;gap:14px;grid-template-columns:1fr}
-.empty{color:var(--muted);font-weight:500;font-size:13.5px;padding:14px 4px}
-@media(min-width:840px){
-  .tabs{display:flex}
-  .bottomnav{display:none}
-  main{padding:22px 28px;padding-bottom:40px}
-  .rail{display:flex}
-  .catbar{display:none}
-  .overlay{align-items:center;padding:20px}
-  .modal{border-radius:18px;padding:24px}
-  .toast{bottom:28px}
-  .cobrand{bottom:14px}
-  .settings-grid{grid-template-columns:1fr 1fr}
-}
+body{background:var(--bg);color:var(--ink);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+.top{display:flex;align-items:center;gap:14px;padding:18px 0}
+.top img{height:44px;width:auto}
+.top .name{font-weight:800;font-size:17px;letter-spacing:-.01em}
+.top .name em{font-style:normal;color:var(--accent)}
+.top .cta{margin-left:auto;display:flex;gap:10px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:13px 22px;border-radius:11px;font-weight:700;font-size:15px;transition:transform .12s}
+.btn:hover{transform:translateY(-1px)}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid #D6D3C9}
+.btn.big{padding:16px 30px;font-size:16.5px}
+.hero{text-align:center;padding:64px 0 30px}
+.hero h1{font-size:clamp(30px,5.4vw,52px);font-weight:800;letter-spacing:-.02em;line-height:1.12}
+.hero h1 span{color:var(--accent)}
+.hero p{font-size:clamp(15px,2.2vw,19px);color:#5f5d54;max-width:640px;margin:18px auto 30px}
+.hero .fine{font-size:12.5px;color:var(--muted);margin-top:12px;font-weight:600}
+.strip{display:flex;justify-content:center;gap:26px;flex-wrap:wrap;padding:26px 0 8px;font-size:13px;font-weight:700;color:var(--muted)}
+.mock{max-width:880px;margin:44px auto 0;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px rgba(35,36,31,.10);overflow:hidden}
+.mock .bar{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.mock .bar i{width:10px;height:10px;border-radius:50%;background:#E4E1D6;display:block}
+.mock .body{display:flex;min-height:270px}
+.mock .rail{width:130px;flex:none;padding:12px 10px;display:flex;flex-direction:column;gap:7px;border-right:1px solid var(--line)}
+.mock .rail b{border-radius:8px;padding:9px 10px;color:#fff;font-size:11px;font-weight:700}
+.mock .grid{flex:1;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start}
+.mock .note{background:#F0F5F1;border-left:4px solid #0F6E56;border-radius:8px;padding:10px;font-size:11.5px;font-weight:600}
+.mock .note small{display:block;color:#8a887e;font-weight:600;margin-top:5px;font-size:10px}
+.sect{padding:70px 0 10px}
+.sect h2{font-size:clamp(24px,3.6vw,34px);font-weight:800;letter-spacing:-.02em;text-align:center}
+.sect .sub{color:#5f5d54;text-align:center;max-width:560px;margin:12px auto 40px}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.feat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px}
+.feat .ic{width:42px;height:42px;border-radius:11px;background:#FBF1E8;color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.feat h3{font-size:16.5px;margin-bottom:6px}
+.feat p{font-size:14px;color:#5f5d54}
+.price{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;max-width:760px;margin:0 auto}
+.plan{background:#fff;border:1px solid var(--line);border-radius:16px;padding:30px 26px;text-align:center}
+.plan.hot{border:2px solid var(--accent);position:relative}
+.plan.hot .tag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:11px;font-weight:800;letter-spacing:.05em;border-radius:12px;padding:4px 14px}
+.plan h3{font-size:17px}
+.plan .amt{font-size:40px;font-weight:800;letter-spacing:-.02em;margin:10px 0 2px}
+.plan .amt small{font-size:14px;color:var(--muted);font-weight:600}
+.plan ul{list-style:none;text-align:left;margin:20px 0 24px;font-size:14px;color:#4a483f}
+.plan li{padding:6px 0 6px 26px;position:relative}
+.plan li:before{content:'✓';position:absolute;left:2px;color:#1D9E75;font-weight:800}
+.foot{border-top:1px solid var(--line);margin-top:80px;padding:30px 0 44px;text-align:center;font-size:13px;color:var(--muted)}
+.foot a{color:var(--accent);font-weight:700}
+.foot img{height:30px;opacity:.9;margin-bottom:10px}
+@media(max-width:640px){.mock .rail{width:96px}.strip{gap:14px}}
 </style>
 </head>
 <body>
-<div id="app"></div>
-<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<div class="wrap">
+  <div class="top">
+    <img src="https://brandexpert.co.za/wp-content/uploads/2022/10/BRAND-EXPERT-LOGO-FINAL.png" alt="Brand Expert">
+    <div class="name">Boards <em>by Brand Expert</em></div>
+    <div class="cta">
+      <a class="btn ghost" href="/app" id="signin-btn">Sign in</a>
+      <a class="btn" href="/app">Start free</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Plan it. Board it. <span>Post it.</span> Done.</h1>
+    <p>The workspace for teams that plan <b>and</b> market: task boards with deadlines, money tracking, a social content calendar with AI copywriting, and posts that publish themselves. One tool. One price. Unlimited users.</p>
+    <a class="btn big" href="/app">Create your workspace — free</a>
+    <div class="fine">14 days of everything, free · no card needed · made in South Africa</div>
+    <div class="mock">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="body">
+        <div class="rail">
+          <b style="background:#0F6E56">Planning 4/6</b>
+          <b style="background:#C75B12;opacity:.65">Content 2/5</b>
+          <b style="background:#534AB7;opacity:.65">Design 1/4</b>
+          <b style="background:#185FA5;opacity:.65">Billing 3/3</b>
+        </div>
+        <div class="grid">
+          <div class="note">Book the venue<small>due Fri · R14 250 quote attached</small></div>
+          <div class="note" style="border-color:#C75B12;background:#FBF3EC">Friday's Instagram post<small>✦ AI-drafted · auto-posts 09:00</small></div>
+          <div class="note" style="border-color:#534AB7;background:#F1F0F8">Approve medal artwork<small>allocated to Zani</small></div>
+          <div class="note">Chase sponsor invoice<small>on your Today list</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="strip"><span>TASK BOARDS</span><span>·</span><span>TODAY LISTS</span><span>·</span><span>MONEY</span><span>·</span><span>CONTENT CALENDAR</span><span>·</span><span>AI COPY</span><span>·</span><span>AUTO-POSTING</span></div>
+
+  <div class="sect" id="features">
+    <h2>Everything your team juggles, on one board</h2>
+    <p class="sub">Stop paying for a task tool AND a social scheduler AND an AI writer. This is all three, and they talk to each other.</p>
+    <div class="feats">
+      <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M8 7v10M13 7v6M18 7v3"/></svg></div>
+        <h3>Colour-coded boards</h3><p>Sticky-note tasks in categories your team actually thinks in. Deadlines flag themselves before they bite.</p></div>
+      <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg></div>
+        <h3>A Today list that builds itself</h3><p>Sign in each morning to your day, assembled from every board — overdue first, nothing forgotten.</p></div>
+      <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M16 3v4M8 3v4M3.5 10.5h17"/></svg></div>
+        <h3>Content calendar + AI copy</h3><p>Plan the month's posts on a calendar. Tell the AI what a post is about — get platform-perfect captions in seconds.</p></div>
+      <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.2V12l3.2 2.4"/></svg></div>
+        <h3>Posts that publish themselves</h3><p>Connect Instagram, Facebook, YouTube, TikTok or LinkedIn once. Approved posts go out on schedule — while you sleep.</p></div>
+      <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M14.6 9.2a2.4 2.4 0 0 0-2.2-1.4h-.9a2.3 2.3 0 0 0 0 4.6h1a2.3 2.3 0 0 1 0 5h-1a2.4 2.4 0 0 1-2.2-1.4"/><path d="M12 6.2v1.6M12 16.6v1.6"/></svg></div>
+        <h3>Money, in the open</h3><p>Supplier and client invoices per project — who owes, who's overdue, net position at a glance.</p></div>
+      <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M16.5 21v-1.9a3.9 3.9 0 0 0-3.9-3.9H5.4a3.9 3.9 0 0 0-3.9 3.9V21"/><circle cx="9" cy="7.4" r="3.9"/><path d="M22.5 21v-1.9a3.9 3.9 0 0 0-2.9-3.8"/><path d="M15.6 3.6a3.9 3.9 0 0 1 0 7.6"/></svg></div>
+        <h3>Unlimited team, no per-seat fees</h3><p>Add everyone. Allocate tasks, private boards for sensitive work, live updates on every screen.</p></div>
+    </div>
+  </div>
+
+  <div class="sect" id="pricing">
+    <h2>One honest price</h2>
+    <p class="sub">Others charge per user, per channel, per everything. We don't.</p>
+    <div class="price">
+      <div class="plan">
+        <h3>Free</h3>
+        <div class="amt">R0<small> forever</small></div>
+        <ul><li>1 board, 3 team members</li><li>Today lists, deadlines, money tracking</li><li>Content calendar (copy &amp; paste posting)</li><li>10 taster AI credits</li></ul>
+        <a class="btn ghost" href="/app">Start free</a>
+      </div>
+      <div class="plan hot">
+        <span class="tag">MOST POPULAR</span>
+        <h3>Pro</h3>
+        <div class="amt">R299<small>/month per workspace</small></div>
+        <ul><li>Unlimited boards &amp; team members</li><li>Auto-posting to your socials</li><li>100 AI credits monthly · top up R99/120</li><li>Your brand only — fully white-label</li></ul>
+        <a class="btn" href="/app">Start 14-day free trial</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <img src="https://brandexpert.co.za/wp-content/uploads/2022/10/BRAND-EXPERT-LOGO-FINAL.png" alt="Brand Expert"><br>
+    A product of <a href="https://brandexpert.co.za" target="_blank" rel="noopener">Brand Expert</a> · Experts in the branding industry<br>
+    <span style="font-size:12px">© 2026 Brand Expert · boards.brandexpert.co.za</span>
+  </div>
+</div>
 <script>
-/* ============ CONFIG & STATE ============ */
-const SUPABASE_URL='https://gpztlbbyylwkcykocczm.supabase.co';
-const SUPABASE_KEY='sb_publishable_deJICRsdUfBSTfdYRO7EUw_yLKUCeiG';
-const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const PRESETS={
-  classic:{accent:'#C75B12',soft:'#FBF1E8'},
-  forest:{accent:'#0F6E56',soft:'#E7F4EF'},
-  magenta:{accent:'#C4006B',soft:'#FBE9F2'},
-  ocean:{accent:'#185FA5',soft:'#E9F1F9'},
-  slate:{accent:'#444441',soft:'#EFEEE9'},
-};
-const CYCLE=['#0F6E56','#C75B12','#534AB7','#185FA5','#993556','#BA7517','#3B6D11','#444441','#0E7490'];
-let SESSION=null, WS=null, MEM=null, MEMBERS=[], BOARDS=[], MYWS=[];
-let S={view:'today',board:null,col:null};
-let cur={cols:[],notes:[],msgs:[],invs:[],pins:[],posts:[]};
-let TD=[], TDN={}, TDC={};
-const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const Rand=v=>'R'+Number(v||0).toLocaleString('en-ZA',{maximumFractionDigits:0});
-const saDate=()=>new Date(Date.now()+2*3600*1000).toISOString().slice(0,10);
-function tint(hex,pct){const n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;
-  const m=c=>Math.round(c+(255-c)*(1-pct/100)); return `rgb(${m(r)},${m(g)},${m(b)})`;}
-function ago(ts){const s=(Date.now()-new Date(ts))/1e3;
-  if(s<60)return 'now'; if(s<3600)return Math.floor(s/60)+'m'; if(s<86400)return Math.floor(s/3600)+'h'; return Math.floor(s/86400)+'d';}
-const avatar=u=>`<span class="avatar" style="background:${u.color}" title="${esc(u.name)}">${esc(u.initials)}</span>`;
-const usr=id=>MEMBERS.find(m=>m.user_id===id);
-function fail(e){console.error(e); toast('⚠ '+((e&&e.message)||e));}
-/* icons */
-const ICONS={
-  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/>',
-  board:'<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M7 7v10M12 7v6M17 7v3"/>',
-  note:'<path d="M4 4h12.5L20 7.5V20H4z"/><path d="M16.5 4v3.5H20"/>',
-  money:'<circle cx="12" cy="12" r="9"/><path d="M14.6 9.2a2.4 2.4 0 0 0-2.2-1.4h-.9a2.3 2.3 0 0 0 0 4.6h1a2.3 2.3 0 0 1 0 4.6h-1a2.4 2.4 0 0 1-2.2-1.4"/><path d="M12 6.2v1.6M12 16.6v1.6"/>',
-  users:'<path d="M16.5 21v-1.9a3.9 3.9 0 0 0-3.9-3.9H5.4a3.9 3.9 0 0 0-3.9 3.9V21"/><circle cx="9" cy="7.4" r="3.9"/><path d="M22.5 21v-1.9a3.9 3.9 0 0 0-2.9-3.8"/><path d="M15.6 3.6a3.9 3.9 0 0 1 0 7.6"/>',
-  gear:'<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>',
-  calendar:'<rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M16 3v4M8 3v4M3.5 10.5h17"/>',
-  alert:'<path d="M10.3 4 2.2 17.6A2 2 0 0 0 3.9 20.6h16.2a2 2 0 0 0 1.7-3L13.7 4a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/>',
-  trash:'<path d="M3.5 6.5h17"/><path d="M8.5 6.5v-2a1.6 1.6 0 0 1 1.6-1.6h3.8a1.6 1.6 0 0 1 1.6 1.6v2"/><path d="M18.8 6.5 18 19.3a2 2 0 0 1-2 1.9H8a2 2 0 0 1-2-1.9L5.2 6.5"/><path d="M10 10.7v6M14 10.7v6"/>',
-  pencil:'<path d="M16.9 3.6a2.6 2.6 0 0 1 3.7 3.7L7.6 20.3 2.5 21.5l1.2-5.1z"/>',
-  x:'<path d="M17.5 6.5l-11 11M6.5 6.5l11 11"/>',
-  check:'<path d="M19.5 6.5 9.6 16.9 4.5 11.8"/>',
-  lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>',
-  plus:'<path d="M12 5v14M5 12h14"/>',
-  undo:'<path d="M3.5 7.5v5.5h5.5"/><path d="M20.5 16.5a8.5 8.5 0 0 0-14.2-6.3L3.5 13"/>',
-  link:'<path d="M10 13.3a5 5 0 0 0 7.5.6l2.9-2.9a5 5 0 0 0-7-7L11.7 5.6"/><path d="M14 10.7a5 5 0 0 0-7.5-.6l-3 3a5 5 0 0 0 7 7l1.8-1.6"/>',
-  home:'<path d="M3 11.5 12 3l9 8.5"/><path d="M5.5 10.5V21h4.8v-6h3.4v6h4.8V10.5"/>',
-};
-const ic=(n,s=15,st=1.8)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${st}" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex:none">${ICONS[n]||''}</svg>`;
-/* toast with optional undo action */
-let _toastT=null,_toastFn=null;
-function toast(msg,actionLabel,actionFn){
-  document.querySelectorAll('.toast').forEach(t=>t.remove());
-  clearTimeout(_toastT); _toastFn=actionFn||null;
-  const el=document.createElement('div'); el.className='toast';
-  el.innerHTML=`<span>${msg}</span>${actionLabel?`<button onclick="_toastFn&&_toastFn();this.parentElement.remove()">${actionLabel}</button>`:''}`;
-  document.body.appendChild(el);
-  _toastT=setTimeout(()=>el.remove(),actionLabel?6000:3200);
-}
-/* plan */
-function planEff(){
-  if(!WS)return 'free';
-  if(WS.plan==='pro')return 'pro';
-  if(WS.plan==='basic')return 'basic';
-  if(WS.plan==='trial'&&WS.trial_ends>=saDate())return 'pro';
-  return 'free';
-}
-function trialDaysLeft(){
-  if(!WS||WS.plan!=='trial')return 0;
-  return Math.max(0,Math.round((new Date(WS.trial_ends)-new Date(saDate()))/86400000));
-}
-function applyTheme(){
-  const t=(WS&&WS.theme)||{};
-  const p=PRESETS[t.preset]||PRESETS.classic;
-  const accent=t.accent||p.accent;
-  document.documentElement.style.setProperty('--accent',accent);
-  document.documentElement.style.setProperty('--accent-soft',tint(accent,12));
-}
-/* ============ DATA ============ */
-async function loadWs(){
-  const {data:mems,error}=await sb.from('bbe_members').select('*').eq('user_id',SESSION.user.id);
-  if(error)throw error;
-  MYWS=mems||[];
-  if(!MYWS.length){WS=null;MEM=null;return;}
-  const savedWs=localStorage.getItem('bbe_ws');
-  MEM=MYWS.find(m=>m.workspace_id===savedWs)||MYWS[0];
-  const [w,mm,b]=await Promise.all([
-    sb.from('bbe_workspaces').select('*').eq('id',MEM.workspace_id).single(),
-    sb.from('bbe_members').select('*').eq('workspace_id',MEM.workspace_id).order('created_at'),
-    sb.from('bbe_boards').select('*').eq('workspace_id',MEM.workspace_id).order('created_at'),
-  ]);
-  if(w.error)throw w.error;
-  WS=w.data; MEMBERS=mm.data||[]; BOARDS=b.data||[];
-  localStorage.setItem('bbe_ws',WS.id);
-  if(!BOARDS.find(x=>x.id===S.board))S.board=localStorage.getItem('bbe_board_'+WS.id);
-  if(!BOARDS.find(x=>x.id===S.board))S.board=BOARDS[0]?BOARDS[0].id:null;
-  applyTheme();
-}
-async function loadBoard(){
-  if(!S.board){cur={cols:[],notes:[],msgs:[],invs:[],pins:[],posts:[]};return;}
-  const [c,n,m,iv,p,po]=await Promise.all([
-    sb.from('bbe_columns').select('*').eq('board_id',S.board).order('position'),
-    sb.from('bbe_notes').select('*').eq('board_id',S.board),
-    sb.from('bbe_messages').select('*').eq('board_id',S.board).order('created_at',{ascending:false}).limit(40),
-    sb.from('bbe_invoices').select('*').eq('board_id',S.board).order('created_at'),
-    sb.from('bbe_pins').select('*').eq('board_id',S.board).order('created_at'),
-    sb.from('bbe_posts').select('*').eq('board_id',S.board).order('post_date'),
-  ]);
-  if(c.error)throw c.error;
-  cur={cols:c.data||[],notes:n.data||[],msgs:(m.data||[]).reverse(),invs:iv.data||[],pins:p.data||[],posts:po.data||[]};
-}
-async function refresh(){try{await loadWs();await loadBoard();await loadToday();render();}catch(e){fail(e);}}
-/* today */
-const tdDone=t=>t.note_id?!!(TDN[t.note_id]&&TDN[t.note_id].done):!!t.done;
-async function loadToday(){
-  if(!WS)return;
-  const {data}=await sb.from('bbe_today').select('*').eq('user_id',SESSION.user.id).eq('workspace_id',WS.id).eq('for_date',saDate()).order('position');
-  TD=data||[]; TDN={};TDC={};
-  const ids=TD.map(t=>t.note_id).filter(Boolean);
-  if(ids.length){
-    const [{data:ns},{data:cs}]=await Promise.all([
-      sb.from('bbe_notes').select('id,title,done,archived,due_date,warn_days,column_id,board_id').in('id',ids),
-      sb.from('bbe_columns').select('id,name,color,board_id').eq('workspace_id',WS.id),
-    ]);
-    (ns||[]).forEach(n=>TDN[n.id]=n);(cs||[]).forEach(c=>TDC[c.id]=c);
-  }
-}
-async function ensureToday(){
-  if(!WS)return;
-  const today=saDate();
-  const {data:ex}=await sb.from('bbe_today').select('id').eq('user_id',SESSION.user.id).eq('workspace_id',WS.id).eq('for_date',today).limit(1);
-  if(ex&&ex.length){await loadToday();return;}
-  const rows=[];let pos=0;
-  const {data:prev}=await sb.from('bbe_today').select('*').eq('user_id',SESSION.user.id).eq('workspace_id',WS.id).lt('for_date',today).order('for_date',{ascending:false}).limit(40);
-  const prevDate=prev&&prev.length?prev[0].for_date:null; const carried=new Set();
-  if(prevDate){
-    const pids=prev.filter(p=>p.for_date===prevDate&&!p.removed&&p.note_id).map(p=>p.note_id);
-    let open={};
-    if(pids.length){const {data:pn}=await sb.from('bbe_notes').select('id,done,archived').in('id',pids);(pn||[]).forEach(n=>open[n.id]=n);}
-    for(const p of prev.filter(p=>p.for_date===prevDate&&!p.removed)){
-      if(p.note_id){const n=open[p.note_id];if(n&&!n.done&&!n.archived){rows.push({workspace_id:WS.id,user_id:SESSION.user.id,for_date:today,note_id:p.note_id,reason:'carried over',position:pos++});carried.add(p.note_id);}}
-      else if(!p.done&&p.text_line)rows.push({workspace_id:WS.id,user_id:SESSION.user.id,for_date:today,text_line:p.text_line,reason:'carried over',position:pos++});
-    }
-  }
-  const {data:cand}=await sb.from('bbe_notes').select('id,done,archived,due_date,warn_days,assignee').eq('workspace_id',WS.id).eq('done',false).eq('archived',false).not('due_date','is',null);
-  const t0=new Date(today+'T00:00:00Z').getTime();
-  for(const n of (cand||[])){
-    if(carried.has(n.id))continue;
-    if(n.assignee&&n.assignee!==SESSION.user.id)continue;
-    const days=Math.round((new Date(n.due_date+'T00:00:00Z').getTime()-t0)/86400000);
-    if(days>(n.warn_days??7))continue;
-    rows.push({workspace_id:WS.id,user_id:SESSION.user.id,for_date:today,note_id:n.id,reason:days<0?'overdue':'due soon',position:pos++});
-  }
-  if(rows.length){const {error}=await sb.from('bbe_today').insert(rows);if(error)console.error(error);}
-  else await sb.from('bbe_today').insert({workspace_id:WS.id,user_id:SESSION.user.id,for_date:today,text_line:null,reason:'__init__',removed:true,position:0});
-  await loadToday();
-}
-/* ============ RENDER ============ */
-function render(){
-  const app=$('app');
-  if(!SESSION){app.innerHTML=authView();return;}
-  if(!WS){app.innerHTML=noWsView();return;}
-  const tdOpen=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&!tdDone(t)).length;
-  const tabs=[['today','sun','Today'],['boards','home','Boards'],['board','board','Board'],['content','calendar','Content'],['money','money','Money'],['team','users','Team']];
-  app.innerHTML=`
-  <div class="topbar">
-    <div class="wordmark" onclick="go('boards')">${esc(WS.name)} <small>· Boards</small></div>
-    <div class="tabs">${tabs.map(([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,14)} ${l}${v==='today'&&tdOpen?` <span class="pill" style="padding:1px 7px;font-size:10px">${tdOpen}</span>`:''}</button>`).join('')}
-      <button class="${S.view==='settings'?'active':''}" onclick="go('settings')">${ic('gear',14)} Settings</button>
-    </div>
-    <span style="flex:1"></span>
-    ${WS.plan==='trial'&&planEff()==='pro'?`<span class="pill" style="background:var(--warn)" title="Full features free for the trial period">Trial · ${trialDaysLeft()}d left</span>`:''}
-    ${planEff()==='pro'&&WS.plan==='pro'?`<span class="pill">Pro</span>`:''}
-    <span onclick="go('settings')" style="cursor:pointer">${avatar(MEM)}</span>
-  </div>
-  <main>${{today:todayView,boards:boardsView,board:boardView,content:contentView,money:moneyView,team:teamView,settings:settingsView}[S.view]()}</main>
-  <div class="bottomnav">
-    ${tabs.map(([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,19)}<span>${l}</span>${v==='today'&&tdOpen?`<span class="bdot">${tdOpen}</span>`:''}</button>`).join('')}
-  </div>
-  ${planEff()==='free'?`<a class="cobrand" href="https://brandexpert.co.za" target="_blank" rel="noopener">powered by <b>Brand Expert</b></a>`:''}`;
-}
-function go(v){
-  S.view=v;
-  if(v==='today')loadToday().then(render).catch(fail);
-  render();
-}
-/* ============ AUTH ============ */
-let _authMode='in';
-function authView(){
-  return `<div class="auth">
-    <div style="text-align:center">
-      <div style="font-weight:800;font-size:26px;letter-spacing:-.02em">Boards <em style="font-style:normal;color:var(--accent)">by Brand Expert</em></div>
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:4px">Plan it. Board it. Done.</div>
-    </div>
-    <div class="auth-card">
-      ${_authMode==='in'?`
-      <h3>Sign in</h3><div class="sub">Welcome back — your boards are waiting.</div>
-      <div class="auth-err" id="a-err"></div>
-      <label>Email</label><input id="a-email" type="email" autocomplete="username" placeholder="you@company.co.za">
-      <label>Password</label><input id="a-pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()">
-      <button class="btn accent" style="width:100%;justify-content:center;padding:12px;margin-top:18px" onclick="doSignIn()">Sign in</button>
-      <button style="width:100%;color:var(--muted);font-weight:600;font-size:12.5px;margin-top:12px;text-decoration:underline" onclick="doForgot()">Forgot password?</button>
-      <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--muted)">New here? <button style="color:var(--accent);font-weight:700" onclick="_authMode='up';render()">Create your workspace</button></div>
-      `:`
-      <h3>Create your workspace</h3><div class="sub">Free to start · full features for 14 days.</div>
-      <div class="auth-err" id="a-err"></div>
-      <label>Your name</label><input id="a-name" placeholder="e.g. Helen Kruger">
-      <label>Workspace name</label><input id="a-ws" placeholder="e.g. Brand Expert Events">
-      <label>Email</label><input id="a-email" type="email" autocomplete="username">
-      <label>Password (min 8 characters)</label><input id="a-pw" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignUp()">
-      <button class="btn accent" style="width:100%;justify-content:center;padding:12px;margin-top:18px" id="a-go" onclick="doSignUp()">Create workspace</button>
-      <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--muted)">Already have an account? <button style="color:var(--accent);font-weight:700" onclick="_authMode='in';render()">Sign in</button></div>
-      `}
-    </div>
-    <div style="font-size:11px;color:var(--muted);font-weight:600">powered by <a href="https://brandexpert.co.za" style="color:var(--accent);text-decoration:none;font-weight:700">Brand Expert</a></div>
-  </div>`;
-}
-function authErr(m){const e=$('a-err');if(e){e.textContent=m;e.style.display='block';}}
-async function doSignIn(){
-  const email=$('a-email').value.trim(),pw=$('a-pw').value;
-  if(!email||!pw){authErr('Enter your email and password.');return;}
-  const {error}=await sb.auth.signInWithPassword({email,password:pw});
-  if(error){authErr(error.message==='Invalid login credentials'?'Wrong email or password.':error.message);return;}
-  const {data:{session}}=await sb.auth.getSession(); SESSION=session;
-  await boot();
-}
-async function doSignUp(){
-  const name=$('a-name').value.trim(),ws=$('a-ws').value.trim(),email=$('a-email').value.trim(),pw=$('a-pw').value;
-  if(!name||!ws||!email||pw.length<8){authErr('Fill in everything — password at least 8 characters.');return;}
-  const b=$('a-go');b.disabled=true;b.textContent='Creating…';
-  try{
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-signup`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw,name,workspace:ws})});
-    const j=await res.json();
-    if(!res.ok||j.error)throw new Error(j.error||'Could not create the workspace');
-    const {error}=await sb.auth.signInWithPassword({email,password:pw});
-    if(error)throw error;
-    const {data:{session}}=await sb.auth.getSession(); SESSION=session;
-    await boot(); toast('🎉 Welcome — your workspace is ready');
-  }catch(e){authErr(e.message||String(e));b.disabled=false;b.textContent='Create workspace';}
-}
-async function doForgot(){
-  const pre=$('a-email')?$('a-email').value.trim():'';
-  const email=prompt('Your account email — a reset link will be sent:',pre); if(!email)return;
-  try{const {error}=await sb.auth.resetPasswordForEmail(email.trim(),{redirectTo:location.origin+location.pathname});
-  if(error)throw error; toast('📬 Reset link sent — check your email');}catch(e){fail(e);}
-}
-function noWsView(){
-  return `<div class="auth"><div class="auth-card" style="text-align:center">
-    <h3>No workspace yet</h3>
-    <p style="font-size:13.5px;color:var(--muted);margin:8px 0 16px">Your account isn't part of a workspace. Ask your team to add you, or create your own.</p>
-    <button class="btn accent" onclick="createOwnWs()">Create a workspace</button>
-    <button class="btn ghost" style="margin-left:8px" onclick="signOut()">Sign out</button>
-  </div></div>`;
-}
-async function createOwnWs(){
-  const name=prompt('Workspace name:'); if(!name)return;
-  try{
-    const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,30)+'-'+Math.random().toString(36).slice(2,5);
-    const {data:ws,error}=await sb.from('bbe_workspaces').insert({name:name.trim(),slug,created_by:SESSION.user.id}).select().single();
-    if(error)throw error;
-    const meta=SESSION.user.email||'';
-    const {error:e2}=await sb.from('bbe_members').insert({workspace_id:ws.id,user_id:SESSION.user.id,role:'owner',name:meta.split('@')[0],initials:meta.slice(0,2).toUpperCase(),email:meta});
-    if(e2)throw e2;
-    await refresh();
-  }catch(e){fail(e);}
-}
-async function signOut(){await sb.auth.signOut();SESSION=null;WS=null;render();}
-async function changePw(){
-  const pw=prompt('New password (min 8 characters):'); if(!pw)return;
-  if(pw.length<8){toast('Minimum 8 characters');return;}
-  try{const {error}=await sb.auth.updateUser({password:pw});if(error)throw error;toast('🔑 Password updated');}catch(e){fail(e);}
-}
-/* ============ TODAY ============ */
-function tdReason(t){
-  if(!t.note_id)return t.reason==='carried over'?'carried over':'';
-  const n=TDN[t.note_id]; if(!n)return t.reason;
-  if(n.due_date){
-    const days=Math.round((new Date(n.due_date+'T00:00:00Z')-new Date(saDate()+'T00:00:00Z'))/86400000);
-    if(days<0)return `overdue ${-days}d`; if(days===0)return 'due today';
-    if(days<=(n.warn_days??7))return `due in ${days}d`;
-  }
-  return t.reason==='carried over'?'carried over':'';
-}
-function todayView(){
-  const items=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&(t.note_id?TDN[t.note_id]&&!TDN[t.note_id].archived:t.text_line));
-  const open=items.filter(t=>!tdDone(t)),done=items.filter(t=>tdDone(t));
-  const row=t=>{
-    const n=t.note_id?TDN[t.note_id]:null;
-    const c=n?TDC[n.column_id]:null;
-    const b=n?BOARDS.find(x=>x.id===n.board_id):null;
-    const r=tdReason(t),ov=/^overdue/.test(r),d=tdDone(t);
-    return `<div class="task-row ${d?'done':''}" style="--c:${c?c.color:'#B4B2A9'};${ov&&!d?'background:#FDF1EF;':''}">
-      <button class="chk ${d?'on':''}" onclick="tdToggle('${t.id}')">${d?'✓':''}</button>
-      <div class="t"><b style="${d?'text-decoration:line-through':''}">${esc(n?n.title:t.text_line)}</b>
-        <span>${n?`${b?esc(b.name):''}${b&&b.private_to?' '+ic('lock',10):''} › ${c?esc(c.name):''}`:'quick job'}</span></div>
-      ${r?`<span style="flex:none;font-size:10.5px;font-weight:800;border-radius:8px;padding:2px 8px;${ov?'background:#F7C1C1;color:#791F1F':r==='carried over'?'background:#EEECE4;color:#6b695f':'background:#FAEEDA;color:#854F0B'}">${esc(r)}</span>`:''}
-      ${n?`<button class="btn ghost sm" onclick="tdOpen('${t.id}')">open</button>`:''}
-      <button style="color:var(--muted);padding:3px" title="Not today" onclick="tdRemove('${t.id}')">${ic('x',13)}</button>
-    </div>`;};
-  return `<div class="view-title"><h2>${ic('sun',18)} Today</h2>
-    <span class="sub">${new Date().toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long'})}</span>
-    <span style="flex:1"></span><span class="pill" style="background:var(--ok)">${done.length}/${items.length} done</span></div>
-  ${open.map(row).join('')||'<div class="empty">Nothing on your list — pull tasks in with the ☀ on any card, or add a quick job below.</div>'}
-  ${done.length?`<div style="font-size:11px;font-weight:800;color:var(--muted);margin:14px 0 8px;letter-spacing:.05em">DONE TODAY</div>${done.map(row).join('')}`:''}
-  <div style="display:flex;gap:8px;margin-top:14px">
-    <input id="td-new" placeholder="Add a quick job for today…" onkeydown="if(event.key==='Enter'){event.preventDefault();tdAdd();}">
-    <button class="btn accent" onclick="tdAdd()">${ic('plus',14)} Add</button>
-  </div>`;
-}
-async function tdToggle(id){
-  const t=TD.find(x=>x.id===id); if(!t)return;
-  try{
-    if(t.note_id){const n=TDN[t.note_id];const {error}=await sb.from('bbe_notes').update({done:!n.done}).eq('id',t.note_id);if(error)throw error;n.done=!n.done;}
-    else{const {error}=await sb.from('bbe_today').update({done:!t.done}).eq('id',id);if(error)throw error;t.done=!t.done;}
-    render();
-  }catch(e){fail(e);}
-}
-async function tdRemove(id){try{await sb.from('bbe_today').update({removed:true}).eq('id',id);const t=TD.find(x=>x.id===id);if(t)t.removed=true;render();}catch(e){fail(e);}}
-async function tdAdd(){
-  const el=$('td-new'),v=el?el.value.trim():''; if(!v)return;
-  try{const {data,error}=await sb.from('bbe_today').insert({workspace_id:WS.id,user_id:SESSION.user.id,for_date:saDate(),text_line:v,position:TD.length}).select().single();
-  if(error)throw error;TD.push(data);render();setTimeout(()=>{const e=$('td-new');if(e)e.focus();},30);}catch(e){fail(e);}
-}
-async function tdOpen(id){
-  const t=TD.find(x=>x.id===id);if(!t||!t.note_id)return;
-  const n=TDN[t.note_id];if(!n)return;
-  S.board=n.board_id;localStorage.setItem('bbe_board_'+WS.id,S.board);S.col=n.column_id;
-  await loadBoard();go('board');
-}
-async function addToToday(noteId){
-  try{
-    const ex=TD.find(t=>t.note_id===noteId);
-    if(ex){if(ex.removed){await sb.from('bbe_today').update({removed:false}).eq('id',ex.id);ex.removed=false;render();}toast('☀ On your Today list');return;}
-    const {data,error}=await sb.from('bbe_today').insert({workspace_id:WS.id,user_id:SESSION.user.id,for_date:saDate(),note_id:noteId,position:TD.length}).select().single();
-    if(error)throw error;TD.push(data);await loadToday();render();toast('☀ Added to your Today list');
-  }catch(e){fail(e);}
-}
-/* ============ BOARDS HOME ============ */
-function statsFor(notes,colId){
-  const ns=colId?notes.filter(n=>n.column_id===colId):notes;
-  const d=ns.filter(n=>n.done).length,t=ns.length;
-  return {d,t,p:t?Math.round(d/t*100):0};
-}
-function boardsView(){
-  return `<div class="view-title"><h2>${ic('home',18)} ${esc(WS.name)}</h2><span class="sub">${BOARDS.length} board${BOARDS.length!==1?'s':''}</span></div>
-  <div class="boards-grid">
-    ${BOARDS.map(b=>`<div class="board-card" onclick="openBoard('${b.id}')">
-      <h3>${b.private_to?ic('lock',13)+' ':''}${esc(b.name)}</h3>
-      <div class="meta">${ic('calendar',11)} ${esc(b.date_label||'no date')}</div>
-      <div class="prog"><i id="bp-${b.id}" style="width:0%"></i></div>
-      <div class="prog-row"><span id="bt-${b.id}">…</span></div>
-    </div>`).join('')}
-    <div class="new-board" onclick="newBoardModal()">${ic('plus',20)} New board</div>
-  </div>
-  ${(()=>{setTimeout(loadBoardStats,40);return '';})()}`;
-}
-async function loadBoardStats(){
-  const {data}=await sb.from('bbe_notes').select('board_id,done').eq('workspace_id',WS.id);
-  for(const b of BOARDS){
-    const ns=(data||[]).filter(n=>n.board_id===b.id);
-    const s={d:ns.filter(n=>n.done).length,t:ns.length};
-    const bar=$('bp-'+b.id),lbl=$('bt-'+b.id);
-    if(bar)bar.style.width=(s.t?Math.round(s.d/s.t*100):0)+'%';
-    if(lbl)lbl.textContent=s.t?`${s.d} of ${s.t} tasks done`:'no tasks yet';
-  }
-}
-async function openBoard(id){S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;await loadBoard();go('board');}
-function newBoardModal(){
-  openModal(`<h3>New board</h3>
-    <label>Board name</label><input id="nb-name" placeholder="e.g. Spring Launch 2026">
-    <label>Date label (optional)</label><input id="nb-date" placeholder="e.g. Sep 2026">
-    <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer">
-      <input type="checkbox" id="nb-priv" style="width:auto"> ${ic('lock',12)} Private — only you (share it later)</label>
-    <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;margin-top:8px">
-      <input type="checkbox" id="nb-std" style="width:auto" checked> Start with starter categories</label>
-    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
-    <button class="btn accent" onclick="createBoard()">Create board</button></div>`);
-  setTimeout(()=>{const e=$('nb-name');if(e)e.focus();},60);
-}
-async function createBoard(){
-  const name=$('nb-name').value.trim(); if(!name){toast('Give the board a name');return;}
-  try{
-    const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id}).select().single();
-    if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 board — upgrade for unlimited boards.');throw error;}
-    if($('nb-std').checked){
-      const cats=['Planning','Content','Design','Suppliers','Admin','Billing'];
-      await sb.from('bbe_columns').insert(cats.map((n,i)=>({workspace_id:WS.id,board_id:data.id,name:n,color:CYCLE[i%CYCLE.length],position:i})));
-    }
-    closeModal();await loadWs();S.board=data.id;localStorage.setItem('bbe_board_'+WS.id,data.id);await loadBoard();go('board');toast('Board created');
-  }catch(e){fail(e);}
-}
-/* ============ BOARD ============ */
-function boardView(){
-  const b=BOARDS.find(x=>x.id===S.board);
-  if(!b)return `<div class="empty" style="text-align:center;padding:60px 20px">${ic('board',26)}<br><br>No board selected.<br><br><button class="btn accent" onclick="go('boards')">Choose a board</button></div>`;
-  const s=statsFor(cur.notes.filter(n=>!n.archived));
-  if(!cur.cols.find(c=>c.id===S.col))S.col=cur.cols[0]?cur.cols[0].id:null;
-  const c=cur.cols.find(x=>x.id===S.col);
-  return `<div class="view-title">
-    <h2>${b.private_to?ic('lock',15)+' ':''}${esc(b.name)}</h2>
-    <span class="sub">${esc(b.date_label||'')}</span>
-    <span class="pill" style="background:var(--ok)">${s.p}%</span>
-    <span style="flex:1"></span>
-    <button class="btn ghost sm" onclick="renameBoard()">${ic('pencil',12)}</button>
-    <button class="btn ghost sm" onclick="delBoard()">${ic('trash',12)}</button>
-    <button class="btn ghost sm" onclick="addCol()">${ic('plus',12)} Column</button>
-  </div>
-  <div class="catbar">
-    ${cur.cols.map(x=>{const xs=statsFor(cur.notes.filter(n=>!n.archived),x.id);
-      return `<span class="catchip ${x.id===S.col?'sel':''}" style="background:${x.color}" onclick="selCol('${x.id}')">${esc(x.name)} <span class="cnt">${xs.d}/${xs.t}</span></span>`;}).join('')}
-    <span class="catchip" style="background:#B4B2A9" onclick="addCol()">${ic('plus',12)}</span>
-  </div>
-  <div class="board-wrap">
-    <div class="rail">
-      ${cur.cols.map(x=>{const xs=statsFor(cur.notes.filter(n=>!n.archived),x.id);
-        return `<button class="rcol ${x.id===S.col?'sel':''}" style="background:${x.color}" onclick="selCol('${x.id}')">
-          <span class="rname">${esc(x.name)}</span><span class="rcount">${xs.d}/${xs.t}</span></button>`;}).join('')}
-      <button class="add-rail" onclick="addCol()">${ic('plus',12)} Add column</button>
-    </div>
-    ${c?openColHtml(c):'<div class="open-col"><div class="empty" style="padding:30px 20px;text-align:center">Add your first category to get going.</div></div>'}
-  </div>`;
-}
-function openColHtml(c){
-  const notes=cur.notes.filter(n=>n.column_id===c.id&&!n.archived).sort((a,b)=>a.done-b.done||(a.position??0)-(b.position??0));
-  const archived=cur.notes.filter(n=>n.column_id===c.id&&n.archived);
-  const cs=statsFor(cur.notes.filter(n=>!n.archived),c.id);
-  return `<div class="open-col">
-    <div class="col-head" style="background:${c.color}">
-      <h3>${esc(c.name)}</h3><span class="count">${cs.d}/${cs.t}</span>
-      ${notes.some(n=>n.done)?`<button title="Archive done" onclick="archiveDone('${c.id}')">${ic('check',14)}</button>`:''}
-      <button title="Rename" onclick="renameCol('${c.id}')">${ic('pencil',13)}</button>
-      <button title="Delete" onclick="delCol('${c.id}')">${ic('x',14)}</button>
-    </div>
-    <div class="quickadd">
-      <input id="qa-in" placeholder="Add a task — type and press Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAdd('${c.id}');}">
-      <button class="btn accent" onclick="quickAdd('${c.id}')">${ic('plus',14)}</button>
-    </div>
-    <div class="notes-grid">
-      ${notes.map(n=>{const u=usr(n.assignee);const st=n.subtasks||[];const sd=st.filter(s=>s.d).length;
-        const short=n.description&&n.description.length>140?n.description.slice(0,140)+'…':n.description;
-        return `<div class="note ${n.done?'done':''}" style="--note-c:${c.color};--note-bg:${tint(c.color,7)}" onclick="noteModal('${n.id}')">
-          <button class="note-del" title="Delete" onclick="event.stopPropagation();delNote('${n.id}')">${ic('trash',13)}</button>
-          <h4>${esc(n.title)}</h4>
-          ${dueChip(n)}
-          ${short?`<p>${esc(short)}</p>`:''}
-          ${st.length?`<div style="font-size:10.5px;font-weight:700;color:var(--muted);margin-bottom:6px">${sd}/${st.length} steps
-            <span style="display:block;height:4px;background:rgba(0,0,0,.07);border-radius:3px;margin-top:3px"><i style="display:block;height:100%;width:${Math.round(sd/st.length*100)}%;background:${c.color};border-radius:3px"></i></span></div>`:''}
-          <div class="meta">
-            <button class="chk ${n.done?'on':''}" onclick="event.stopPropagation();toggleDone('${n.id}')">${n.done?'✓':''}</button>
-            ${u?avatar(u):''}<span class="who">${u?esc(u.name.split(' ')[0]):'Unassigned'}</span>
-            <button style="color:var(--muted);padding:0 2px" title="Add to my Today" onclick="event.stopPropagation();addToToday('${n.id}')">${ic('sun',13)}</button>
-          </div>
-        </div>`;}).join('')||'<div class="empty">No tasks here yet — add one above.</div>'}
-    </div>
-    ${archived.length?`<details style="margin:0 16px 16px"><summary style="list-style:none;cursor:pointer;font-size:11.5px;font-weight:800;color:var(--muted)">ARCHIVE (${archived.length}) ▾</summary>
-      ${archived.map(n=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)">
-        <span style="flex:1;font-size:12.5px;text-decoration:line-through;opacity:.6">${esc(n.title)}</span>
-        <button class="btn ghost sm" onclick="unarchive('${n.id}')">${ic('undo',11)} Restore</button></div>`).join('')}</details>`:''}
-  </div>`;
-}
-function dueChip(n){
-  if(!n.due_date)return '';
-  const label=new Date(n.due_date+'T12:00').toLocaleDateString('en-ZA',{day:'numeric',month:'short'});
-  const days=Math.round((new Date(n.due_date+'T00:00:00Z')-new Date(saDate()+'T00:00:00Z'))/86400000);
-  if(n.done)return `<span class="due" style="background:rgba(0,0,0,.06);color:var(--muted)">${ic('calendar',10)} ${label}</span>`;
-  if(days<0)return `<span class="due" style="background:var(--danger);color:#fff">${ic('alert',10)} ${label} · ${-days}d over</span>`;
-  if(days<=(n.warn_days??7))return `<span class="due" style="background:#FAEEDA;color:#854F0B">${ic('calendar',10)} ${label} · ${days===0?'today':days+'d'}</span>`;
-  return `<span class="due" style="background:rgba(0,0,0,.06);color:var(--muted)">${ic('calendar',10)} ${label}</span>`;
-}
-function selCol(id){S.col=id;render();}
-async function quickAdd(colId){
-  const el=$('qa-in'),t=el?el.value.trim():''; if(!t)return;
-  try{
-    const {data,error}=await sb.from('bbe_notes').insert({workspace_id:WS.id,board_id:S.board,column_id:colId,title:t,created_by:SESSION.user.id,position:cur.notes.filter(n=>n.column_id===colId).length}).select().single();
-    if(error)throw error;
-    cur.notes.push(data);render();
-    setTimeout(()=>{const e=$('qa-in');if(e)e.focus();},30);
-  }catch(e){fail(e);}
-}
-async function toggleDone(id){
-  const n=cur.notes.find(x=>x.id===id);
-  try{const {error}=await sb.from('bbe_notes').update({done:!n.done}).eq('id',id);if(error)throw error;n.done=!n.done;render();}catch(e){fail(e);}
-}
-let _lastDeleted=null;
-async function delNote(id){
-  const n=cur.notes.find(x=>x.id===id); if(!n)return;
-  try{
-    const {error}=await sb.from('bbe_notes').delete().eq('id',id); if(error)throw error;
-    _lastDeleted={...n}; cur.notes=cur.notes.filter(x=>x.id!==id); render();
-    toast(`Deleted “${esc(n.title.slice(0,30))}”`,'Undo',async()=>{
-      try{const {error:e2}=await sb.from('bbe_notes').insert(_lastDeleted);if(e2)throw e2;
-      cur.notes.push(_lastDeleted);render();}catch(e){fail(e);}});
-  }catch(e){fail(e);}
-}
-async function archiveDone(colId){
-  try{const {error}=await sb.from('bbe_notes').update({archived:true}).eq('column_id',colId).eq('done',true).eq('archived',false);
-  if(error)throw error;await loadBoard();render();toast('Done tasks archived','Undo',async()=>{await sb.from('bbe_notes').update({archived:false}).eq('column_id',colId).eq('archived',true);await loadBoard();render();});}catch(e){fail(e);}
-}
-async function unarchive(id){try{await sb.from('bbe_notes').update({archived:false}).eq('id',id);await loadBoard();render();}catch(e){fail(e);}}
-async function addCol(){
-  const name=prompt('Category name:'); if(!name)return;
-  try{const {error}=await sb.from('bbe_columns').insert({workspace_id:WS.id,board_id:S.board,name:name.trim(),color:CYCLE[cur.cols.length%CYCLE.length],position:cur.cols.length});
-  if(error)throw error;await loadBoard();render();}catch(e){fail(e);}
-}
-async function renameCol(id){
-  const c=cur.cols.find(x=>x.id===id);const n=prompt('Rename category:',c.name);if(!n)return;
-  try{await sb.from('bbe_columns').update({name:n.trim()}).eq('id',id);await loadBoard();render();}catch(e){fail(e);}
-}
-async function delCol(id){
-  const c=cur.cols.find(x=>x.id===id);
-  if(!confirm(`Delete “${c.name}” and its tasks?`))return;
-  try{await sb.from('bbe_columns').delete().eq('id',id);S.col=null;await loadBoard();render();}catch(e){fail(e);}
-}
-async function renameBoard(){
-  const b=BOARDS.find(x=>x.id===S.board);
-  const name=prompt('Board name:',b.name);if(name===null)return;
-  const date=prompt('Date label:',b.date_label||'');if(date===null)return;
-  try{await sb.from('bbe_boards').update({name:name.trim()||b.name,date_label:date.trim()}).eq('id',b.id);await loadWs();render();}catch(e){fail(e);}
-}
-async function delBoard(){
-  const b=BOARDS.find(x=>x.id===S.board);
-  if(!confirm(`Delete the whole board “${b.name}”? This can't be undone.`))return;
-  try{await sb.from('bbe_boards').delete().eq('id',b.id);S.board=null;await loadWs();await loadBoard();go('boards');}catch(e){fail(e);}
-}
-/* ============ NOTE MODAL ============ */
-let _subs=[];
-function noteModal(id){
-  const n=cur.notes.find(x=>x.id===id); if(!n)return;
-  _subs=(n.subtasks||[]).map(s=>({t:s.t,d:!!s.d}));
-  openModal(`<h3>${esc(n.title)}</h3>
-    <label>Task</label><input id="f-title" value="${esc(n.title)}">
-    <label>Details</label><textarea id="f-desc" rows="3">${esc(n.description||'')}</textarea>
-    <label>Steps</label><div id="f-subs"></div>
-    <div style="display:flex;gap:8px;margin-top:6px">
-      <input id="f-subnew" placeholder="Add a step… (Enter)" onkeydown="if(event.key==='Enter'){event.preventDefault();subAdd();}">
-      <button class="btn ghost" type="button" onclick="subAdd()">${ic('plus',13)}</button>
-    </div>
-    <div style="display:flex;gap:10px">
-      <div style="flex:1"><label>Deadline</label><input type="date" id="f-due" value="${n.due_date||''}"></div>
-      <div style="width:120px"><label>Flag days</label><input type="number" id="f-warn" value="${n.warn_days??7}" min="0" max="90"></div>
-    </div>
-    <label>Allocated to</label>
-    <select id="f-who"><option value="">Unassigned</option>${MEMBERS.map(m=>`<option value="${m.user_id}" ${m.user_id===n.assignee?'selected':''}>${esc(m.name)}</option>`).join('')}</select>
-    <label>Category</label>
-    <select id="f-col">${cur.cols.map(x=>`<option value="${x.id}" ${x.id===n.column_id?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
-    <label>Status</label>
-    <select id="f-done"><option value="0" ${!n.done?'selected':''}>To do</option><option value="1" ${n.done?'selected':''}>Done</option></select>
-    <div class="row">
-      <button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="closeModal();delNote('${id}')">${ic('trash',13)}</button>
-      <button class="btn ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn accent" onclick="saveNote('${id}')">Save</button>
-    </div>`);
-  renderSubs();
-}
-function renderSubs(){
-  const el=$('f-subs'); if(!el)return;
-  el.innerHTML=_subs.map((s,i)=>`<div style="display:flex;align-items:center;gap:9px;padding:4px 0">
-    <button type="button" class="chk ${s.d?'on':''}" onclick="subToggle(${i})">${s.d?'✓':''}</button>
-    <span style="flex:1;font-size:13px;${s.d?'text-decoration:line-through;opacity:.5':''}">${esc(s.t)}</span>
-    <button type="button" style="color:var(--muted)" onclick="subDel(${i})">${ic('x',12)}</button>
-  </div>`).join('')||'<div class="empty" style="padding:4px 0">No steps yet.</div>';
-}
-function subAdd(){const v=$('f-subnew').value.trim();if(!v)return;_subs.push({t:v,d:false});$('f-subnew').value='';renderSubs();}
-function subToggle(i){_subs[i].d=!_subs[i].d;renderSubs();}
-function subDel(i){_subs.splice(i,1);renderSubs();}
-async function saveNote(id){
-  const p=$('f-subnew'); if(p&&p.value.trim())_subs.push({t:p.value.trim(),d:false});
-  const n=cur.notes.find(x=>x.id===id); const prevWho=n.assignee;
-  const patch={title:$('f-title').value.trim()||n.title,description:$('f-desc').value.trim(),
-    assignee:$('f-who').value||null,column_id:$('f-col').value,done:$('f-done').value==='1',
-    subtasks:_subs,due_date:$('f-due').value||null,warn_days:Math.max(0,Math.min(90,parseInt($('f-warn').value,10)||7))};
-  try{
-    const {error}=await sb.from('bbe_notes').update(patch).eq('id',id);if(error)throw error;
-    if(patch.assignee&&patch.assignee!==prevWho&&patch.assignee!==SESSION.user.id)
-      await sb.from('bbe_notifications').insert({workspace_id:WS.id,user_id:patch.assignee,body:`${MEM.name.split(' ')[0]} allocated to you: ${patch.title}`,color:MEM.color});
-    closeModal();await loadBoard();render();toast('Saved');
-  }catch(e){fail(e);}
-}
-/* ============ MONEY ============ */
-function moneyView(){
-  const b=BOARDS.find(x=>x.id===S.board);
-  if(!b)return `<div class="empty">Choose a board first.</div>`;
-  const sum=a=>a.reduce((t,x)=>t+Number(x.amount||0),0);
-  const inc=cur.invs.filter(i=>i.kind==='in'),out=cur.invs.filter(i=>i.kind==='out');
-  const led=(list,kind)=>`<div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:13px 16px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px">${kind==='in'?'Money in (clients owe us)':'Money out (we owe suppliers)'} · ${Rand(sum(list))}</div>
-    ${list.map(i=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);${i.paid?'opacity:.5':''}">
-      <button class="chk ${i.paid?'on':''}" onclick="payInv('${i.id}')">${i.paid?'✓':''}</button>
-      <div style="flex:1;min-width:0"><b style="font-size:13.5px">${esc(i.party)}</b>
-        <span style="display:block;font-size:11px;color:var(--muted)">${esc(i.descr||'')}${i.due_date?' · due '+i.due_date:''}</span></div>
-      <b style="font-size:13.5px;flex:none">${Rand(i.amount)}</b>
-      <button style="color:var(--muted)" onclick="delInv('${i.id}')">${ic('x',12)}</button>
-    </div>`).join('')||'<div class="empty" style="padding:14px 16px">Nothing yet.</div>'}
-  </div>`;
-  return `<div class="view-title"><h2>${ic('money',18)} Money</h2><span class="sub">${esc(b.name)}</span>
-    <span style="flex:1"></span>
-    <span class="pill" style="background:${sum(inc)-sum(out)>=0?'var(--ok)':'var(--danger)'}">net ${Rand(sum(inc)-sum(out))}</span>
-    <button class="btn accent sm" onclick="invModal()">${ic('plus',12)} Add</button></div>
-  <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))">${led(out,'out')}${led(inc,'in')}</div>`;
-}
-function invModal(){
-  openModal(`<h3>Add invoice</h3>
-    <label>Type</label><select id="iv-kind"><option value="out">We owe (supplier)</option><option value="in">Owed to us (client)</option></select>
-    <label>Who</label><input id="iv-party" placeholder="e.g. SoundHire">
-    <label>For</label><input id="iv-descr" placeholder="e.g. Stage audio deposit">
-    <div style="display:flex;gap:10px">
-      <div style="flex:1"><label>Amount (R)</label><input id="iv-amount" type="number" min="0"></div>
-      <div style="flex:1"><label>Due date</label><input id="iv-due" type="date"></div>
-    </div>
-    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
-    <button class="btn accent" onclick="saveInv()">Add</button></div>`);
-}
-async function saveInv(){
-  const party=$('iv-party').value.trim(),amount=Number($('iv-amount').value||0);
-  if(!party||!amount){toast('Who and how much?');return;}
-  try{const {error}=await sb.from('bbe_invoices').insert({workspace_id:WS.id,board_id:S.board,kind:$('iv-kind').value,party,descr:$('iv-descr').value.trim(),amount,due_date:$('iv-due').value||null});
-  if(error)throw error;closeModal();await loadBoard();render();toast('Invoice added');}catch(e){fail(e);}
-}
-async function payInv(id){const i=cur.invs.find(x=>x.id===id);
-  try{await sb.from('bbe_invoices').update({paid:!i.paid,paid_at:!i.paid?new Date().toISOString():null}).eq('id',id);i.paid=!i.paid;render();}catch(e){fail(e);}}
-async function delInv(id){
-  const i=cur.invs.find(x=>x.id===id);
-  try{await sb.from('bbe_invoices').delete().eq('id',id);const copy={...i};cur.invs=cur.invs.filter(x=>x.id!==id);render();
-  toast('Invoice removed','Undo',async()=>{await sb.from('bbe_invoices').insert(copy);await loadBoard();render();});}catch(e){fail(e);}
-}
-/* ============ TEAM ============ */
-const canManage=()=>MEM&&['owner','admin'].includes(MEM.role);
-function teamView(){
-  return `<div class="view-title"><h2>${ic('users',18)} Team</h2><span class="sub">${MEMBERS.length} member${MEMBERS.length!==1?'s':''}</span>
-    <span style="flex:1"></span>${canManage()?`<button class="btn accent sm" onclick="inviteModal()">${ic('plus',12)} Add member</button>`:''}</div>
-  <div class="card" style="padding:6px 16px">
-    ${MEMBERS.map(m=>`<div class="member-row">${avatar(m)}
-      <div class="m"><b>${esc(m.name)}${m.user_id===SESSION.user.id?' (you)':''}</b><span>${esc(m.email)}</span></div>
-      <span class="rolebadge">${m.role}</span>
-      ${canManage()?`<button style="color:var(--muted);padding:3px" onclick="editMemberModal('${m.user_id}')">${ic('pencil',13)}</button>`:''}
-      ${canManage()&&m.user_id!==SESSION.user.id&&m.role!=='owner'?`<button style="color:var(--danger);padding:3px" onclick="removeMember('${m.user_id}')">${ic('trash',13)}</button>`:''}
-    </div>`).join('')}
-  </div>
-  ${planEff()==='free'?`<p style="font-size:12px;color:var(--muted);margin-top:12px">Free plan: up to 3 members. Upgrade for an unlimited team.</p>`:''}`;
-}
-function inviteModal(){
-  openModal(`<h3>Add a team member</h3>
-    <p style="font-size:12.5px;color:var(--muted);margin-top:2px">They'll get an email with the address and their login details.</p>
-    <label>Full name</label><input id="im-name">
-    <label>Email</label><input id="im-email" type="email">
-    <label>Temporary password (min 8 — they change it later)</label><input id="im-pw">
-    <label>Role</label><select id="im-role"><option value="member">Member</option><option value="admin">Admin</option></select>
-    <label>Colour</label><div class="swatches" id="im-colors">${CYCLE.map((c,i)=>`<button type="button" style="background:${c}" class="${i===0?'sel':''}" onclick="pickSwatch(this)" data-c="${c}"></button>`).join('')}</div>
-    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
-    <button class="btn accent" id="im-go" onclick="sendInvite()">Add member</button></div>`);
-}
-function pickSwatch(el){el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');}
-async function sendInvite(){
-  const name=$('im-name').value.trim(),email=$('im-email').value.trim(),pw=$('im-pw').value;
-  if(!name||!email||pw.length<8){toast('Name, email and an 8-character password');return;}
-  const b=$('im-go');b.disabled=true;b.textContent='Adding…';
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-invite`,{method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},
-      body:JSON.stringify({workspace_id:WS.id,email,password:pw,name,role:$('im-role').value,color:document.querySelector('#im-colors .sel').dataset.c})});
-    const j=await res.json();
-    if(!res.ok||j.error){if(/FREE_LIMIT/.test(j.error||''))throw new Error('Free plan is 3 members — upgrade for more.');throw new Error(j.error||'Could not add');}
-    closeModal();await loadWs();render();
-    toast(j.emailed?`${name.split(' ')[0]} added — details emailed`:`${name.split(' ')[0]} added — share the password yourself`);
-  }catch(e){fail(e);b.disabled=false;b.textContent='Add member';}
-}
-function editMemberModal(uid){
-  const m=MEMBERS.find(x=>x.user_id===uid); if(!m)return;
-  openModal(`<h3>Edit ${esc(m.name.split(' ')[0])}</h3>
-    <label>Full name</label><input id="em-name" value="${esc(m.name)}">
-    ${m.role!=='owner'?`<label>Role</label><select id="em-role"><option value="member" ${m.role==='member'?'selected':''}>Member</option><option value="admin" ${m.role==='admin'?'selected':''}>Admin</option></select>`:''}
-    <label>Colour</label><div class="swatches" id="em-colors">${CYCLE.map(c=>`<button type="button" style="background:${c}" class="${c===m.color?'sel':''}" onclick="pickSwatch(this)" data-c="${c}"></button>`).join('')}</div>
-    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
-    <button class="btn accent" onclick="saveMemberEdit('${uid}')">Save</button></div>`);
-}
-async function saveMemberEdit(uid){
-  const m=MEMBERS.find(x=>x.user_id===uid);
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    const body={action:'update',workspace_id:WS.id,user_id:uid,name:$('em-name').value.trim(),color:document.querySelector('#em-colors .sel').dataset.c};
-    if(m.role!=='owner'&&$('em-role'))body.role=$('em-role').value;
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-invite`,{method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},body:JSON.stringify(body)});
-    const j=await res.json(); if(!res.ok||j.error)throw new Error(j.error||'Could not update');
-    closeModal();await loadWs();render();toast('Member updated');
-  }catch(e){fail(e);}
-}
-async function removeMember(uid){
-  const m=MEMBERS.find(x=>x.user_id===uid);
-  if(!confirm(`Remove ${m.name} from ${WS.name}? Their tasks become unassigned.`))return;
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-invite`,{method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},
-      body:JSON.stringify({action:'remove',workspace_id:WS.id,user_id:uid})});
-    const j=await res.json(); if(!res.ok||j.error)throw new Error(j.error||'Could not remove');
-    await loadWs();render();toast(`${m.name.split(' ')[0]} removed`);
-  }catch(e){fail(e);}
-}
-/* ============ SETTINGS ============ */
-function settingsView(){
-  const t=(WS.theme)||{};
-  return `<div class="view-title"><h2>${ic('gear',18)} Settings</h2><span class="sub">${esc(WS.name)}</span></div>
-  <div class="settings-grid">
-    <div class="card">
-      <h3 style="font-size:15px;margin-bottom:4px">Workspace</h3>
-      <label>Name</label><input id="st-name" value="${esc(WS.name)}" ${canManage()?'':'disabled'}>
-      <label>Plan</label>
-      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
-        <span class="pill" style="background:${planEff()!=='free'?'var(--ok)':'var(--muted)'}">${WS.plan==='trial'?`Trial · ${trialDaysLeft()} days left`:WS.plan==='pro'?'Pro':WS.plan==='basic'?'Basic — AI available on Pro':'Free'}</span>
-        ${planEff()==='free'?'<span style="font-size:12px;color:var(--muted)">1 board · 3 members · powered by Brand Expert</span>':''}
-      </div>
-      <label>AI credits</label>
-      <div id="cred-line">${(()=>{if(WS.plan!=='basic')setTimeout(loadCredits,60);return creditsHtml();})()}</div>
-      ${canManage()?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-        ${WS.plan!=='pro'&&WS.plan!=='basic'?`<button class="btn accent sm" onclick="checkout('pro')">Upgrade to Pro — R299/month</button>`:''}
-        ${planEff()==='pro'?`<button class="btn ghost sm" onclick="checkout('topup')">Top up — R99 for 120 credits</button>`:''}
-      </div>`:''}
-      ${canManage()?`<div class="row" style="justify-content:flex-start"><button class="btn accent sm" onclick="saveWsName()">Save name</button></div>`:''}
-      ${MYWS.length>1?`<label>Switch workspace</label><select onchange="localStorage.setItem('bbe_ws',this.value);refresh()">${MYWS.map(m=>`<option value="${m.workspace_id}" ${m.workspace_id===WS.id?'selected':''}>${m.workspace_id===WS.id?esc(WS.name):'Workspace '+m.workspace_id.slice(0,6)}</option>`).join('')}</select>`:''}
-    </div>
-    <div class="card">
-      <h3 style="font-size:15px;margin-bottom:4px">Theme</h3>
-      <label>Preset</label>
-      <div class="swatches">${Object.entries(PRESETS).map(([k,p])=>`<button type="button" title="${k}" style="background:${p.accent}" class="${(t.preset||'classic')===k?'sel':''}" onclick="setTheme('${k}')"></button>`).join('')}</div>
-      <p style="font-size:12px;color:var(--muted);margin-top:12px">The accent colours your buttons, highlights and progress bars. Category colours are set per category on each board.</p>
-    </div>
-    <div class="card">
-      <h3 style="font-size:15px;margin-bottom:4px">Connected socials</h3>
-      <p style="font-size:12px;color:var(--muted);margin:6px 0 10px">${planEff()==='pro'?'Approved posts publish themselves at the scheduled time.':'Auto-posting is a Pro feature — on the free plan you plan and copy-paste.'}</p>
-      <div id="soc-list">${(()=>{if(planEff()==='pro')setTimeout(loadSocials,60);return '<div class="empty">Checking connections…</div>';})()}</div>
-      ${planEff()==='pro'&&canManage()?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px">
-        ${['instagram','facebook','youtube','tiktok','linkedin'].map(p=>`<button class="chip" onclick="connectSocial('${p}')">${ic('plus',11)} ${PLAT[p][0]}</button>`).join('')}
-      </div>`:''}
-    </div>
-    <div class="card">
-      <h3 style="font-size:15px;margin-bottom:4px">You</h3>
-      <div style="display:flex;align-items:center;gap:10px;margin:10px 0">${avatar(MEM)}<div><b style="font-size:14px">${esc(MEM.name)}</b><span style="display:block;font-size:11.5px;color:var(--muted)">${esc(MEM.email)} · ${MEM.role}</span></div></div>
-      <div class="row" style="justify-content:flex-start">
-        <button class="btn ghost sm" onclick="changePw()">Change password</button>
-        <button class="btn ghost sm" onclick="signOut()">Sign out</button>
-      </div>
-    </div>
-  </div>`;
-}
-async function saveWsName(){
-  const name=$('st-name').value.trim(); if(!name)return;
-  try{await sb.from('bbe_workspaces').update({name}).eq('id',WS.id);await loadWs();render();toast('Saved');}catch(e){fail(e);}
-}
-async function setTheme(preset){
-  if(!canManage()){toast('Only the owner or an admin can change the theme');return;}
-  try{const theme={...(WS.theme||{}),preset,accent:PRESETS[preset].accent};
-  await sb.from('bbe_workspaces').update({theme}).eq('id',WS.id);WS.theme=theme;applyTheme();render();}catch(e){fail(e);}
-}
-/* ============ CONTENT (social calendar) ============ */
-const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],linkedin:['LinkedIn','#0F6E8E'],other:['Other','#8a887e']};
-let _calMonth=null;
-function contentView(){
-  const b=BOARDS.find(x=>x.id===S.board);
-  if(!b)return `<div class="empty" style="text-align:center;padding:60px 20px">Choose a board first.<br><br><button class="btn accent" onclick="go('boards')">Boards</button></div>`;
-  if(!_calMonth)_calMonth=saDate().slice(0,7);
-  const [Y,M]=_calMonth.split('-').map(Number);
-  const first=new Date(Date.UTC(Y,M-1,1));
-  const startDow=(first.getUTCDay()+6)%7;
-  const daysIn=new Date(Date.UTC(Y,M,0)).getUTCDate();
-  const today=saDate();
-  const posts=cur.posts||[];
-  const byDate={}; posts.forEach(p=>{(byDate[p.post_date]=byDate[p.post_date]||[]).push(p);});
-  let cells='';
-  for(let i=0;i<startDow;i++)cells+='<div></div>';
-  for(let d=1;d<=daysIn;d++){
-    const ds=`${Y}-${String(M).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dp=byDate[ds]||[];
-    cells+=`<div onclick="postModal(null,'${ds}')" style="min-height:74px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:5px 6px;cursor:pointer;${ds===today?'outline:2px solid var(--accent);outline-offset:-2px;':''}">
-      <div style="font-size:10.5px;font-weight:700;color:var(--muted)">${d}</div>
-      ${dp.slice(0,3).map(p=>`<div onclick="event.stopPropagation();postModal('${p.id}')" title="${esc(p.caption.slice(0,80))}" style="font-size:9.5px;font-weight:700;color:#fff;background:${PLAT[p.platform][1]};border-radius:5px;padding:2px 5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${p.status==='posted'?'opacity:.45;':''}">${p.status==='approved'?'✓ ':p.status==='scheduled'?'⏱ ':''}${PLAT[p.platform][0]}</div>`).join('')}
-      ${dp.length>3?`<div style="font-size:9px;color:var(--muted);font-weight:700;margin-top:2px">+${dp.length-3} more</div>`:''}
-    </div>`;
-  }
-  const monthLbl=first.toLocaleDateString('en-ZA',{month:'long',year:'numeric',timeZone:'UTC'});
-  const upcoming=posts.filter(p=>p.post_date>=today&&p.status!=='posted').slice(0,8);
-  return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2><span class="sub">${esc(b.name)} · plan, draft and post in one place</span>
-    <span style="flex:1"></span><button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button></div>
-  <div class="card" style="padding:14px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <button class="btn ghost sm" onclick="calShift(-1)">‹</button>
-      <b style="flex:1;text-align:center;font-size:14.5px">${monthLbl}</b>
-      <button class="btn ghost sm" onclick="calShift(1)">›</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:10px;font-weight:800;color:var(--muted);text-align:center;margin-bottom:5px">
-      <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${cells}</div>
-  </div>
-  <div style="margin-top:16px">
-    <div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.05em;margin-bottom:8px">COMING UP</div>
-    ${upcoming.map(p=>`<div class="task-row" style="--c:${PLAT[p.platform][1]}" onclick="postModal('${p.id}')">
-      <span class="pill" style="background:${PLAT[p.platform][1]};flex:none">${PLAT[p.platform][0]}</span>
-      <div class="t"><b>${esc(p.caption.split('\\n')[0].slice(0,70)||'(no caption yet)')}</b>
-        <span>${p.post_date} · ${(p.post_time||'').slice(0,5)} · ${p.status}</span></div>
-      <button class="btn ghost sm" onclick="event.stopPropagation();copyCaption('${p.id}')">Copy</button>
-    </div>`).join('')||'<div class="empty">Nothing scheduled — click a day on the calendar to plan a post.</div>'}
-  </div>`;
-}
-function calShift(n){
-  const [Y,M]=_calMonth.split('-').map(Number);
-  const d=new Date(Date.UTC(Y,M-1+n,1));
-  _calMonth=d.toISOString().slice(0,7); render();
-}
-function postModal(id,dateStr){
-  const p=id?(cur.posts||[]).find(x=>x.id===id):null;
-  openModal(`<h3>${p?'Edit post':'New post'}</h3>
-    <label>Platform</label>
-    <select id="po-plat">${Object.entries(PLAT).map(([k,[n]])=>`<option value="${k}" ${p&&p.platform===k?'selected':''}>${n}</option>`).join('')}</select>
-    <label>Caption ${planEff()==='pro'?`<button type="button" style="float:right;color:var(--accent);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0" onclick="draftAI()">✦ Draft with AI</button>`:''}</label>
-    <textarea id="po-cap" rows="6" placeholder="Write it yourself — or tell the AI what the post is about and press ✦">${p?esc(p.caption):''}</textarea>
-    <label>Media note (what image/video goes with it)</label>
-    <input id="po-media" value="${p?esc(p.media_note||''):''}" placeholder="e.g. medal design photo, 1080x1080">
-    <div style="display:flex;gap:10px">
-      <div style="flex:1"><label>Date</label><input type="date" id="po-date" value="${p?p.post_date:(dateStr||saDate())}"></div>
-      <div style="width:110px"><label>Time</label><input type="time" id="po-time" value="${p?(p.post_time||'09:00').slice(0,5):'09:00'}"></div>
-    </div>
-    <label>Status</label>
-    <select id="po-status">
-      <option value="draft" ${!p||p.status==='draft'?'selected':''}>Draft</option>
-      <option value="approved" ${p&&p.status==='approved'?'selected':''}>Approved — ready to post</option>
-      <option value="posted" ${p&&p.status==='posted'?'selected':''}>Posted</option>
-    </select>
-    <div class="row">
-      ${p?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="delPost('${p.id}')">${ic('trash',13)}</button>`:''}
-      ${p?`<button class="btn ghost" onclick="copyCaption('${p.id}')">Copy caption</button>`:''}
-      ${p&&planEff()==='pro'&&p.status!=='posted'&&p.platform!=='other'?`<button class="btn" onclick="publishPost('${p.id}')">⏱ Auto-post</button>`:''}
-      <button class="btn ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn accent" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save':'Add to calendar'}</button>
-    </div>`);
-}
-async function draftAI(){
-  const brief=$('po-cap').value.trim()||prompt('What is this post about? One or two lines:');
-  if(!brief)return;
-  const cap=$('po-cap'); cap.value='✦ Drafting…'; cap.disabled=true;
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-draft`,{method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},
-      body:JSON.stringify({workspace_id:WS.id,board_id:S.board,platform:$('po-plat').value,brief})});
-    const j=await res.json();
-    if(j.error==='OUT_OF_CREDITS'){cap.value=brief;cap.disabled=false;toast(j.message||'Out of AI credits — top up in Settings');return;}
-    if(!res.ok||j.error)throw new Error(j.error||'Drafting failed');
-    cap.value=j.text;
-    if(typeof j.credits_left==='number'){_credits=j.credits_left;toast(`✦ Drafted — ${j.credits_left} credits left`);}
-  }catch(e){cap.value=brief;fail(e);}
-  cap.disabled=false;
-}
-async function savePost(id){
-  const row={workspace_id:WS.id,board_id:S.board,platform:$('po-plat').value,caption:$('po-cap').value.trim(),
-    media_note:$('po-media').value.trim(),post_date:$('po-date').value,post_time:$('po-time').value||'09:00',
-    status:$('po-status').value,created_by:SESSION.user.id};
-  if(!row.post_date){toast('Pick a date');return;}
-  try{
-    if(id){const {error}=await sb.from('bbe_posts').update(row).eq('id',id);if(error)throw error;}
-    else{const {error}=await sb.from('bbe_posts').insert(row);if(error)throw error;}
-    closeModal();await loadBoard();render();toast(id?'Post updated':'On the calendar');
-  }catch(e){fail(e);}
-}
-async function delPost(id){
-  const p=(cur.posts||[]).find(x=>x.id===id);
-  try{await sb.from('bbe_posts').delete().eq('id',id);const copy={...p};cur.posts=cur.posts.filter(x=>x.id!==id);closeModal();render();
-  toast('Post removed','Undo',async()=>{await sb.from('bbe_posts').insert(copy);await loadBoard();render();});}catch(e){fail(e);}
-}
-async function copyCaption(id){
-  const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
-  try{await navigator.clipboard.writeText(p.caption);toast('Caption copied — paste it straight into the app');}catch(_){toast('Could not copy');}
-}
-
-/* ============ CONNECTED SOCIALS (PostPeer) ============ */
-let _socAccounts=null;
-async function socialApi(body){
-  const {data:{session}}=await sb.auth.getSession();
-  const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-social`,{method:'POST',
-    headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},
-    body:JSON.stringify({workspace_id:WS.id,...body})});
-  return await res.json();
-}
-async function loadSocials(){
-  try{const j=await socialApi({action:'accounts'});
-  _socAccounts=j.ok?(j.accounts||[]):[];
-  const el=$('soc-list'); if(el)el.innerHTML=socListHtml();}catch(_){_socAccounts=[];}
-}
-function socListHtml(){
-  if(_socAccounts===null)return '<div class="empty">Checking connections…</div>';
-  if(!_socAccounts.length)return '<div class="empty">Nothing connected yet — pick a platform below. A window opens where you sign in and approve; then it posts on your behalf.</div>';
-  return _socAccounts.map(a=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid var(--line)">
-    <span class="pill" style="background:${(PLAT[a.platform]||PLAT.other)[1]}">${(PLAT[a.platform]||PLAT.other)[0]}</span>
-    <span style="flex:1;font-size:13px;color:var(--muted)">connected</span>
-    <span style="font-size:11px;color:var(--ok);font-weight:700">● live</span>
-  </div>`).join('');
-}
-async function connectSocial(platform){
-  try{
-    const j=await socialApi({action:'connect',platform});
-    if(j.error){toast(j.message||j.error);return;}
-    window.open(j.url,'_blank');
-    toast('Approve the connection in the new tab, then come back and refresh');
-  }catch(e){fail(e);}
-}
-async function publishPost(id){
-  const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
-  if(!confirm(`Send "${(p.caption.split('\n')[0]||'this post').slice(0,60)}" to ${(PLAT[p.platform]||PLAT.other)[0]} — ${p.post_date} at ${(p.post_time||'09:00').slice(0,5)}?`))return;
-  toast('Sending to the scheduler…');
-  try{
-    const j=await socialApi({action:'publish',post_id:id});
-    if(j.error==='NO_ACCOUNTS'){toast(j.message);return;}
-    if(j.error){toast('⚠ '+(j.message||j.error));return;}
-    closeModal();await loadBoard();render();
-    toast(j.scheduled?'⏱ Scheduled — it posts itself at the set time':'Posted! It is live now');
-  }catch(e){fail(e);}
-}
-
-/* ============ BILLING (PayFast) ============ */
-let _credits=null;
-async function loadCredits(){
-  try{const {data,error}=await sb.rpc('bbe_credit_balance',{ws:WS.id});
-  if(!error&&data&&data.ok)_credits=data.left;else _credits=null;
-  const el=$('cred-line'); if(el)el.innerHTML=creditsHtml();}catch(_){}
-}
-function creditsHtml(){
-  if(WS.plan==='basic')return '<span style="font-size:12px;color:var(--muted)">AI is not part of this plan.</span>';
-  if(_credits===null)return '<span style="font-size:12px;color:var(--muted)">Checking credits…</span>';
-  return `<b style="font-size:20px">${_credits}</b> <span style="font-size:12px;color:var(--muted)">AI credits left${planEff()==='pro'?' · 100 refill monthly':' · taster credits'}</span>`;
-}
-async function checkout(kind){
-  try{
-    toast('Opening secure payment…');
-    const {data:{session}}=await sb.auth.getSession();
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-checkout`,{method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},
-      body:JSON.stringify({workspace_id:WS.id,kind})});
-    const j=await res.json();
-    if(!res.ok||j.error)throw new Error(j.error||'Could not start checkout');
-    const f=document.createElement('form'); f.method='POST'; f.action=j.action;
-    for(const [k,v] of j.fields){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;f.appendChild(i);}
-    document.body.appendChild(f); f.submit();
-  }catch(e){fail(e);}
-}
-function billingReturnCheck(){
-  const q=new URLSearchParams(location.search);
-  if(q.get('billing')==='success'){history.replaceState(null,'',location.pathname);
-    setTimeout(()=>toast('💳 Payment received — your plan updates within a minute'),800);}
-  if(q.get('billing')==='cancelled'){history.replaceState(null,'',location.pathname);
-    setTimeout(()=>toast('Payment cancelled — nothing was charged'),800);}
-}
-
-/* ============ MODAL / REALTIME / BOOT ============ */
-function openModal(html){$('modal').innerHTML=html;$('overlay').classList.add('open');}
-function closeModal(){$('overlay').classList.remove('open');}
-$('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
-let rt=null,rtT=null;
-function subscribeRealtime(){
-  if(rt)sb.removeChannel(rt);
-  rt=sb.channel('bbe-changes').on('postgres_changes',{event:'*',schema:'public'},p=>{
-    if(!p.table||!p.table.startsWith('bbe_'))return;
-    clearTimeout(rtT);
-    rtT=setTimeout(()=>{if($('overlay').classList.contains('open'))return;refresh();},600);
-  }).subscribe();
-}
-async function boot(){
-  try{
-    await loadWs();
-    if(WS){await loadBoard();await ensureToday();subscribeRealtime();}
-    render();
-  }catch(e){fail(e);render();}
-}
-(async()=>{
-  const {data:{session}}=await sb.auth.getSession();
-  SESSION=session;
-  billingReturnCheck();
-  if(SESSION)await boot(); else render();
-  sb.auth.onAuthStateChange((ev,s)=>{
-    SESSION=s;
-    if(ev==='PASSWORD_RECOVERY'){openModal(`<h3>Set a new password</h3>
-      <label>New password (min 8)</label><input id="rp-new" type="password">
-      <div class="row"><button class="btn accent" onclick="doResetPw()">Save</button></div>`);return;}
-    if(!s){WS=null;render();}
-  });
-})();
-async function doResetPw(){
-  const pw=$('rp-new').value; if(pw.length<8){toast('Minimum 8 characters');return;}
-  try{const {error}=await sb.auth.updateUser({password:pw});if(error)throw error;
-  closeModal();await boot();toast('🔑 Password updated');}catch(e){fail(e);}
-}
+try{if(Object.keys(localStorage).some(k=>k.startsWith('sb-'))){var b=document.getElementById('signin-btn');if(b)b.textContent='Open your boards →';}}catch(e){}
 </script>
 </body>
 </html>
