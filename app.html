@@ -326,6 +326,7 @@ async function ensureToday(){
 function render(){
   const app=$('app');
   if(!SESSION){app.innerHTML=authView();return;}
+  if(!SESSION.user.email_confirmed_at){app.innerHTML=verifyView();return;}
   if(!WS){app.innerHTML=noWsView();return;}
   const tdOpen=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&!tdDone(t)).length;
   const tabs=[['today','sun','Today'],['boards','home','Boards'],['board','board','Board'],['content','calendar','Content'],['money','money','Money'],['team','users','Team']];
@@ -365,7 +366,7 @@ function authView(){
       <h3>Sign in</h3><div class="sub">Welcome back — your boards are waiting.</div>
       <div class="auth-err" id="a-err"></div>
       <label>Email</label><input id="a-email" type="email" autocomplete="username" placeholder="you@company.co.za">
-      <label>Password</label><input id="a-pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()">
+      <label>Password</label>${pwField('a-pw','current-password','doSignIn')}
       <button class="btn accent" style="width:100%;justify-content:center;padding:12px;margin-top:18px" onclick="doSignIn()">Sign in</button>
       <button style="width:100%;color:var(--muted);font-weight:600;font-size:12.5px;margin-top:12px;text-decoration:underline" onclick="doForgot()">Forgot password?</button>
       <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--muted)">New here? <button style="color:var(--accent);font-weight:700" onclick="_authMode='up';render()">Create your workspace</button></div>
@@ -375,13 +376,24 @@ function authView(){
       <label>Your name</label><input id="a-name" placeholder="e.g. Helen Kruger">
       <label>Workspace name</label><input id="a-ws" placeholder="e.g. Brand Expert Events">
       <label>Email</label><input id="a-email" type="email" autocomplete="username">
-      <label>Password (min 8 characters)</label><input id="a-pw" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignUp()">
+      <label>Password (min 8 characters)</label>${pwField('a-pw','new-password','doSignUp')}
       <button class="btn accent" style="width:100%;justify-content:center;padding:12px;margin-top:18px" id="a-go" onclick="doSignUp()">Create workspace</button>
       <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--muted)">Already have an account? <button style="color:var(--accent);font-weight:700" onclick="_authMode='in';render()">Sign in</button></div>
       `}
     </div>
     <div style="font-size:11px;color:var(--muted);font-weight:600">powered by <a href="https://brandexpert.co.za" style="color:var(--accent);text-decoration:none;font-weight:700">Brand Expert</a></div>
   </div>`;
+}
+ICONS.eye='<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>';
+ICONS.eyeoff='<path d="M2.5 12s3.5-6.5 9.5-6.5c1.8 0 3.4.55 4.7 1.3M21.5 12s-3.5 6.5-9.5 6.5c-1.8 0-3.4-.55-4.7-1.3"/><path d="M4 20 20 4"/>';
+function pwField(id,autocomplete,onEnter){
+  return `<div style="position:relative"><input id="${id}" type="password" autocomplete="${autocomplete}" style="padding-right:40px" ${onEnter?`onkeydown="if(event.key==='Enter')${onEnter}()"`:''}>
+    <button type="button" tabindex="-1" title="Show/hide password" style="position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--muted);display:flex" onclick="togglePw('${id}',this)">${ic('eye',16)}</button></div>`;
+}
+function togglePw(id,btn){
+  const i=document.getElementById(id); if(!i)return;
+  i.type=i.type==='password'?'text':'password';
+  btn.innerHTML=ic(i.type==='password'?'eye':'eyeoff',16);
 }
 function authErr(m){const e=$('a-err');if(e){e.textContent=m;e.style.display='block';}}
 async function doSignIn(){
@@ -401,16 +413,31 @@ async function doSignUp(){
     const j=await res.json();
     if(!res.ok||j.error)throw new Error(j.error||'Could not create the workspace');
     const {error}=await sb.auth.signInWithPassword({email,password:pw});
-    if(error)throw error;
+    if(error&&!/confirm/i.test(error.message))throw error;
     const {data:{session}}=await sb.auth.getSession(); SESSION=session;
-    await boot(); toast('🎉 Welcome — your workspace is ready');
+    if(SESSION)await boot(); else {_authMode='in';render();}
+    toast('📬 Almost there — confirm your email via the link we just sent');
   }catch(e){authErr(e.message||String(e));b.disabled=false;b.textContent='Create workspace';}
 }
 async function doForgot(){
   const pre=$('a-email')?$('a-email').value.trim():'';
   const email=prompt('Your account email — a reset link will be sent:',pre); if(!email)return;
-  try{const {error}=await sb.auth.resetPasswordForEmail(email.trim(),{redirectTo:location.origin+location.pathname});
-  if(error)throw error; toast('📬 Reset link sent — check your email');}catch(e){fail(e);}
+  try{await fetch(`${SUPABASE_URL}/functions/v1/bbe-auth`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({action:'forgot',email:email.trim()})});
+  toast('📬 Reset link sent — check your email (also spam)');}catch(e){fail(e);}
+}
+async function resendConfirm(){
+  const email=SESSION?.user?.email; if(!email)return;
+  try{await fetch(`${SUPABASE_URL}/functions/v1/bbe-auth`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({action:'verify',email})});
+  toast('📬 Confirmation email sent — check your inbox');}catch(e){fail(e);}
+}
+function verifyView(){
+  return `<div class="auth"><div class="auth-card" style="text-align:center">
+    <h3>Confirm your email</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin:10px 0 18px">We sent a confirmation link to <b>${esc(SESSION.user.email)}</b>.<br>Click it and your workspace opens — that's it.</p>
+    <button class="btn accent" onclick="resendConfirm()">Resend the email</button>
+    <button class="btn ghost" style="margin-left:8px" onclick="signOut()">Sign out</button>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:16px">Wrong address? Sign out and create the workspace again with the right one.</p>
+  </div></div>`;
 }
 function noWsView(){
   return `<div class="auth"><div class="auth-card" style="text-align:center">
@@ -1414,7 +1441,31 @@ async function boot(){
     render();
   }catch(e){fail(e);render();}
 }
+async function authLinkCheck(){
+  const q=new URLSearchParams(location.search);
+  const confirm=q.get('confirm'), pwreset=q.get('pwreset');
+  if(!confirm&&!pwreset)return false;
+  history.replaceState({},'',location.pathname);
+  try{
+    if(confirm){
+      const {data,error}=await sb.auth.verifyOtp({type:'magiclink',token_hash:confirm});
+      if(error)throw error;
+      SESSION=data.session; await boot(); toast('✅ Email confirmed — welcome!'); return true;
+    }
+    if(pwreset){
+      const {data,error}=await sb.auth.verifyOtp({type:'recovery',token_hash:pwreset});
+      if(error)throw error;
+      SESSION=data.session;
+      openModal(`<h3>Set a new password</h3>
+      <label>New password (min 8)</label>${pwField('rp-new','new-password',null)}
+      <div class="row"><button class="btn accent" onclick="doResetPw()">Save</button></div>`);
+      render(); return true;
+    }
+  }catch(e){toast('That link has expired — request a fresh one.');render();return true;}
+  return false;
+}
 (async()=>{
+  if(await authLinkCheck())return;
   const {data:{session}}=await sb.auth.getSession();
   SESSION=session;
   billingReturnCheck();
@@ -1422,7 +1473,7 @@ async function boot(){
   sb.auth.onAuthStateChange((ev,s)=>{
     SESSION=s;
     if(ev==='PASSWORD_RECOVERY'){openModal(`<h3>Set a new password</h3>
-      <label>New password (min 8)</label><input id="rp-new" type="password">
+      <label>New password (min 8)</label>${pwField('rp-new','new-password',null)}
       <div class="row"><button class="btn accent" onclick="doResetPw()">Save</button></div>`);return;}
     if(!s){WS=null;render();}
   });
