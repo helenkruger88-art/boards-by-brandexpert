@@ -1441,28 +1441,53 @@ async function boot(){
     render();
   }catch(e){fail(e);render();}
 }
+let _linkToken=null;
 async function authLinkCheck(){
   const q=new URLSearchParams(location.search);
   const confirm=q.get('confirm'), pwreset=q.get('pwreset');
   if(!confirm&&!pwreset)return false;
   history.replaceState({},'',location.pathname);
-  try{
-    if(confirm){
-      const {data,error}=await sb.auth.verifyOtp({type:'magiclink',token_hash:confirm});
-      if(error)throw error;
-      SESSION=data.session; await boot(); toast('✅ Email confirmed — welcome!'); return true;
-    }
-    if(pwreset){
-      const {data,error}=await sb.auth.verifyOtp({type:'recovery',token_hash:pwreset});
-      if(error)throw error;
-      SESSION=data.session;
-      openModal(`<h3>Set a new password</h3>
+  // The token is only consumed when the person clicks — email security scanners
+  // that pre-open links can't burn it.
+  _linkToken=confirm||pwreset;
+  const app=$('app');
+  if(pwreset){
+    app.innerHTML=`<div class="auth"><div class="auth-card">
+      <h3>Set a new password</h3>
+      <div class="auth-err" id="a-err"></div>
       <label>New password (min 8)</label>${pwField('rp-new','new-password',null)}
-      <div class="row"><button class="btn accent" onclick="doResetPw()">Save</button></div>`);
-      render(); return true;
-    }
-  }catch(e){toast('That link has expired — request a fresh one.');render();return true;}
-  return false;
+      <button class="btn accent" style="width:100%;justify-content:center;padding:12px;margin-top:18px" id="rp-go" onclick="doLinkReset()">Save my new password</button>
+      <div style="text-align:center;font-size:12px;margin-top:14px;color:var(--muted)">Link expired? <button style="color:var(--accent);font-weight:700" onclick="location.href=location.pathname">Back to sign in</button> and use "Forgot password?" — the newest email is the one that works.</div>
+    </div></div>`;
+  }else{
+    app.innerHTML=`<div class="auth"><div class="auth-card" style="text-align:center">
+      <h3>Confirm your email</h3>
+      <div class="auth-err" id="a-err"></div>
+      <p style="font-size:13.5px;color:var(--muted);margin:10px 0 18px">One click and you're in.</p>
+      <button class="btn accent" style="width:100%;justify-content:center;padding:12px" id="cf-go" onclick="doLinkConfirm()">Confirm &amp; open my workspace</button>
+    </div></div>`;
+  }
+  return true;
+}
+async function doLinkReset(){
+  const pw=$('rp-new').value; if(pw.length<8){authErr('Minimum 8 characters.');return;}
+  const b=$('rp-go');b.disabled=true;b.textContent='Saving…';
+  try{
+    const {data,error}=await sb.auth.verifyOtp({type:'recovery',token_hash:_linkToken});
+    if(error)throw new Error('That link has expired or was already used — go back to sign in and request a fresh one (only the newest email works).');
+    SESSION=data.session;
+    const {error:e2}=await sb.auth.updateUser({password:pw});
+    if(e2)throw e2;
+    await boot(); toast('🔑 Password updated — welcome back');
+  }catch(e){authErr(e.message||String(e));b.disabled=false;b.textContent='Save my new password';}
+}
+async function doLinkConfirm(){
+  const b=$('cf-go');b.disabled=true;b.textContent='Confirming…';
+  try{
+    const {data,error}=await sb.auth.verifyOtp({type:'magiclink',token_hash:_linkToken});
+    if(error)throw new Error('That link has expired or was already used — sign in and press "Resend the email" for a fresh one.');
+    SESSION=data.session; await boot(); toast('✅ Email confirmed — welcome!');
+  }catch(e){authErr(e.message||String(e));b.disabled=false;b.textContent='Confirm & open my workspace';}
 }
 (async()=>{
   if(await authLinkCheck())return;
