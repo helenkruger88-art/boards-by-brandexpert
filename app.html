@@ -1099,6 +1099,14 @@ function contentView(){
       <button class="btn ghost sm" onclick="event.stopPropagation();copyCaption('${p.id}')">Copy</button>
     </div>`).join('')||'<div class="empty">Nothing scheduled — click a day on the calendar to plan a post.</div>'}
   </div>
+  ${(_socAccounts&&_socAccounts.length)?`<div class="card" style="padding:14px;margin-top:16px" id="perf-card">
+    <div style="display:flex;align-items:center;gap:8px">
+      <b style="font-size:11px;letter-spacing:.05em;color:var(--muted)">LAST 30 DAYS</b>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" onclick="boardStats(true)" title="Refresh from the platforms">↻</button>
+    </div>
+    <div id="perf-body" style="margin-top:8px">${(()=>{setTimeout(()=>boardStats(false),120);return '<div class="empty">Loading performance…</div>';})()}</div>
+  </div>`:''}
   </div>
   ${_contentSplit?`<div style="flex:1;min-width:270px;position:sticky;top:14px">${contentTasksPanel()}</div>`:''}
   </div>`;
@@ -1128,6 +1136,7 @@ function postModal(id,dateStr){
       <div style="flex:1"><label>Date</label><input type="date" id="po-date" value="${p?p.post_date:(dateStr||saDate())}"></div>
       <div style="width:110px"><label>Time</label><input type="time" id="po-time" value="${p?(p.post_time||'09:00').slice(0,5):'09:00'}"></div>
     </div>
+    ${p&&p.postpeer_id?`<div id="po-stats" style="display:flex;gap:14px;flex-wrap:wrap;background:var(--panel,#F4F3EE);border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:var(--muted)">Loading stats…${(()=>{setTimeout(()=>postStats(p.id),80);return '';})()}</div>`:''}
     <label>Status</label>
     <select id="po-status">
       <option value="draft" ${!p||p.status==='draft'?'selected':''}>Draft</option>
@@ -1195,7 +1204,8 @@ async function loadSocials(){
   try{const j=await socialApi({action:'accounts',board_id:S.board});
   _socAccounts=j.ok?(j.accounts||[]):[];
   if(j.content_boards_used!==undefined){_cbUsed=j.content_boards_used;_cbAllowed=j.content_boards_allowed;}
-  const el=$('soc-list'); if(el)el.innerHTML=socListHtml();}catch(_){_socAccounts=[];}
+  const el=$('soc-list'); if(el)el.innerHTML=socListHtml();
+  if(S.view==='content'&&_socAccounts.length&&!document.getElementById('perf-card'))render();}catch(_){_socAccounts=[];}
 }
 function socListHtml(){
   if(_socAccounts===null)return '<div class="empty">Checking connections…</div>';
@@ -1229,6 +1239,36 @@ async function connectSocial(platform){
     window.open(j.url,'_blank');
     toast('Approve the connection in the new tab, then come back and refresh');
   }catch(e){fail(e);}
+}
+function statNum(n){n=Number(n||0);return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n);}
+async function postStats(id){
+  const el=document.getElementById('po-stats'); if(!el)return;
+  try{
+    const j=await socialApi({action:'stats',post_id:id});
+    if(j.error){el.innerHTML=`<span>${esc(j.message||'No stats yet.')}</span>`;return;}
+    const a=j.stats.aggregated||{};
+    el.innerHTML=[['👁',a.impressions,'impressions'],['♥',a.likes,'likes'],['💬',a.comments,'comments'],['↗',a.shares,'shares'],['⚑',a.saves,'saves']]
+      .filter(x=>x[1]!==undefined&&x[1]!==null)
+      .map(([i,v,t])=>`<span title="${t}" style="font-weight:700;color:var(--ink)">${i} ${statNum(v)}</span>`).join('')
+      +(a.engagementRate!=null?`<span title="engagement rate" style="font-weight:700;color:var(--accent)">${(Number(a.engagementRate)).toFixed(1)}% eng.</span>`:'');
+  }catch(_){el.textContent='Stats unavailable right now.';}
+}
+async function boardStats(force){
+  const el=document.getElementById('perf-body'); if(!el)return;
+  if(force)el.innerHTML='<div class="empty">Fetching fresh numbers…</div>';
+  try{
+    const j=await socialApi({action:'board_stats',board_id:S.board});
+    if(j.error){el.innerHTML=`<div class="empty">${esc(j.message||j.error)}</div>`;return;}
+    const t=j.analytics.totals||{};
+    el.innerHTML=`<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">
+      ${[['Posts',t.posts],['Impressions',t.impressions],['Likes',t.likes],['Comments',t.comments],['Shares',t.shares]].map(([l,v])=>`<div><b style="font-size:17px;display:block">${statNum(v)}</b><span style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.03em">${l.toUpperCase()}</span></div>`).join('')}
+    </div>
+    ${(j.analytics.top||[]).slice(0,3).map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:12px">
+      <span class="pill" style="background:${(PLAT[p.platform]||PLAT.other)[1]};flex:none;font-size:9.5px">${(PLAT[p.platform]||PLAT.other)[0]}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.content||'(media post)')}</span>
+      <span style="color:var(--muted);flex:none">♥ ${statNum(p.likes)} · 💬 ${statNum(p.comments)}</span>
+    </div>`).join('')}`;
+  }catch(_){el.innerHTML='<div class="empty">Stats unavailable right now.</div>';}
 }
 async function publishPost(id){
   const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
