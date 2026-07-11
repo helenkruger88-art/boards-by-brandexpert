@@ -991,8 +991,6 @@ function allBoardsView(){
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
     ${BOARDS.map(b=>`<span class="chip" style="cursor:pointer" onclick="switchContentBoard('${b.id}')"><span style="width:10px;height:10px;border-radius:3px;background:${boardHue(b.id)};display:inline-block"></span> ${esc(b.name)}</span>`).join('')}
   </div>
-  <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
-  <div style="flex:1.7;min-width:340px">
   <div class="card" style="padding:14px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <button class="btn ghost sm" onclick="calShift(-1)">‹</button>
@@ -1080,6 +1078,8 @@ function contentView(){
       ${canManage()?['instagram','facebook','youtube','tiktok','linkedin'].map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join(''):''}
     </div>
   </div>`:''}
+  <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+  <div style="flex:1.7;min-width:340px">
   <div class="card" style="padding:14px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <button class="btn ghost sm" onclick="calShift(-1)">‹</button>
