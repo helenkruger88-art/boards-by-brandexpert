@@ -992,7 +992,7 @@ async function saveAccent(){
   await sb.from('bbe_workspaces').update({theme}).eq('id',WS.id);WS.theme=theme;applyTheme();render();toast('Accent applied');}catch(e){fail(e);}
 }
 /* ============ CONTENT (social calendar) ============ */
-const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],linkedin:['LinkedIn','#0F6E8E'],other:['Other','#8a887e']};
+const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],other:['Other','#8a887e']};
 let _calMonth=null,_contentAll=false,_allPosts=[];
 const BOARD_HUES=['#0F6E56','#C75B12','#534AB7','#185FA5','#993556','#BA7517','#3B6D11','#0E7490','#72243E'];
 const boardHue=id=>{const b=BOARDS.find(x=>x.id===id);if(b&&b.color)return b.color;const i=BOARDS.findIndex(x=>x.id===id);return BOARD_HUES[(i<0?0:i)%BOARD_HUES.length];};
@@ -1115,7 +1115,7 @@ function contentView(){
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
       <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
       <span style="flex:1"></span>
-      ${canManage()?['instagram','facebook','youtube','tiktok','linkedin'].map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join('')+`<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" title="Link your Facebook Page + Instagram so comments and messages land in the Inbox" onclick="fbConnect()">${ic('mail',10)} Inbox: connect FB Page</button>`:''}
+      ${canManage()?['instagram','facebook','youtube','tiktok','threads','linkedin'].map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join('')+`<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" title="Link your Facebook Page + Instagram so comments and messages land in the Inbox" onclick="fbConnect()">${ic('mail',10)} Inbox: connect FB Page</button>`:''}
     </div>
   </div>`:''}
   <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
@@ -1172,6 +1172,11 @@ function postModal(id,dateStr){
     <textarea id="po-cap" rows="6" placeholder="Write it yourself — or tell the AI what the post is about and press ✦">${p?esc(p.caption):''}</textarea>
     <label>Media note (what image/video goes with it)</label>
     <input id="po-media" value="${p?esc(p.media_note||''):''}" placeholder="e.g. medal design photo, 1080x1080">
+    <label>Images / video <span style="font-weight:500;text-transform:none;letter-spacing:0">— attached media publishes with the post</span></label>
+    <div id="po-thumbs" style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px">${(_postMedia=(p&&p.media?[...p.media]:[]),_postMedia.map((m,ix)=>mediaThumb(m,ix)).join(''))}</div>
+    <input type="file" id="po-file" accept="image/*,video/mp4,video/quicktime" multiple style="display:none" onchange="uploadPostMedia(this.files)">
+    <button type="button" class="btn ghost sm" onclick="document.getElementById('po-file').click()">＋ Add images / video</button>
+    <span id="po-upl" style="font-size:11.5px;color:var(--muted);margin-left:8px"></span>
     <div style="display:flex;gap:10px">
       <div style="flex:1"><label>Date</label><input type="date" id="po-date" value="${p?p.post_date:(dateStr||saDate())}"></div>
       <div style="width:110px"><label>Time</label><input type="time" id="po-time" value="${p?(p.post_time||'09:00').slice(0,5):'09:00'}"></div>
@@ -1186,6 +1191,7 @@ function postModal(id,dateStr){
     <div class="row">
       ${p?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="delPost('${p.id}')">${ic('trash',13)}</button>`:''}
       ${p?`<button class="btn ghost" onclick="copyCaption('${p.id}')">Copy caption</button>`:''}
+      ${p?`<button class="btn ghost" onclick="dupModal('${p.id}')" title="Create copies of this post for other platforms — tweak each caption before it goes out">⧉ Also post on…</button>`:''}
       ${p&&paidAI()&&p.status!=='posted'&&p.platform!=='other'?`<button class="btn" onclick="publishPost('${p.id}')">⏱ Auto-post</button>`:''}
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
       <button class="btn accent" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save':'Add to calendar'}</button>
@@ -1208,10 +1214,29 @@ async function draftAI(){
   }catch(e){cap.value=brief;fail(e);}
   cap.disabled=false;
 }
+let _postMedia=[];
+function mediaThumb(m,ix){
+  return `<span style="position:relative;display:inline-block">${m.type==='image'?`<img src="${m.url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`:`<span style="display:flex;width:64px;height:64px;border-radius:8px;background:var(--panel,#F4F3EE);align-items:center;justify-content:center;font-size:22px;border:1px solid var(--line)">🎬</span>`}
+  <button type="button" onclick="_postMedia.splice(${ix},1);document.getElementById('po-thumbs').innerHTML=_postMedia.map(mediaThumb).join('')" style="position:absolute;top:-6px;right:-6px;background:var(--ink,#23241f);color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;line-height:1">✕</button></span>`;
+}
+async function uploadPostMedia(files){
+  const st=document.getElementById('po-upl');
+  for(const f of files){
+    if(f.size>50*1024*1024){toast(f.name+' is over 50MB');continue;}
+    st.textContent='Uploading '+f.name+'…';
+    const path=WS.id+'/'+Date.now()+'-'+f.name.replace(/[^\w.\-]+/g,'_');
+    const {error}=await sb.storage.from('post-media').upload(path,f,{upsert:true});
+    if(error){toast('Upload failed: '+error.message);continue;}
+    const {data}=sb.storage.from('post-media').getPublicUrl(path);
+    _postMedia.push({type:f.type.startsWith('video')?'video':'image',url:data.publicUrl});
+  }
+  st.textContent='';
+  document.getElementById('po-thumbs').innerHTML=_postMedia.map(mediaThumb).join('');
+}
 async function savePost(id){
   const row={workspace_id:WS.id,board_id:S.board,platform:$('po-plat').value,caption:$('po-cap').value.trim(),
     media_note:$('po-media').value.trim(),post_date:$('po-date').value,post_time:$('po-time').value||'09:00',
-    status:$('po-status').value,created_by:SESSION.user.id};
+    status:$('po-status').value,created_by:SESSION.user.id,media:_postMedia};
   if(!row.post_date){toast('Pick a date');return;}
   try{
     if(id){const {error}=await sb.from('bbe_posts').update(row).eq('id',id);if(error)throw error;}
@@ -1357,6 +1382,37 @@ async function boardStats(force){
     </div>`).join('')}`;
   }catch(_){el.innerHTML='<div class="empty">Stats unavailable right now.</div>';}
 }
+function dupModal(id){
+  const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
+  const plats=Object.keys(PLAT).filter(k=>k!=='other'&&k!==p.platform);
+  openModal(`<h3>Also post on…</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:4px 0 10px">Creates a copy per platform on the same day & time. Open each copy to tweak the wording, then approve or auto-post as usual.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${plats.map(k=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;background:var(--panel,#F4F3EE);border-radius:9px;padding:7px 11px;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="dup-p" value="${k}"> <span class="pill" style="background:${PLAT[k][1]};font-size:10px;padding:2px 8px">${PLAT[k][0]}</span></label>`).join('')}</div>
+    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600"><input type="checkbox" id="dup-ai" ${paidAI()?'':'disabled'}> ✦ Let AI adapt the caption to each platform (1 credit each)${paidAI()?'':' — Pro feature'}</label>
+    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn accent" onclick="dupPost('${p.id}')">Create copies</button></div>`);
+}
+async function dupPost(id){
+  const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
+  const plats=[...document.querySelectorAll('.dup-p:checked')].map(c=>c.value);
+  if(!plats.length){toast('Pick at least one platform');return;}
+  const useAI=document.getElementById('dup-ai').checked;
+  closeModal(); toast('Creating '+plats.length+' cop'+(plats.length>1?'ies':'y')+'…');
+  try{
+    for(const plat of plats){
+      let caption=p.caption;
+      if(useAI){
+        try{
+          const {data:{session}}=await sb.auth.getSession();
+          const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-draft`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,platform:plat,topic:'Rewrite this exact post for '+PLAT[plat][0]+', keeping the message and tone but fitting the platform\'s style and length:\n\n'+p.caption})});
+          const j=await r.json(); if(j.caption)caption=j.caption; if(j.credits_left!==undefined)_credits=j.credits_left;
+        }catch(_){}
+      }
+      await sb.from('bbe_posts').insert({workspace_id:WS.id,board_id:p.board_id,platform:plat,caption,media_note:p.media_note,media:p.media||[],post_date:p.post_date,post_time:p.post_time,status:'draft'});
+    }
+    await loadBoard(); render(); toast('✅ Copies created — tap each to review');
+  }catch(e){fail(e);}
+}
 async function publishPost(id){
   const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
   if(!confirm(`Send "${(p.caption.split('\n')[0]||'this post').slice(0,60)}" to ${(PLAT[p.platform]||PLAT.other)[0]} — ${p.post_date} at ${(p.post_time||'09:00').slice(0,5)}?`))return;
@@ -1403,7 +1459,7 @@ function billingReturnCheck(){
   if(q.get('billing')==='cancelled'){history.replaceState(null,'',location.pathname);
     setTimeout(()=>toast('Payment cancelled — nothing was charged'),800);}
   if(q.get('connected')){const p=q.get('connected');history.replaceState(null,'',location.pathname);
-    setTimeout(()=>{toast('🎉 '+p.charAt(0).toUpperCase()+p.slice(1)+' connected — approved posts can now publish themselves');if(typeof go==='function')go('settings');},900);}
+    setTimeout(()=>{toast('🎉 '+p.charAt(0).toUpperCase()+p.slice(1)+' connected — approved posts can now publish themselves');if(typeof go==='function')go('content');},900);}
 }
 
 /* ============ AI ASSIST (notes chat + day brief) ============ */
