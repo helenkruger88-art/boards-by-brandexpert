@@ -733,12 +733,24 @@ function renameBoard(){
     <label>Name</label><input id="bb-name" value="${esc(b.name)}">
     <label>Date label</label><input id="bb-date" value="${esc(b.date_label||'')}">
     <label>Board colour</label>${swatchGrid('bb-col',b.color||'#C75B12')}
+    <div style="border-top:1px solid var(--line);margin:16px 0 4px;padding-top:12px">
+      <b style="font-size:12px;letter-spacing:.04em;color:var(--muted)">INBOX — WHO ANSWERS SOCIAL MESSAGES</b>
+      <label>Responders <span style="font-weight:500;text-transform:none;letter-spacing:0">(new items go to their Today; blank = owner &amp; admins)</span></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px">${MEMBERS.map(m=>`<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;text-transform:none;letter-spacing:0;font-weight:600;background:var(--panel,#F4F3EE);border-radius:8px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="bb-resp" value="${m.user_id}" ${(b.inbox_responders||[]).includes(m.user_id)?'checked':''}> ${esc(m.name.split(' ')[0])}</label>`).join('')}</div>
+      <div style="display:flex;gap:10px">
+        <div style="flex:1"><label>Answer within (hours)</label><input id="bb-sla" type="number" min="1" max="168" value="${b.inbox_sla_hours||24}"></div>
+        <div style="flex:1.4"><label>Escalate to</label><select id="bb-sup">${MEMBERS.map(m=>`<option value="${m.user_id}" ${(b.inbox_supervisor||'')===m.user_id?'selected':''}>${esc(m.name)}</option>`).join('')}<option value="" ${!b.inbox_supervisor?'selected':''}>Workspace owner (default)</option></select></div>
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin-top:6px">If a comment or message sits unanswered past the window, the escalation contact gets an email.</p>
+    </div>
     <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
     <button class="btn accent" onclick="saveBoardEdit('${b.id}')">Save</button></div>`);
 }
 async function saveBoardEdit(id){
   const b=BOARDS.find(x=>x.id===id);
-  const patch={name:$('bb-name').value.trim()||b.name,date_label:$('bb-date').value.trim(),color:gridColor('bb-col',b.color||'#C75B12')};
+  const resp=[...document.querySelectorAll('.bb-resp:checked')].map(c=>c.value);
+  const patch={name:$('bb-name').value.trim()||b.name,date_label:$('bb-date').value.trim(),color:gridColor('bb-col',b.color||'#C75B12'),
+    inbox_responders:resp.length?resp:null,inbox_sla_hours:Math.max(1,Math.min(168,parseInt($('bb-sla').value)||24)),inbox_supervisor:$('bb-sup').value||null};
   try{await sb.from('bbe_boards').update(patch).eq('id',id);closeModal();await loadWs();render();toast('Board updated');}catch(e){fail(e);}
 }
 async function delBoard(){
