@@ -329,7 +329,7 @@ function render(){
   if(!SESSION.user.email_confirmed_at){app.innerHTML=verifyView();return;}
   if(!WS){app.innerHTML=noWsView();return;}
   const tdOpen=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&!tdDone(t)).length;
-  const tabs=[['today','sun','Today'],['boards','home','Boards'],['board','board','Board'],['content','calendar','Content'],['money','money','Money'],['team','users','Team']];
+  const tabs=[['today','sun','Today'],['boards','home','Boards'],['board','board','Board'],['inbox','mail','Inbox'],['content','calendar','Content'],['money','money','Money'],['team','users','Team']];
   app.innerHTML=`
   <div class="topbar">
     <div class="wordmark" onclick="go('boards')">${esc(WS.name)} <small>· Boards</small></div>
@@ -609,7 +609,11 @@ function boardView(){
     <button class="btn ghost sm" onclick="renameBoard()">${ic('pencil',12)}</button>
     <button class="btn ghost sm" onclick="delBoard()">${ic('trash',12)}</button>
     <button class="btn ghost sm" onclick="addCol()">${ic('plus',12)} Column</button>
+    <button class="btn ${_boardInbox?'accent':'ghost'} sm" onclick="_boardInbox=!_boardInbox;render()" title="Incoming comments & messages for this board">${ic('mail',12)} Inbox</button>
   </div>
+  <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+    ${_boardInbox?`<div style="flex:none;width:300px;max-width:100%">${boardInboxHtml(b.id)}</div>`:''}
+    <div style="flex:1;min-width:280px">
   <div class="catbar">
     ${cur.cols.map(x=>{const xs=statsFor(cur.notes.filter(n=>!n.archived),x.id);
       return `<span class="catchip ${x.id===S.col?'sel':''}" style="background:${x.color}" onclick="selCol('${x.id}')">${esc(x.name)} <span class="cnt">${xs.d}/${xs.t}</span></span>`;}).join('')}
@@ -623,6 +627,8 @@ function boardView(){
       <button class="add-rail" onclick="addCol()">${ic('plus',12)} Add column</button>
     </div>
     ${c?openColHtml(c):'<div class="open-col"><div class="empty" style="padding:30px 20px;text-align:center">Add your first category to get going.</div></div>'}
+  </div>
+    </div>
   </div>`;
 }
 function openColHtml(c){
@@ -1115,7 +1121,7 @@ function contentView(){
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
       <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
       <span style="flex:1"></span>
-      ${canManage()?['instagram','facebook','youtube','tiktok','threads','linkedin'].map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join('')+`<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" title="Link your Facebook Page + Instagram so comments and messages land in the Inbox" onclick="fbConnect()">${ic('mail',10)} Inbox: connect FB Page</button>`:''}
+      ${canManage()?['instagram','facebook','youtube','tiktok','threads','linkedin'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)).map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join('')+`<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" title="Link your Facebook Page + Instagram so comments and messages land in the Inbox" onclick="fbConnect()">${ic('mail',10)} Inbox: connect FB Page</button>`:''}
     </div>
   </div>`:''}
   <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
@@ -1316,7 +1322,7 @@ async function fbConnect(){
   metaApi({action:'setup'});
   location.href=j.url;}catch(e){fail(e);}
 }
-let _inbox=[];let _inboxFilter='new';
+let _inbox=[];let _inboxFilter='new';let _boardInbox=false;
 async function loadInbox(){
   const {data}=await sb.from('bbe_interactions').select('*').eq('workspace_id',WS.id).order('received_at',{ascending:false}).limit(200);
   _inbox=data||[];
@@ -1351,6 +1357,39 @@ async function inboxSet(id,status){
   await sb.from('bbe_interactions').update(patch).eq('id',id);
   const it=_inbox.find(x=>x.id===id);if(it)Object.assign(it,patch);
   render();
+}
+function boardInboxHtml(boardId){
+  setTimeout(async()=>{await loadInbox();const el=document.getElementById('board-inbox-body');if(el)el.innerHTML=boardInboxBody(boardId);},60);
+  return `<div class="card" style="padding:10px 12px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <b style="font-size:12px;letter-spacing:.04em;color:var(--muted)">${ic('mail',13)} INBOX</b>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" style="padding:3px 8px" onclick="syncInbox()" title="Check the connected pages for new comments">↻</button>
+    </div>
+    <div id="board-inbox-body">${boardInboxBody(boardId)}</div>
+  </div>`;
+}
+function boardInboxBody(boardId){
+  const rows=(_inbox||[]).filter(i=>i.board_id===boardId&&i.status!=='dismissed');
+  if(!rows.length)return '<div class="empty" style="padding:20px 8px;text-align:center;font-size:12px">No messages yet.<br>New comments on this board&rsquo;s connected pages will land here.</div>';
+  return rows.map(i=>`<div style="border-left:3px solid ${(PLAT[i.platform]||PLAT.other)[1]};padding:7px 9px;margin-bottom:7px;background:var(--panel,#F4F3EE);border-radius:7px">
+    <div style="font-size:10.5px;color:var(--muted);font-weight:700">${i.kind==='message'?'✉':'💬'} ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})}</div>
+    <div style="font-size:12.5px;margin:3px 0">${esc(i.text||'')}</div>
+    <div style="display:flex;gap:5px;align-items:center">
+      ${i.status!=='answered'?`<button class="btn ghost sm" style="padding:2px 7px;font-size:11px" onclick="inboxSet('${i.id}','answered')">✓ Done</button>`:'<span style="font-size:10.5px;color:var(--ok);font-weight:700">answered</span>'}
+      <button class="btn ghost sm" style="padding:2px 7px;font-size:11px;color:var(--muted)" onclick="inboxSet('${i.id}','dismissed')">Dismiss</button>
+      ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
+    </div>
+  </div>`).join('');
+}
+async function syncInbox(){
+  toast('Checking for new messages…');
+  try{const j=await metaApi({action:'sync'});
+    await loadInbox();
+    const el=document.getElementById('board-inbox-body'); if(el&&S.board)el.innerHTML=boardInboxBody(S.board);
+    const el2=document.getElementById('inbox-list'); if(el2)el2.outerHTML=inboxListHtml();
+    toast(j&&j.added!==undefined?`Synced — ${j.added} new`:'Synced ✓');
+  }catch(e){fail(e);}
 }
 function statNum(n){n=Number(n||0);return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n);}
 async function postStats(id){
