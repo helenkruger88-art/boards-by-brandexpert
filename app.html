@@ -597,8 +597,21 @@ function statsFor(notes,colId){
   const d=ns.filter(n=>n.done).length,t=ns.length;
   return {d,t,p:t?Math.round(d/t*100):0};
 }
+let _home={tasks:[],inbox:[],posts:[],docs:[]};
 function boardsView(){
-  return `<div class="view-title"><h2>${ic('home',18)} ${esc(WS.name)}</h2><span class="sub">${BOARDS.length} board${BOARDS.length!==1?'s':''}</span></div>
+  const first=esc((MEM&&MEM.name?MEM.name.split(' ')[0]:(WS&&WS.name))||'there');
+  const h=new Date(Date.now()+2*3600*1000).getUTCHours();
+  const greet=h<12?'Good morning':h<18?'Good afternoon':'Good evening';
+  setTimeout(loadHome,40);
+  return `<div class="view-title"><h2>${ic('sun',18)} ${greet}, ${first}</h2></div>
+  <div id="home-brief" style="margin:-4px 0 16px;color:var(--muted);font-size:13.5px;font-weight:600">Pulling together your day…</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+    ${homeCard('check','Needs you today','home-tasks','')}
+    ${homeCard('users','Inbox','home-inbox','<span id="home-inbox-count"></span>')}
+    ${homeCard('calendar','Going out this week','home-posts','')}
+    ${homeCard('note','Documents','home-docs','')}
+  </div>
+  <div class="view-title" style="margin-top:26px"><h2 style="font-size:13px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase">${ic('board',14)} Your boards</h2><span class="sub">${BOARDS.length} board${BOARDS.length!==1?'s':''}</span></div>
   <div class="boards-grid">
     ${BOARDS.map(b=>`<div class="board-card" style="border-top-color:${b.color||'var(--accent)'}" onclick="openBoard('${b.id}')">
       <h3>${b.private_to?ic('lock',13)+' ':''}${esc(b.name)}</h3>
@@ -609,6 +622,95 @@ function boardsView(){
     <div class="new-board" onclick="newBoardModal()">${ic('plus',20)} New board</div>
   </div>
   ${(()=>{setTimeout(loadBoardStats,40);return '';})()}`;
+}
+function homeCard(iconName,title,bodyId,extra){
+  return `<div class="card" style="padding:14px 16px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="color:var(--accent);display:flex">${ic(iconName,15)}</span>
+      <b style="font-size:11.5px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">${title}</b>
+      ${extra||''}
+    </div>
+    <div id="${bodyId}"><div style="color:var(--muted);font-size:12px;padding:8px 0">Loading…</div></div>
+  </div>`;
+}
+function homeEmpty(t){return `<div style="color:var(--muted);font-size:12.5px;padding:14px 2px">${t}</div>`;}
+function homeTasks(rows){
+  if(!rows.length)return homeEmpty("Nothing due — you're on top of it.");
+  const today=saDate();
+  return rows.map(n=>{
+    const bn=BOARDS.find(x=>x.id===n.board_id)?.name||'—';
+    const over=n.due_date&&n.due_date<today;
+    return `<div onclick="openBoard('${n.board_id}')" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.title||'Untitled')}</div>
+        <div style="font-size:11px;color:var(--muted)">${esc(bn)}</div>
+      </div>
+      <span style="flex:none;font-size:10.5px;font-weight:700;border-radius:8px;padding:3px 8px;background:${over?'var(--danger)':'var(--bg)'};color:${over?'#fff':'var(--muted)'}">${esc(n.due_date||'—')}</span>
+    </div>`;
+  }).join('');
+}
+function homeInbox(rows){
+  if(!rows.length)return homeEmpty('Inbox zero.');
+  const col={facebook:'#185FA5',instagram:'#C4356B',whatsapp:'#25A366',email:'#6A5ACD'};
+  return rows.map(i=>{
+    const c=col[i.platform]||'#8a887e';
+    return `<div style="display:flex;gap:9px;padding:7px 0;border-bottom:1px solid var(--line)">
+      <span style="flex:none;width:8px;height:8px;border-radius:50%;background:${c};margin-top:5px"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px"><b>${esc(i.author_name||'Someone')}</b> <span style="color:var(--muted);font-size:11px">· ${ago(i.received_at)}</span></div>
+        <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.text||'')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function homePosts(rows){
+  if(!rows.length)return homeEmpty('Nothing scheduled.');
+  return rows.map(p=>{
+    const pl=PLAT[p.platform]||PLAT.other;
+    const cap=(p.caption||'').split('\n')[0];
+    return `<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">
+      <span style="flex:none;font-size:10px;font-weight:800;color:#fff;background:${pl[1]};border-radius:8px;padding:3px 8px">${esc(pl[0])}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cap||'(no caption)')}</div>
+        <div style="font-size:11px;color:var(--muted)">${esc(p.post_date||'')}${p.post_time?' · '+esc(p.post_time):''} · ${esc(p.status||'')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function homeDocs(rows){
+  if(!rows.length)return homeEmpty('No documents yet.');
+  return rows.map(f=>{
+    const bn=BOARDS.find(x=>x.id===f.board_id)?.name||'—';
+    return `<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">
+      <span style="flex:none;color:var(--accent);display:flex">${ic('note',16)}</span>
+      <div style="flex:1;min-width:0">
+        <a href="${esc(f.url||'#')}" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;color:var(--ink);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name||'Untitled')}</a>
+        <div style="font-size:11px;color:var(--muted)">${esc(bn)}${f.source?' · '+esc(f.source):''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function loadHome(){
+  let tasks=[],inbox=[],posts=[],docs=[];
+  try{
+    const [t,i,p,d]=await Promise.all([
+      sb.from('bbe_notes').select('*').eq('workspace_id',WS.id).eq('done',false).eq('archived',false).lte('due_date',saDate()).order('due_date').limit(8),
+      sb.from('bbe_interactions').select('*').eq('workspace_id',WS.id).order('received_at',{ascending:false}).limit(6),
+      sb.from('bbe_posts').select('*').eq('workspace_id',WS.id).gte('post_date',saDate()).neq('status','posted').order('post_date').limit(6),
+      sb.from('bbe_board_files').select('*').eq('workspace_id',WS.id).order('created_at',{ascending:false}).limit(6),
+    ]);
+    tasks=t.data||[];inbox=i.data||[];posts=p.data||[];docs=d.data||[];
+  }catch(e){console.error(e);}
+  _home={tasks,inbox,posts,docs};
+  const newc=inbox.filter(x=>x.status==='new').length;
+  const todayPosts=posts.filter(p=>p.post_date===saDate()).length;
+  const bt=document.getElementById('home-tasks'); if(bt)bt.innerHTML=homeTasks(tasks);
+  const bi=document.getElementById('home-inbox'); if(bi)bi.innerHTML=homeInbox(inbox);
+  const bc=document.getElementById('home-inbox-count'); if(bc)bc.innerHTML=newc?`<span style="background:var(--accent);color:#fff;font-size:10px;font-weight:800;border-radius:10px;padding:2px 7px">${newc} new</span>`:'';
+  const bp=document.getElementById('home-posts'); if(bp)bp.innerHTML=homePosts(posts);
+  const bd=document.getElementById('home-docs'); if(bd)bd.innerHTML=homeDocs(docs);
+  const br=document.getElementById('home-brief');
+  if(br)br.innerHTML=`${tasks.length} task${tasks.length!==1?'s':''} due · ${newc} message${newc!==1?'s':''} waiting · ${todayPosts} post${todayPosts!==1?'s':''} going out today`;
 }
 async function loadBoardStats(){
   const {data}=await sb.from('bbe_notes').select('board_id,done').eq('workspace_id',WS.id);
