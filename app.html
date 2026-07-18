@@ -350,7 +350,7 @@ function render(){
   const tdOpen=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&!tdDone(t)).length;
   const nav=navItems();
   const b=nav.board;
-  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,settings:settingsView,btoday:boardTodayView,board:boardView,content:contentView,binbox:boardInboxView,money:moneyView,team:teamView,setup:boardSetupView};
+  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,settings:settingsView,btoday:boardTodayView,board:boardView,content:contentView,binbox:boardInboxView,files:filesView,money:moneyView,team:teamView,setup:boardSetupView};
   const viewFn=VIEWS[S.view]||boardsView;
   const sItem=([v,i,l])=>`<button class="sb-item ${S.view===v?'on':''}" onclick="go('${v}')">${ic(i,16)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="sb-b">${tdOpen}</span>`:''}</button>`;
   const bItem=([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,19)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="bdot">${tdOpen}</span>`:''}</button>`;
@@ -380,7 +380,7 @@ function render(){
   ${planEff()==='free'?`<a class="cobrand" href="https://brandexpert.co.za" target="_blank" rel="noopener">powered by <b>Brand Expert</b></a>`:''}`;
 }
 function go(v){
-  const bv=['btoday','board','content','binbox','money','team','setup'];
+  const bv=['btoday','board','content','binbox','files','money','team','setup'];
   S.scope=bv.includes(v)?'board':'workspace';
   S.view=v;
   if(v==='today')loadToday().then(render).catch(fail);
@@ -396,6 +396,7 @@ function navItems(){
       const items=[['btoday','sun','Today'],['board','board','Board']];
       if(m.content)items.push(['content','calendar','Content']);
       if(m.inbox)items.push(['binbox','mail','Inbox']);
+      if(m.files)items.push(['files','note','Files']);
       if(m.money)items.push(['money','money','Money']);
       if(m.team)items.push(['team','users','Team']);
       items.push(['setup','gear','Setup']);
@@ -631,7 +632,7 @@ function newBoardModal(){
       <input type="checkbox" id="nb-std" style="width:auto" checked> Start with starter categories</label>
     <label>Modules — change any time in Setup</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
-      ${[['content','Content',true],['inbox','Inbox',true],['money','Money',false],['team','Team',true]].map(([k,l,d])=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;background:var(--bg);border-radius:9px;padding:7px 11px;cursor:pointer;margin:0;width:auto"><input type="checkbox" id="nb-mod-${k}" style="width:auto" ${d?'checked':''}> ${l}</label>`).join('')}
+      ${[['content','Content',true],['inbox','Inbox',true],['files','Files',true],['money','Money',false],['team','Team',true]].map(([k,l,d])=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;background:var(--bg);border-radius:9px;padding:7px 11px;cursor:pointer;margin:0;width:auto"><input type="checkbox" id="nb-mod-${k}" style="width:auto" ${d?'checked':''}> ${l}</label>`).join('')}
     </div>
     <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
     <button class="btn accent" onclick="createBoard()">Create board</button></div>`);
@@ -639,7 +640,7 @@ function newBoardModal(){
 }
 async function createBoard(){
   const name=$('nb-name').value.trim(); if(!name){toast('Give the board a name');return;}
-  const modules={content:$('nb-mod-content').checked,inbox:$('nb-mod-inbox').checked,money:$('nb-mod-money').checked,team:$('nb-mod-team').checked};
+  const modules={content:$('nb-mod-content').checked,inbox:$('nb-mod-inbox').checked,files:$('nb-mod-files').checked,money:$('nb-mod-money').checked,team:$('nb-mod-team').checked};
   try{
     const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),color:gridColor('nb-col','#C75B12'),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id,modules}).select().single();
     if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 board — upgrade for more.');if(/PRO_LIMIT_BOARDS/.test(error.message))throw new Error('Pro includes 10 boards — move to Agency for unlimited.');throw error;}
@@ -669,7 +670,7 @@ function boardInboxView(){
 function boardSetupView(){
   const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
   const m=b.modules||{content:true,inbox:true,money:true,team:true};
-  const MOD=[['content','calendar','Content','Social calendar, AI drafting & auto-posting'],['inbox','mail','Inbox',"Comments & DMs from this board's connected pages"],['money','money','Money','Budget & spend tracking'],['team','users','Team','The team screen for this board']];
+  const MOD=[['content','calendar','Content','Social calendar, AI drafting & auto-posting'],['inbox','mail','Inbox',"Comments & DMs from this board's connected pages"],['files','note','Files','Link Drive/Dropbox folders & documents for the board'],['money','money','Money','Budget & spend tracking'],['team','users','Team','The team screen for this board']];
   return `<div class="view-title"><h2>${ic('gear',18)} Setup <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2></div>
   <div class="card" style="max-width:580px">
     <label>Board name</label><input id="bs-name" value="${esc(b.name)}">
@@ -694,6 +695,48 @@ async function saveBoardSetup(){
   const name=($('bs-name').value||'').trim()||b.name; b.name=name;
   try{await sb.from('bbe_boards').update({name}).eq('id',b.id);toast('Saved');}catch(e){fail(e);}
   render();
+}
+let _files=[];
+function filesView(){
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  setTimeout(async()=>{try{const {data}=await sb.from('bbe_board_files').select('*').eq('board_id',b.id).order('created_at',{ascending:false});_files=data||[];}catch(_){_files=[];}const el=document.getElementById('files-body');if(el)el.innerHTML=filesBody();},50);
+  return `<div class="view-title"><h2>${ic('note',18)} Files <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">links &amp; documents for this board</span><span style="flex:1"></span>${canManage()?`<button class="btn accent sm" onclick="fileModal()">${ic('plus',12)} Add link / folder</button>`:''}</div>
+  <div id="files-body">${filesBody()}</div>`;
+}
+function filesBody(){
+  if(!_files.length)return '<div class="empty" style="padding:26px 4px">No files yet. Link a Google Drive or Dropbox folder, or paste a document link, so the whole board team can find it.</div>';
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px">${_files.map(f=>`<div class="card" style="padding:13px 14px;display:flex;align-items:center;gap:12px">
+    <span style="color:var(--accent);flex:none">${f.kind==='folder'?ic('link',20):ic('note',20)}</span>
+    <div style="flex:1;min-width:0">
+      <a href="${esc(f.url||'#')}" target="_blank" rel="noopener" style="font-weight:700;font-size:13.5px;color:var(--ink);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</a>
+      <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:capitalize">${esc(f.source)} · ${esc(f.kind)} · ${ago(f.created_at)}</div>
+    </div>
+    ${canManage()?`<button class="btn ghost sm" style="color:var(--danger);flex:none" title="Remove" onclick="delFile('${f.id}')">${ic('trash',12)}</button>`:''}
+  </div>`).join('')}</div>`;
+}
+function fileModal(){
+  openModal(`<h3>Add a link or folder</h3>
+    <label>Name</label><input id="fl-name" placeholder="e.g. Sponsor deck, or Event Drive folder">
+    <label>Link — Google Drive, Dropbox, a doc URL…</label><input id="fl-url" placeholder="https://…">
+    <label>Type</label>
+    <select id="fl-kind"><option value="file">File / document</option><option value="folder">Folder</option></select>
+    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn accent" onclick="saveFile()">Add</button></div>`);
+  setTimeout(()=>{const e=$('fl-name');if(e)e.focus();},60);
+}
+async function saveFile(){
+  const name=($('fl-name').value||'').trim(); if(!name){toast('Give it a name');return;}
+  let url=($('fl-url').value||'').trim(); if(url&&!/^https?:\/\//i.test(url))url='https://'+url;
+  const kind=$('fl-kind').value;
+  const src=/drive\.google|docs\.google/i.test(url)?'drive':/dropbox/i.test(url)?'dropbox':'link';
+  try{
+    const {error}=await sb.from('bbe_board_files').insert({workspace_id:WS.id,board_id:S.board,name,url:url||null,source:src,kind,created_by:SESSION.user.id});
+    if(error)throw error;
+    closeModal();
+    const {data}=await sb.from('bbe_board_files').select('*').eq('board_id',S.board).order('created_at',{ascending:false});_files=data||[];render();toast('Added');
+  }catch(e){fail(e);}
+}
+async function delFile(id){
+  try{await sb.from('bbe_board_files').delete().eq('id',id);_files=_files.filter(f=>f.id!==id);render();toast('Removed');}catch(e){fail(e);}
 }
 /* ============ BOARD ============ */
 function boardView(){
