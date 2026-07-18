@@ -1056,6 +1056,8 @@ async function openPostFromAll(postId,boardId){
 }
 let _contentSplit=localStorage.getItem('bbe_csplit')==='1';
 function toggleContentSplit(){_contentSplit=!_contentSplit;localStorage.setItem('bbe_csplit',_contentSplit?'1':'0');render();}
+let _cShow=(()=>{try{return JSON.parse(localStorage.getItem('bbe_cshow'))||{tasks:true,cal:true,inbox:true};}catch(_){return {tasks:true,cal:true,inbox:true};}})();
+function colToggle(k){_cShow[k]=!_cShow[k];localStorage.setItem('bbe_cshow',JSON.stringify(_cShow));render();}
 function contentTasksPanel(){
   const open=cur.notes.filter(n=>!n.archived&&!n.done);
   const doneN=cur.notes.filter(n=>!n.archived&&n.done).length;
@@ -1107,14 +1109,39 @@ function contentView(){
   }
   const monthLbl=first.toLocaleDateString('en-ZA',{month:'long',year:'numeric',timeZone:'UTC'});
   const upcoming=posts.filter(p=>p.post_date>=today&&p.status!=='posted').slice(0,8);
+  const calCol=`<div class="card" style="padding:14px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <button class="btn ghost sm" onclick="calShift(-1)">‹</button>
+      <b style="flex:1;text-align:center;font-size:14.5px">${monthLbl}</b>
+      <button class="btn ghost sm" onclick="calShift(1)">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:10px;font-weight:800;color:var(--muted);text-align:center;margin-bottom:5px">
+      <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${cells}</div>
+    <div style="margin-top:16px">
+      <div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.05em;margin-bottom:8px">COMING UP</div>
+      ${upcoming.map(p=>`<div class="task-row" style="--c:${PLAT[p.platform][1]}" onclick="postModal('${p.id}')">
+        <span class="pill" style="background:${PLAT[p.platform][1]};flex:none">${PLAT[p.platform][0]}</span>
+        <div class="t"><b>${esc(p.caption.split('\\n')[0].slice(0,70)||'(no caption yet)')}</b>
+          <span>${p.post_date} · ${(p.post_time||'').slice(0,5)} · ${p.status}</span></div>
+        <button class="btn ghost sm" onclick="event.stopPropagation();copyCaption('${p.id}')">Copy</button>
+      </div>`).join('')||'<div class="empty">Nothing scheduled — click a day on the calendar to plan a post.</div>'}
+    </div>
+  </div>`;
+  const _cols=[];
+  if(_cShow.tasks)_cols.push(`<div style="flex:1;min-width:250px">${contentTasksPanel()}</div>`);
+  if(_cShow.cal)_cols.push(`<div style="flex:1.5;min-width:300px">${calCol}</div>`);
+  if(_cShow.inbox)_cols.push(`<div style="flex:1;min-width:260px">${boardInboxHtml(S.board)}</div>`);
   return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2>
     <select onchange="switchContentBoard(this.value)" style="width:auto;padding:7px 12px;font-weight:600;font-size:13px">
       ${BOARDS.map(x=>`<option value="${x.id}" ${!_contentAll&&x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}
       ${BOARDS.length>1?`<option value="__all" ${_contentAll?'selected':''}>▦ All boards</option>`:''}
     </select>
-    <span class="sub">this board's calendar & accounts</span>
     <span style="flex:1"></span>
-    <button class="btn ${_contentSplit?'accent':'ghost'} sm" onclick="toggleContentSplit()" title="Show this board's tasks beside the calendar">${ic('board',12)} Tasks</button>
+    <span style="font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-right:2px">COLUMNS</span>
+    <button class="btn ${_cShow.tasks?'accent':'ghost'} sm" onclick="colToggle('tasks')" title="Show or hide the Tasks column">${ic('board',12)} Tasks</button>
+    <button class="btn ${_cShow.cal?'accent':'ghost'} sm" onclick="colToggle('cal')" title="Show or hide the Calendar column">${ic('calendar',12)} Calendar</button>
+    <button class="btn ${_cShow.inbox?'accent':'ghost'} sm" onclick="colToggle('inbox')" title="Show or hide the Inbox column">${ic('mail',12)} Inbox</button>
     <button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button></div>
   ${paidAI()?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -1124,28 +1151,7 @@ function contentView(){
       ${canManage()?['instagram','facebook','youtube','tiktok','threads','linkedin'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)).map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join('')+`<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" title="Link your Facebook Page + Instagram so comments and messages land in the Inbox" onclick="fbConnect()">${ic('mail',10)} Inbox: connect FB Page</button>`:''}
     </div>
   </div>`:''}
-  <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
-  <div style="flex:1.7;min-width:340px">
-  <div class="card" style="padding:14px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <button class="btn ghost sm" onclick="calShift(-1)">‹</button>
-      <b style="flex:1;text-align:center;font-size:14.5px">${monthLbl}</b>
-      <button class="btn ghost sm" onclick="calShift(1)">›</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:10px;font-weight:800;color:var(--muted);text-align:center;margin-bottom:5px">
-      <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${cells}</div>
-  </div>
-  <div style="margin-top:16px">
-    <div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.05em;margin-bottom:8px">COMING UP</div>
-    ${upcoming.map(p=>`<div class="task-row" style="--c:${PLAT[p.platform][1]}" onclick="postModal('${p.id}')">
-      <span class="pill" style="background:${PLAT[p.platform][1]};flex:none">${PLAT[p.platform][0]}</span>
-      <div class="t"><b>${esc(p.caption.split('\\n')[0].slice(0,70)||'(no caption yet)')}</b>
-        <span>${p.post_date} · ${(p.post_time||'').slice(0,5)} · ${p.status}</span></div>
-      <button class="btn ghost sm" onclick="event.stopPropagation();copyCaption('${p.id}')">Copy</button>
-    </div>`).join('')||'<div class="empty">Nothing scheduled — click a day on the calendar to plan a post.</div>'}
-  </div>
-  ${(_socAccounts&&_socAccounts.length)?`<div class="card" style="padding:14px;margin-top:16px" id="perf-card">
+  ${(_socAccounts&&_socAccounts.length)?`<div class="card" style="padding:14px;margin-bottom:14px" id="perf-card">
     <div style="display:flex;align-items:center;gap:8px">
       <b style="font-size:11px;letter-spacing:.05em;color:var(--muted)">LAST 30 DAYS</b>
       <span style="flex:1"></span>
@@ -1153,9 +1159,7 @@ function contentView(){
     </div>
     <div id="perf-body" style="margin-top:8px">${(()=>{setTimeout(()=>boardStats(false),120);return '<div class="empty">Loading performance…</div>';})()}</div>
   </div>`:''}
-  </div>
-  ${_contentSplit?`<div style="flex:1;min-width:270px;position:sticky;top:14px">${contentTasksPanel()}</div>`:''}
-  </div>`;
+  <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">${_cols.join('')||'<div class="empty" style="flex:1;text-align:center;padding:40px">All columns hidden — use the Tasks / Calendar / Inbox buttons above to bring them back.</div>'}</div>`;
 }
 async function switchContentBoard(id){
   if(id==='__all'){_contentAll=true;await loadAllPosts();render();return;}
