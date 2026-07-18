@@ -46,6 +46,24 @@ main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(
 .bottomnav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--muted);padding:4px 10px;border-radius:10px;position:relative}
 .bottomnav button.active{color:var(--accent)}
 .bottomnav .bdot{position:absolute;top:0;right:4px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px}
+.bottomnav{overflow-x:auto}
+.bottomnav button{flex:none;min-width:54px}
+.appshell{display:flex;min-height:100vh}
+.sidebar{display:none}
+.contentarea{flex:1;min-width:0;max-width:100%}
+.sb-brand{font-weight:800;font-size:15px;letter-spacing:-.01em;padding:4px 10px 12px;cursor:pointer}
+.sb-brand small{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.06em}
+.sb-back{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;color:var(--accent);padding:2px 10px 6px;width:100%;text-align:left}
+.sb-bhead{display:flex;align-items:center;gap:6px;padding:0 6px 10px}
+.sb-sw{width:11px;height:11px;border-radius:4px;flex:none}
+.sb-switch{border:none;background:transparent;font-weight:800;font-size:14.5px;padding:2px 2px;width:auto;max-width:148px;cursor:pointer;color:var(--ink)}
+.sb-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--muted);text-align:left}
+.sb-item:hover{background:#F1EFEA;color:var(--ink)}
+.sb-item.on{background:var(--accent-soft);color:var(--accent)}
+.sb-item .sb-b{margin-left:auto;background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:800}
+.sb-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line);margin-top:16px}
+.sb-cred{align-self:flex-start;background:var(--accent);color:#fff;border-radius:12px;padding:5px 12px;font-size:12px;font-weight:800}
+.tb-back{padding:2px 8px;color:var(--ink);font-size:20px;font-weight:700}
 .view-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 14px}
 .view-title h2{font-size:20px}
 .view-title .sub{font-size:12.5px;color:var(--muted);font-weight:500}
@@ -126,7 +144,8 @@ main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(
 .settings-grid{display:grid;gap:14px;grid-template-columns:1fr}
 .empty{color:var(--muted);font-weight:500;font-size:13.5px;padding:14px 4px}
 @media(min-width:840px){
-  .tabs{display:flex}
+  .sidebar{display:flex;flex-direction:column;width:214px;flex:none;background:#fff;border-right:1px solid var(--line);padding:14px 10px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .topbar{display:none}
   .bottomnav{display:none}
   main{padding:22px 28px;padding-bottom:40px}
   .rail{display:flex}
@@ -177,7 +196,7 @@ function gridColor(id,fallback){
   const sel=g.querySelector('.sel'); return sel?sel.dataset.c:fallback;
 }
 let SESSION=null, WS=null, MEM=null, MEMBERS=[], BOARDS=[], MYWS=[];
-let S={view:'today',board:null,col:null};
+let S={view:'boards',board:null,col:null,scope:'workspace'};
 let cur={cols:[],notes:[],msgs:[],invs:[],pins:[],posts:[]};
 let TD=[], TDN={}, TDC={};
 const $=id=>document.getElementById(id);
@@ -329,29 +348,61 @@ function render(){
   if(!SESSION.user.email_confirmed_at){app.innerHTML=verifyView();return;}
   if(!WS){app.innerHTML=noWsView();return;}
   const tdOpen=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&!tdDone(t)).length;
-  const tabs=[['today','sun','Today'],['boards','home','Boards'],['board','board','Board'],['inbox','mail','Inbox'],['content','calendar','Content'],['money','money','Money'],['team','users','Team']];
+  const nav=navItems();
+  const b=nav.board;
+  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,settings:settingsView,btoday:boardTodayView,board:boardView,content:contentView,binbox:boardInboxView,money:moneyView,team:teamView,setup:boardSetupView};
+  const viewFn=VIEWS[S.view]||boardsView;
+  const sItem=([v,i,l])=>`<button class="sb-item ${S.view===v?'on':''}" onclick="go('${v}')">${ic(i,16)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="sb-b">${tdOpen}</span>`:''}</button>`;
+  const bItem=([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,19)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="bdot">${tdOpen}</span>`:''}</button>`;
+  const foot=`<div class="sb-foot">
+    ${WS.plan!=='basic'&&_credits!==null?`<button class="sb-cred" onclick="go('settings')" title="AI credits — tap for billing">✦ ${_credits} credits</button>`:''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${WS.plan==='trial'&&planEff()==='pro'?`<span class="pill" style="background:var(--warn)">Trial · ${trialDaysLeft()}d</span>`:''}${WS.plan==='pro'?`<span class="pill">Pro</span>`:''}${WS.plan==='agency'?`<span class="pill">Agency</span>`:''}</div>
+    <button class="sb-item ${S.view==='settings'?'on':''}" onclick="go('settings')">${ic('gear',16)}<span>Settings</span></button>
+  </div>`;
+  const sideHead=nav.ws
+    ?`<div class="sb-brand" onclick="go('boards')">${esc(WS.name)} <small>· BOARDS</small></div>`
+    :`<button class="sb-back" onclick="leaveBoard()">‹ All boards</button>
+      <div class="sb-bhead"><span class="sb-sw" style="background:${b?b.color||'var(--accent)':'var(--accent)'}"></span><select class="sb-switch" onchange="switchBoardTo(this.value)">${BOARDS.map(x=>`<option value="${x.id}" ${x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
   app.innerHTML=`
-  <div class="topbar">
-    <div class="wordmark" onclick="go('boards')">${esc(WS.name)} <small>· Boards</small></div>
-    <div class="tabs">${tabs.map(([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,14)} ${l}${v==='today'&&tdOpen?` <span class="pill" style="padding:1px 7px;font-size:10px">${tdOpen}</span>`:''}</button>`).join('')}
-      <button class="${S.view==='settings'?'active':''}" onclick="go('settings')">${ic('gear',14)} Settings</button>
+  <div class="appshell">
+    <aside class="sidebar">${sideHead}<div>${nav.items.map(sItem).join('')}</div>${foot}</aside>
+    <div class="contentarea">
+      <div class="topbar">
+        ${nav.ws?`<div class="wordmark" onclick="go('boards')">${esc(WS.name)} <small>· Boards</small></div>`:`<button class="tb-back" onclick="leaveBoard()">‹</button><div class="wordmark">${esc(b?b.name:'')}</div>`}
+        <span style="flex:1"></span>
+        ${WS.plan!=='basic'&&_credits!==null?`<span class="pill" style="background:var(--accent);cursor:pointer" onclick="go('settings')">✦ ${_credits}</span>`:''}
+        <span onclick="go('settings')" style="cursor:pointer">${avatar(MEM)}</span>
+      </div>
+      <main>${viewFn()}</main>
+      <div class="bottomnav">${nav.items.map(bItem).join('')}</div>
     </div>
-    <span style="flex:1"></span>
-    ${WS.plan!=='basic'&&_credits!==null?`<span class="pill" style="background:var(--accent);cursor:pointer" title="AI credits — tap for billing" onclick="go('settings')">✦ ${_credits}</span>`:''}
-    ${WS.plan==='trial'&&planEff()==='pro'?`<span class="pill" style="background:var(--warn)" title="Full features free for the trial period">Trial · ${trialDaysLeft()}d left</span>`:''}
-    ${WS.plan==='pro'?`<span class="pill">Pro</span>`:''}${WS.plan==='agency'?`<span class="pill">Agency</span>`:''}
-    <span onclick="go('settings')" style="cursor:pointer">${avatar(MEM)}</span>
-  </div>
-  <main>${{today:todayView,boards:boardsView,board:boardView,content:contentView,inbox:inboxView,money:moneyView,team:teamView,settings:settingsView}[S.view]()}</main>
-  <div class="bottomnav">
-    ${tabs.map(([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,19)}<span>${l}</span>${v==='today'&&tdOpen?`<span class="bdot">${tdOpen}</span>`:''}</button>`).join('')}
   </div>
   ${planEff()==='free'?`<a class="cobrand" href="https://brandexpert.co.za" target="_blank" rel="noopener">powered by <b>Brand Expert</b></a>`:''}`;
 }
 function go(v){
+  const bv=['btoday','board','content','binbox','money','team','setup'];
+  S.scope=bv.includes(v)?'board':'workspace';
   S.view=v;
   if(v==='today')loadToday().then(render).catch(fail);
   render();
+}
+function leaveBoard(){S.scope='workspace';go('boards');}
+async function switchBoardTo(id){S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;await loadBoard();go('btoday');}
+function navItems(){
+  if(S.scope==='board'&&S.board){
+    const b=BOARDS.find(x=>x.id===S.board);
+    if(b){
+      const m=b.modules||{content:true,inbox:true,money:true,team:true};
+      const items=[['btoday','sun','Today'],['board','board','Board']];
+      if(m.content)items.push(['content','calendar','Content']);
+      if(m.inbox)items.push(['binbox','mail','Inbox']);
+      if(m.money)items.push(['money','money','Money']);
+      if(m.team)items.push(['team','users','Team']);
+      items.push(['setup','gear','Setup']);
+      return {ws:false,items,board:b};
+    }
+  }
+  return {ws:true,items:[['boards','home','Dashboard'],['today','sun','Today'],['inbox','mail','Inbox']]};
 }
 /* ============ AUTH ============ */
 let _authMode='in';
@@ -568,7 +619,7 @@ async function loadBoardStats(){
     if(lbl)lbl.textContent=s.t?`${s.d} of ${s.t} tasks done`:'no tasks yet';
   }
 }
-async function openBoard(id){S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;await loadBoard();go('board');}
+async function openBoard(id){S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;await loadBoard();go('btoday');}
 function newBoardModal(){
   openModal(`<h3>New board</h3>
     <label>Board name</label><input id="nb-name" placeholder="e.g. Spring Launch 2026">
@@ -578,21 +629,71 @@ function newBoardModal(){
       <input type="checkbox" id="nb-priv" style="width:auto"> ${ic('lock',12)} Private — only you (share it later)</label>
     <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;margin-top:8px">
       <input type="checkbox" id="nb-std" style="width:auto" checked> Start with starter categories</label>
+    <label>Modules — change any time in Setup</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${[['content','Content',true],['inbox','Inbox',true],['money','Money',false],['team','Team',true]].map(([k,l,d])=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;background:var(--bg);border-radius:9px;padding:7px 11px;cursor:pointer;margin:0;width:auto"><input type="checkbox" id="nb-mod-${k}" style="width:auto" ${d?'checked':''}> ${l}</label>`).join('')}
+    </div>
     <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
     <button class="btn accent" onclick="createBoard()">Create board</button></div>`);
   setTimeout(()=>{const e=$('nb-name');if(e)e.focus();},60);
 }
 async function createBoard(){
   const name=$('nb-name').value.trim(); if(!name){toast('Give the board a name');return;}
+  const modules={content:$('nb-mod-content').checked,inbox:$('nb-mod-inbox').checked,money:$('nb-mod-money').checked,team:$('nb-mod-team').checked};
   try{
-    const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),color:gridColor('nb-col','#C75B12'),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id}).select().single();
+    const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),color:gridColor('nb-col','#C75B12'),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id,modules}).select().single();
     if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 board — upgrade for more.');if(/PRO_LIMIT_BOARDS/.test(error.message))throw new Error('Pro includes 10 boards — move to Agency for unlimited.');throw error;}
     if($('nb-std').checked){
       const cats=['Planning','Content','Design','Suppliers','Admin','Billing'];
       await sb.from('bbe_columns').insert(cats.map((n,i)=>({workspace_id:WS.id,board_id:data.id,name:n,color:CYCLE[i%CYCLE.length],position:i})));
     }
-    closeModal();await loadWs();S.board=data.id;localStorage.setItem('bbe_board_'+WS.id,data.id);await loadBoard();go('board');toast('Board created');
+    closeModal();await loadWs();S.board=data.id;localStorage.setItem('bbe_board_'+WS.id,data.id);await loadBoard();go('btoday');toast('Board created');
   }catch(e){fail(e);}
+}
+/* ============ BOARD-SCOPED VIEWS (Today / Inbox / Setup) ============ */
+function boardTodayView(){
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  const m=b.modules||{content:true,inbox:true,money:true,team:true};
+  const open=cur.notes.filter(n=>!n.archived&&!n.done);
+  return `<div class="view-title"><h2>${ic('sun',18)} Today <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">${open.length} open task${open.length!==1?'s':''}</span></div>
+  <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1.4;min-width:280px">${contentTasksPanel()}</div>
+    ${m.inbox?`<div style="flex:1;min-width:260px">${boardInboxHtml(b.id)}</div>`:''}
+  </div>`;
+}
+function boardInboxView(){
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  return `<div class="view-title"><h2>${ic('mail',18)} Inbox <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">comments &amp; messages for this board</span><span style="flex:1"></span><button class="btn ghost sm" onclick="syncInbox()">↻ Refresh</button></div>
+  ${boardInboxHtml(b.id)}`;
+}
+function boardSetupView(){
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  const m=b.modules||{content:true,inbox:true,money:true,team:true};
+  const MOD=[['content','calendar','Content','Social calendar, AI drafting & auto-posting'],['inbox','mail','Inbox',"Comments & DMs from this board's connected pages"],['money','money','Money','Budget & spend tracking'],['team','users','Team','The team screen for this board']];
+  return `<div class="view-title"><h2>${ic('gear',18)} Setup <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2></div>
+  <div class="card" style="max-width:580px">
+    <label>Board name</label><input id="bs-name" value="${esc(b.name)}">
+    <label>What this board needs</label>
+    <div style="display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;opacity:.85">${ic('board',16)}<div style="flex:1"><b style="font-size:13px">Tasks board</b><div style="font-size:11px;color:var(--muted)">Columns, deadlines, assignments</div></div><span style="font-size:9px;font-weight:800;color:var(--muted);background:var(--bg);border-radius:6px;padding:3px 7px">ALWAYS ON</span></div>
+    ${MOD.map(([k,i,t,s])=>`<div style="display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px">${ic(i,16)}<div style="flex:1"><b style="font-size:13px">${t}</b><div style="font-size:11px;color:var(--muted)">${s}</div></div>
+      <button onclick="toggleModule('${k}')" style="width:42px;height:24px;border-radius:20px;background:${m[k]?'var(--accent)':'var(--line-strong)'};position:relative;flex:none;padding:0"><i style="position:absolute;top:2px;left:${m[k]?'20px':'2px'};width:20px;height:20px;border-radius:50%;background:#fff;display:block;transition:.15s"></i></button></div>`).join('')}
+    <div class="row" style="justify-content:space-between;margin-top:22px">
+      <button class="btn ghost" style="color:var(--danger)" onclick="delBoard()">${ic('trash',13)} Delete board</button>
+      <button class="btn accent" onclick="saveBoardSetup()">Save name</button>
+    </div>
+  </div>`;
+}
+async function toggleModule(k){
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return;
+  const m={content:true,inbox:true,money:true,team:true,...(b.modules||{})}; m[k]=!m[k]; b.modules=m;
+  try{await sb.from('bbe_boards').update({modules:m}).eq('id',b.id);}catch(e){fail(e);}
+  render();
+}
+async function saveBoardSetup(){
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return;
+  const name=($('bs-name').value||'').trim()||b.name; b.name=name;
+  try{await sb.from('bbe_boards').update({name}).eq('id',b.id);toast('Saved');}catch(e){fail(e);}
+  render();
 }
 /* ============ BOARD ============ */
 function boardView(){
