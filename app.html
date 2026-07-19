@@ -1406,7 +1406,7 @@ function contentView(){
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
       <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
       <span style="flex:1"></span>
-      ${canManage()?['instagram','facebook','youtube','tiktok','threads','linkedin'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)).map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join('')+`<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" title="Link your Facebook Page + Instagram so comments and messages land in the Inbox" onclick="fbConnect()">${ic('mail',10)} Inbox: connect FB Page</button>`+`<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" title="Connect a YouTube channel so new video comments land in the Inbox" onclick="ytConnect()">${ic('mail',10)} Inbox: connect YouTube</button>`+`<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" title="Connect your Threads account so replies and mentions land in the Inbox" onclick="thConnect()">${ic('mail',10)} Inbox: connect Threads</button>`:''}
+      ${canManage()?['instagram','facebook','youtube','tiktok','threads','linkedin'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)).map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join('')+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`:''}
     </div>
   </div>`:''}
   ${(_socAccounts&&_socAccounts.length)?`<div class="card" style="padding:14px;margin-bottom:14px" id="perf-card">
@@ -1538,6 +1538,7 @@ async function loadSocials(){
   _socAccounts=j.ok?(j.accounts||[]):[];
   if(j.content_boards_used!==undefined){_cbUsed=j.content_boards_used;_cbAllowed=j.content_boards_allowed;}
   const el=$('soc-list'); if(el)el.innerHTML=socListHtml();
+  loadInboxConnects();
   if(S.view==='content'&&_socAccounts.length&&!document.getElementById('perf-card'))render();}catch(_){_socAccounts=[];}
 }
 function socListHtml(){
@@ -1611,6 +1612,50 @@ async function thConnect(){
   if(j.error){toast(j.error);return;}
   location.href=j.url;}catch(e){fail(e);}
 }
+let _inboxLinks=null;
+async function loadInboxConnects(){
+  try{const j=await metaApi({action:'links'}); _inboxLinks=(j&&j.links)||[];}catch(_){_inboxLinks=_inboxLinks||[];}
+  const el=document.getElementById('inbox-connects'); if(el)el.innerHTML=inboxConnectsHtml();
+}
+function inboxLinkFor(pl){return (_inboxLinks||[]).find(l=>l.platform===pl&&l.board_id===S.board);}
+function inboxConnectsHtml(){
+  const chip=(pl,label,connectFn,canDisc)=>{
+    const l=inboxLinkFor(pl);
+    if(l)return `<span class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--ok);color:var(--ok)" title="${label} connected — messages land in the Inbox"><b style="color:var(--ok);font-weight:800">✓</b> ${label}${l.name?': '+esc(l.name):' connected'}${canDisc?` <b style="cursor:pointer;color:var(--muted);margin-left:3px;font-weight:800" title="Disconnect" onclick="inboxDisconnect('${pl}')">✕</b>`:''}</span>`;
+    return `<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" onclick="${connectFn}">${ic('mail',10)} Inbox: connect ${label}</button>`;
+  };
+  let out=chip('facebook','FB Page','fbConnect()',false)+chip('youtube','YouTube','ytConnect()',true)+chip('threads','Threads','thConnect()',true);
+  if(WS&&WS.inbox_handle)out+=`<span class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--ok);color:var(--ok)" title="Emails sent here land in the Inbox — click to copy" onclick="copyEmailInbox()"><b style="color:var(--ok);font-weight:800">✓</b> Email: ${esc(WS.inbox_handle)}@in.brandexpert.co.za</span>`;
+  return out;
+}
+async function inboxDisconnect(pl){
+  if(!confirm('Disconnect this from the board? New messages will stop arriving. You can reconnect any time.'))return;
+  try{
+    if(pl==='youtube')await ytApi({action:'disconnect',board_id:S.board});
+    else if(pl==='threads')await thApi({action:'disconnect',board_id:S.board});
+    await loadInboxConnects(); toast('Disconnected');
+  }catch(e){fail(e);}
+}
+function copyEmailInbox(){
+  if(!WS||!WS.inbox_handle)return;
+  const addr=WS.inbox_handle+'@in.brandexpert.co.za';
+  try{navigator.clipboard.writeText(addr);toast('Email address copied: '+addr);}catch(_){toast(addr);}
+}
+async function waReply(id,to,pfx){
+  pfx=pfx||'wa-reply-';
+  const inp=document.getElementById(pfx+id); const text=(inp?inp.value:'').trim();
+  if(!text){toast('Type a reply first');return;}
+  if(!to){toast('No sender number on this message');return;}
+  const it=(_inbox||[]).find(x=>x.id===id);
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-whatsapp-send`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({to:to,text:text,workspace_id:WS.id,board_id:it?it.board_id:S.board})});
+    const j=await r.json();
+    if(j.error){toast(j.error);return;}
+    if(inp)inp.value='';
+    toast('Sent on WhatsApp ✓'); inboxSet(id,'answered');
+  }catch(e){fail(e);}
+}
 let _inbox=[];let _inboxFilter='new';let _boardInbox=false;
 async function loadInbox(){
   const {data}=await sb.from('bbe_interactions').select('*').eq('workspace_id',WS.id).order('received_at',{ascending:false}).limit(200);
@@ -1632,6 +1677,7 @@ function inboxListHtml(){
       <div style="font-size:11.5px;color:var(--muted);font-weight:700"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉ Direct message':'💬 Comment'} · ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})} ${bn(i.board_id)?'· '+esc(bn(i.board_id)):''}</div>
       <div style="font-size:13.5px;margin-top:3px">${esc(i.text||'')}</div>
       ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11.5px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
+      ${i.platform==='whatsapp'?`<div style="display:flex;gap:6px;margin-top:6px"><input id="wa-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12.5px;padding:5px 9px;border:1px solid var(--line);border-radius:7px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${i.author_external_id||''}')"><button class="btn accent sm" style="flex:none" onclick="waReply('${i.id}','${i.author_external_id||''}')">Send</button></div>`:''}
     </div>
     <div style="display:flex;gap:6px;flex:none">
       ${i.status!=='answered'?`<button class="btn ghost sm" onclick="inboxSet('${i.id}','answered')">✓ Answered</button>`:''}
@@ -1669,6 +1715,7 @@ function boardInboxBody(boardId){
       <button class="btn ghost sm" style="padding:2px 7px;font-size:11px;color:var(--muted)" onclick="inboxSet('${i.id}','dismissed')">Dismiss</button>
       ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
     </div>
+    ${i.platform==='whatsapp'?`<div style="display:flex;gap:5px;margin-top:5px"><input id="wab-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${i.author_external_id||''}','wab-reply-')"><button class="btn accent sm" style="padding:2px 9px;font-size:11px" onclick="waReply('${i.id}','${i.author_external_id||''}','wab-reply-')">Send</button></div>`:''}
   </div>`).join('');
 }
 async function syncInbox(){
