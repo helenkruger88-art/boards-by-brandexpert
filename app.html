@@ -1244,7 +1244,19 @@ async function saveAccent(){
   await sb.from('bbe_workspaces').update({theme}).eq('id',WS.id);WS.theme=theme;applyTheme();render();toast('Accent applied');}catch(e){fail(e);}
 }
 /* ============ CONTENT (social calendar) ============ */
-const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],other:['Other','#8a887e']};
+const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],whatsapp:['WhatsApp','#1FA855'],email:['Email','#6E6A62'],other:['Other','#8a887e']};
+const PICON={
+  facebook:'<svg viewBox="0 0 24 24" width="60%" height="60%" fill="#fff"><path d="M13.5 21v-7h2.3l.4-2.9h-2.7V9.3c0-.8.3-1.4 1.5-1.4H16.4V5.3c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H8.1V14h2.4v7h3z"/></svg>',
+  instagram:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17.2" cy="6.8" r="1.15" fill="#fff" stroke="none"/></svg>',
+  youtube:'<svg viewBox="0 0 24 24" width="66%" height="66%" fill="#fff"><path d="M9 8.3l7 3.7-7 3.7z"/></svg>',
+  tiktok:'<svg viewBox="0 0 24 24" width="60%" height="60%" fill="#fff"><path d="M14.2 4c.4 2 1.7 3.4 3.8 3.7v2.7c-1.4 0-2.6-.4-3.8-1.2v5.2a5 5 0 1 1-5-5c.3 0 .6 0 .9.1v2.8a2.2 2.2 0 1 0 1.5 2.1V4h2.6z"/></svg>',
+  linkedin:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="#fff"><path d="M6.6 8.2A1.6 1.6 0 1 0 6.6 5a1.6 1.6 0 0 0 0 3.2zM5.1 9.6h3V19h-3zm5 0H13v1.3h.1c.4-.8 1.4-1.6 3-1.6 3.2 0 3.8 2.1 3.8 4.8V19h-3v-4.3c0-1 0-2.4-1.5-2.4s-1.6 1.1-1.6 2.3V19h-3z"/></svg>',
+  threads:'<svg viewBox="0 0 24 24" width="62%" height="62%" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"><path d="M12 20c-3.7 0-6-2.7-6-8s2.3-8 6-8c2.7 0 4.4 1.3 5.1 3.4M9.6 13.6c.4 1.6 1.7 2.2 3 2.1 1.6-.1 2.6-1.1 2.6-2.6 0-1.8-1.6-2.6-3.3-2.4-1.5.1-2.3 1-2.1 2"/></svg>',
+  whatsapp:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="#fff"><path d="M12 4a8 8 0 0 0-6.9 12L4 19.6l3.7-1A8 8 0 1 0 12 4zm4.3 11.2c-.2.5-1 .9-1.4.9-.4.1-.8.3-2.8-.6-2.4-1-3.9-3.4-4-3.6-.1-.2-1-1.3-1-2.4 0-1.1.6-1.7.8-1.9.2-.2.4-.3.6-.3H9c.1 0 .3 0 .5.4l.7 1.7c.1.1.1.3 0 .4l-.3.5c-.2.2-.3.3-.1.6.1.3.7 1.1 1.5 1.7 1 .8 1.7.9 2 .8.2-.1.5-.6.7-.8.2-.3.4-.2.6-.2l1.6.8c.2.1.4.2.4.3.1.2.1.6 0 .8z"/></svg>',
+  email:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="none" stroke="#fff" stroke-width="2"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 5.5L20 7"/></svg>',
+  other:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="#fff"><circle cx="12" cy="12" r="4"/></svg>'
+};
+function platBadge(p,size){size=size||20;const c=(PLAT[p]||PLAT.other)[1];return `<span title="${(PLAT[p]||PLAT.other)[0]}" style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:6px;background:${c};flex:none">${PICON[p]||PICON.other}</span>`;}
 let _calMonth=null,_contentAll=false,_allPosts=[];
 const BOARD_HUES=['#0F6E56','#C75B12','#534AB7','#185FA5','#993556','#BA7517','#3B6D11','#0E7490','#72243E'];
 const boardHue=id=>{const b=BOARDS.find(x=>x.id===id);if(b&&b.color)return b.color;const i=BOARDS.findIndex(x=>x.id===id);return BOARD_HUES[(i<0?0:i)%BOARD_HUES.length];};
@@ -1604,9 +1616,9 @@ function inboxListHtml(){
   const rows=_inbox.filter(i=>_inboxFilter==='all'||i.status===_inboxFilter);
   const bn=id=>{const b=BOARDS.find(x=>x.id===id);return b?b.name:'';};
   return `<div id="inbox-list">${rows.map(i=>`<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;border-left:4px solid ${(PLAT[i.platform]||PLAT.other)[1]}">
-    <span class="pill" style="background:${(PLAT[i.platform]||PLAT.other)[1]};flex:none">${(PLAT[i.platform]||PLAT.other)[0]}</span>
+    ${platBadge(i.platform,24)}
     <div style="flex:1;min-width:0">
-      <div style="font-size:11.5px;color:var(--muted);font-weight:700">${i.kind==='message'?'✉ Direct message':'💬 Comment'} · ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})} ${bn(i.board_id)?'· '+esc(bn(i.board_id)):''}</div>
+      <div style="font-size:11.5px;color:var(--muted);font-weight:700"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉ Direct message':'💬 Comment'} · ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})} ${bn(i.board_id)?'· '+esc(bn(i.board_id)):''}</div>
       <div style="font-size:13.5px;margin-top:3px">${esc(i.text||'')}</div>
       ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11.5px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
     </div>
@@ -1639,7 +1651,7 @@ function boardInboxBody(boardId){
   const rows=(_inbox||[]).filter(i=>i.board_id===boardId&&i.status!=='dismissed');
   if(!rows.length)return '<div class="empty" style="padding:20px 8px;text-align:center;font-size:12px">No messages yet.<br>New comments on this board&rsquo;s connected pages will land here.</div>';
   return rows.map(i=>`<div style="border-left:3px solid ${(PLAT[i.platform]||PLAT.other)[1]};padding:7px 9px;margin-bottom:7px;background:var(--panel,#F4F3EE);border-radius:7px">
-    <div style="font-size:10.5px;color:var(--muted);font-weight:700">${i.kind==='message'?'✉':'💬'} ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})}</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);font-weight:700">${platBadge(i.platform,16)}<span><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉':'💬'} ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})}</span></div>
     <div style="font-size:12.5px;margin:3px 0">${esc(i.text||'')}</div>
     <div style="display:flex;gap:5px;align-items:center">
       ${i.status!=='answered'?`<button class="btn ghost sm" style="padding:2px 7px;font-size:11px" onclick="inboxSet('${i.id}','answered')">✓ Done</button>`:'<span style="font-size:10.5px;color:var(--ok);font-weight:700">answered</span>'}
