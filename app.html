@@ -31,6 +31,9 @@ h1,h2,h3{font-weight:700;letter-spacing:-.01em}
 .btn.sm{padding:6px 12px;font-size:12.5px;border-radius:8px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line-strong);border-radius:16px;padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer}
 .pill{display:inline-flex;align-items:center;gap:5px;border-radius:12px;padding:3px 10px;font-size:11.5px;font-weight:700;color:#fff;background:var(--accent)}
+.socic{position:relative;display:inline-flex;line-height:0}
+.socic .x{position:absolute;top:-5px;right:-5px;width:14px;height:14px;line-height:13px;text-align:center;border-radius:50%;background:#c0392b;color:#fff;font-size:9px;font-weight:800;cursor:pointer;display:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.socic:hover .x{display:block}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
 .avatar{width:30px;height:30px;border-radius:50%;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none}
 .topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top))}
@@ -383,6 +386,7 @@ function go(v){
   const bv=['btoday','board','content','binbox','files','money','team','setup'];
   S.scope=bv.includes(v)?'board':'workspace';
   S.view=v;
+  if(v==='content')_contentAll=false;
   if(v==='today')loadToday().then(render).catch(fail);
   render();
 }
@@ -1406,7 +1410,7 @@ function contentView(){
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
       <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
       <span style="flex:1"></span>
-      ${canManage()?['instagram','facebook','youtube','tiktok','threads','linkedin'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)).map(p=>`<button class="chip" style="padding:4px 10px;font-size:11px" onclick="connectSocial('${p}')">${ic('plus',10)} ${PLAT[p][0]}</button>`).join('')+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`:''}
+      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
     </div>
   </div>`:''}
   ${(_socAccounts&&_socAccounts.length)?`<div class="card" style="padding:14px;margin-bottom:14px" id="perf-card">
@@ -1552,7 +1556,11 @@ function socListHtml(){
   </div>`).join('');
 }
 function socStripChips(){
-  return (_socAccounts||[]).map(a=>`<span class="chip" style="cursor:default"><span class="pill" style="background:${(PLAT[a.platform]||PLAT.other)[1]};padding:2px 8px;font-size:10px">${(PLAT[a.platform]||PLAT.other)[0]}</span> ${esc(a.user||'')}${canManage()?` <b style="cursor:pointer;color:var(--muted);margin-left:2px;font-weight:800" title="Disconnect" onclick="disconnectSocial('${a.id}')">✕</b>`:''}</span>`).join(' ');
+  return (_socAccounts||[]).map(a=>{
+    const nm=(PLAT[a.platform]||PLAT.other)[0];
+    const tip=nm+(a.user?' · '+a.user:'');
+    return `<span class="socic" title="${esc(tip)}">${platBadge(a.platform,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="disconnectSocial('${a.id}')">✕</b>`:''}</span>`;
+  }).join('');
 }
 async function disconnectSocial(id){
   const a=(_socAccounts||[]).find(x=>x.id===id); if(!a)return;
