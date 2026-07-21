@@ -1556,11 +1556,12 @@ function socListHtml(){
   </div>`).join('');
 }
 function socStripChips(){
-  return (_socAccounts||[]).map(a=>{
+  const items=(_socAccounts||[]).map(a=>{
     const nm=(PLAT[a.platform]||PLAT.other)[0];
     const tip=nm+(a.user?' · '+a.user:'');
     return `<span class="socic" title="${esc(tip)}">${platBadge(a.platform,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="disconnectSocial('${a.id}')">✕</b>`:''}</span>`;
   }).join('');
+  return items?`<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${items}</span>`:'';
 }
 async function disconnectSocial(id){
   const a=(_socAccounts||[]).find(x=>x.id===id); if(!a)return;
@@ -1627,15 +1628,27 @@ async function loadInboxConnects(){
 }
 function inboxLinkFor(pl){return (_inboxLinks||[]).find(l=>l.platform===pl&&l.board_id===S.board);}
 function inboxConnectsHtml(){
-  const chip=(pl,label,connectFn,canDisc)=>{
-    const l=inboxLinkFor(pl);
-    if(l)return `<span class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--ok);color:var(--ok)" title="${label} connected — messages land in the Inbox"><b style="color:var(--ok);font-weight:800">✓</b> ${label}${l.name?': '+esc(l.name):' connected'}${canDisc?` <b style="cursor:pointer;color:var(--muted);margin-left:3px;font-weight:800" title="Disconnect" onclick="inboxDisconnect('${pl}')">✕</b>`:''}</span>`;
-    return `<button class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)" onclick="${connectFn}">${ic('mail',10)} Inbox: connect ${label}</button>`;
-  };
-  let out=chip('facebook','FB Page','fbConnect()',false)+chip('youtube','YouTube','ytConnect()',true)+chip('threads','Threads','thConnect()',true);
-  if(WS&&WS.inbox_handle)out+=`<span class="chip" style="padding:4px 10px;font-size:11px;border-color:var(--ok);color:var(--ok)" title="Emails sent here land in the Inbox — click to copy" onclick="copyEmailInbox()"><b style="color:var(--ok);font-weight:800">✓</b> Email: ${esc(WS.inbox_handle)}@in.brandexpert.co.za</span>`;
-  return out;
+  const defs=[['facebook','FB Page'],['youtube','YouTube'],['threads','Threads']];
+  const icons=[];
+  for(const [pl,label] of defs){
+    const l=inboxLinkFor(pl); if(!l)continue;
+    const tip=label+(l.name?' · '+l.name:' connected');
+    const canDisc=(pl==='youtube'||pl==='threads');
+    icons.push(`<span class="socic" title="${esc(tip)}">${platBadge(pl,24)}${canDisc?`<b class="x" title="Disconnect ${label}" onclick="inboxDisconnect('${pl}')">✕</b>`:''}</span>`);
+  }
+  if(WS&&WS.inbox_handle){
+    icons.push(`<span class="socic" title="Email inbox: ${esc(WS.inbox_handle)}@in.brandexpert.co.za — click to copy" onclick="copyEmailInbox()" style="cursor:pointer">${platBadge('email',24)}</span>`);
+  }
+  const un=defs.filter(([pl])=>!inboxLinkFor(pl));
+  let dd='';
+  if(canManage()&&un.length){
+    dd=`<select onchange="inboxConnectPick(this.value);this.value='';" title="Connect a source so its messages land in this board's Inbox" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Inbox source</option>${un.map(([pl,label])=>`<option value="${pl}">${label}</option>`).join('')}</select>`;
+  }
+  const lbl=`<b style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.04em;margin:0 4px 0 10px">INBOX</b>`;
+  const iconWrap=icons.length?`${lbl}<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${icons.join('')}</span>`:(dd?lbl:'');
+  return iconWrap+dd;
 }
+function inboxConnectPick(v){ if(v==='facebook')fbConnect(); else if(v==='youtube')ytConnect(); else if(v==='threads')thConnect(); }
 async function inboxDisconnect(pl){
   if(!confirm('Disconnect this from the board? New messages will stop arriving. You can reconnect any time.'))return;
   try{
