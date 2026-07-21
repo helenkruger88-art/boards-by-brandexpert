@@ -734,12 +734,13 @@ function newBoardModal(){
     <label>Board colour</label>${swatchGrid('nb-col','#C75B12')}
     <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer">
       <input type="checkbox" id="nb-priv" style="width:auto"> ${ic('lock',12)} Private — only you (share it later)</label>
-    <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;margin-top:8px">
-      <input type="checkbox" id="nb-std" style="width:auto" checked> Start with starter categories</label>
-    <label>Modules — change any time in Setup</label>
+    <label>Smart sections — dedicated screens (change any time in Setup)</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
-      ${[['content','Content',true],['inbox','Inbox',true],['files','Files',true],['money','Money',false],['team','Team',true]].map(([k,l,d])=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;background:var(--bg);border-radius:9px;padding:7px 11px;cursor:pointer;margin:0;width:auto"><input type="checkbox" id="nb-mod-${k}" style="width:auto" ${d?'checked':''}> ${l}</label>`).join('')}
+      ${[['content','calendar','Content',true],['inbox','mail','Inbox',true],['money','money','Money',false],['files','note','Files',true],['team','users','Team',true]].map(([k,i,l,d])=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;background:var(--bg);border-radius:9px;padding:7px 11px;cursor:pointer;margin:0;width:auto"><input type="checkbox" id="nb-mod-${k}" style="width:auto" ${d?'checked':''}> ${ic(i,13)} ${l}</label>`).join('')}
     </div>
+    <label style="margin-top:12px">Task lists — your board columns (comma-separated, make your own)</label>
+    <input id="nb-cols" value="Planning, Design, Suppliers, Admin" placeholder="e.g. Planning, Design, Suppliers, Admin">
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">These become the columns on the board. Leave blank for an empty board.</div>
     <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
     <button class="btn accent" onclick="createBoard()">Create board</button></div>`);
   setTimeout(()=>{const e=$('nb-name');if(e)e.focus();},60);
@@ -750,9 +751,9 @@ async function createBoard(){
   try{
     const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),color:gridColor('nb-col','#C75B12'),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id,modules}).select().single();
     if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 board — upgrade for more.');if(/PRO_LIMIT_BOARDS/.test(error.message))throw new Error('Pro includes 10 boards — move to Agency for unlimited.');throw error;}
-    if($('nb-std').checked){
-      const cats=['Planning','Content','Design','Suppliers','Admin','Billing'];
-      await sb.from('bbe_columns').insert(cats.map((n,i)=>({workspace_id:WS.id,board_id:data.id,name:n,color:CYCLE[i%CYCLE.length],position:i})));
+    const colNames=($('nb-cols').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if(colNames.length){
+      await sb.from('bbe_columns').insert(colNames.map((n,i)=>({workspace_id:WS.id,board_id:data.id,name:n,color:CYCLE[i%CYCLE.length],position:i})));
     }
     closeModal();await loadWs();S.board=data.id;localStorage.setItem('bbe_board_'+WS.id,data.id);await loadBoard();go('btoday');toast('Board created');
   }catch(e){fail(e);}
