@@ -193,6 +193,10 @@ main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(
 .pnode.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 6px 16px rgba(199,91,18,.18)}
 .pnode.done{opacity:.55}
 .pnode.done .pt{text-decoration:line-through}
+.plink{position:absolute;right:-11px;top:20px;width:22px;height:22px;border-radius:50%;background:#fff;border:1.5px solid var(--accent);color:var(--accent);font-size:12px;font-weight:800;line-height:19px;text-align:center;cursor:crosshair;box-shadow:0 1px 4px rgba(0,0,0,.18);padding:0;z-index:6;opacity:.55;transition:opacity .12s}
+.pnode:hover .plink{opacity:1}
+.plink:hover{background:var(--accent);color:#fff}
+.pnode.plink-target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .pbadge{position:absolute;top:-9px;right:-8px;background:var(--ok);color:#fff;font-size:9px;font-weight:800;border-radius:20px;padding:2px 7px;box-shadow:0 1px 3px rgba(0,0,0,.2);pointer-events:none}
 .pwire-x{position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;border:1px solid var(--line-strong);color:var(--muted);font-size:10px;font-weight:800;line-height:16px;text-align:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.12);padding:0;z-index:4}
 .pwire-x:hover{color:var(--danger);border-color:var(--danger)}
@@ -460,8 +464,9 @@ function navItems(){
     const b=BOARDS.find(x=>x.id===S.board);
     if(b){
       const m=b.modules||{content:true,inbox:true,money:true,team:true};
-      const items=[['btoday','sun','Today'],['board','board','Board']];
+      const items=[['btoday','sun','Today']];
       if(m.plan!==false)items.push(['plan','route','Plan']);
+      items.push(['board','board','Board']);
       if(m.content)items.push(['content','calendar','Content']);
       if(m.inbox)items.push(['binbox','mail','Inbox']);
       if(m.files)items.push(['files','note','Files']);
@@ -890,11 +895,12 @@ function planView(){
   const nodeHtml=nodes.map(n=>{
     const linked=n.note_id?noteById[n.note_id]:null;
     const isDone=!!(linked&&linked.done);
-    return `<div class="pnode${_planConnectFrom===n.id?' sel':''}${isDone?' done':''}" style="left:${Number(n.x)||0}px;top:${Number(n.y)||0}px;--pc:${esc(n.color||'#888')}" onpointerdown="planDragStart(event,'${n.id}')">
+    return `<div class="pnode${_planConnectFrom===n.id?' sel':''}${isDone?' done':''}" data-id="${n.id}" style="left:${Number(n.x)||0}px;top:${Number(n.y)||0}px;--pc:${esc(n.color||'#888')}" onpointerdown="planDragStart(event,'${n.id}')">
       ${n.note_id?`<span class="pbadge">${isDone?'✓ done':'✓ task'}</span>`:''}
       <div class="pt">${esc(n.title)}</div>
       ${n.note?`<div class="pd">${esc(n.note.length>64?n.note.slice(0,64)+'…':n.note)}</div>`:''}
       ${n.start_date||n.due_date?`<div class="pd">📅 ${[pDate(n.start_date),pDate(n.due_date)].filter(Boolean).join(' – ')}</div>`:''}
+      ${canManage()?`<button class="plink" title="Drag me onto another step to link them" onpointerdown="planLinkStart(event,'${n.id}')">↳</button>`:''}
     </div>`;}).join('');
   return `<div class="view-title">
     <h2>${ic('route',18)} Plan <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2>
@@ -905,11 +911,12 @@ function planView(){
   </div>
   ${_planConnect?`<div style="font-size:12px;font-weight:700;color:var(--accent);margin:-4px 0 10px">Click a node, then another, to link them (Esc to stop).</div>`:''}
   <div class="plan-stage" id="plan-stage">
-    <div style="position:relative;width:${W}px;height:${H}px">
+    <div class="plan-inner" style="position:relative;width:${W}px;height:${H}px">
       <svg style="position:absolute;inset:0;pointer-events:none" width="${W}" height="${H}">
         <defs><marker id="planar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#C2BEB2"/></marker></defs>
         <g fill="none" stroke="#C2BEB2" stroke-width="2" marker-end="url(#planar)">${wires}</g>
       </svg>
+      <svg class="plan-templayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible" width="${W}" height="${H}"></svg>
       ${wireX}
       ${nodeHtml}
       ${nodes.length?'':`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px">
@@ -921,31 +928,71 @@ function planView(){
   </div>`;
 }
 function planDragStart(ev,id){
-  if(ev.target.closest('button'))return;
+  if(ev.target.closest('button')||ev.target.closest('.plink'))return;
   if(_planConnect){planPickConnect(id);return;}
   const node=cur.planNodes.find(x=>x.id===id); if(!node)return;
   ev.preventDefault();
   const el=ev.currentTarget;
-  _pd={id,el,sx:ev.clientX,sy:ev.clientY,ox:Number(node.x)||0,oy:Number(node.y)||0,moved:false};
-  if(el.setPointerCapture)try{el.setPointerCapture(ev.pointerId);}catch(_){}
-  el.onpointermove=e=>{
-    if(!_pd)return;
-    const dx=e.clientX-_pd.sx,dy=e.clientY-_pd.sy;
-    if(Math.abs(dx)>4||Math.abs(dy)>4)_pd.moved=true;
-    if(!_pd.moved||!canManage())return;
-    el.style.left=Math.max(0,_pd.ox+dx)+'px';
-    el.style.top=Math.max(0,_pd.oy+dy)+'px';
+  const st={sx:ev.clientX,sy:ev.clientY,ox:Number(node.x)||0,oy:Number(node.y)||0,moved:false};
+  const move=e=>{
+    const dx=e.clientX-st.sx,dy=e.clientY-st.sy;
+    if(Math.abs(dx)>4||Math.abs(dy)>4)st.moved=true;
+    if(!st.moved||!canManage())return;
+    el.style.left=Math.max(0,st.ox+dx)+'px';
+    el.style.top=Math.max(0,st.oy+dy)+'px';
+    el.style.zIndex=7;
   };
-  el.onpointerup=async e=>{
-    el.onpointermove=null; el.onpointerup=null;
-    const d=_pd; _pd=null; if(!d)return;
-    if(!d.moved){planNodeModal(id);return;}
+  const up=async e=>{
+    document.removeEventListener('pointermove',move);
+    document.removeEventListener('pointerup',up);
+    if(!st.moved){planNodeModal(id);return;}
     if(!canManage())return;
-    const nx=Math.max(0,Math.round(d.ox+(e.clientX-d.sx))),ny=Math.max(0,Math.round(d.oy+(e.clientY-d.sy)));
+    const nx=Math.max(0,Math.round(st.ox+(e.clientX-st.sx))),ny=Math.max(0,Math.round(st.oy+(e.clientY-st.sy)));
     const n2=cur.planNodes.find(x=>x.id===id); if(n2){n2.x=nx;n2.y=ny;}
     render();
     try{const {error}=await sb.from('bbe_plan_nodes').update({x:nx,y:ny}).eq('id',id);if(error)throw error;}catch(err){fail(err);}
   };
+  document.addEventListener('pointermove',move);
+  document.addEventListener('pointerup',up);
+}
+// Drag the ↳ handle onto another step to link them (or just click it, then click a target).
+function planLinkStart(ev,id){
+  if(!canManage())return;
+  ev.preventDefault(); ev.stopPropagation();
+  const inner=document.querySelector('#plan-stage .plan-inner');
+  const layer=document.querySelector('#plan-stage .plan-templayer');
+  const node=cur.planNodes.find(x=>x.id===id); if(!node||!inner||!layer)return;
+  const ax=(Number(node.x)||0)+150, ay=(Number(node.y)||0)+24;
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('stroke','var(--accent)');path.setAttribute('stroke-width','2.5');path.setAttribute('fill','none');path.setAttribute('stroke-dasharray','6 4');
+  layer.appendChild(path);
+  let moved=false,lastHover=null;
+  const clearHover=()=>{if(lastHover){lastHover.classList.remove('plink-target');lastHover=null;}};
+  const move=e=>{
+    moved=true;
+    const r=inner.getBoundingClientRect();
+    const cx=e.clientX-r.left, cy=e.clientY-r.top;
+    path.setAttribute('d',`M${ax},${ay} C${ax+40},${ay} ${cx-40},${cy} ${cx},${cy}`);
+    const el=document.elementFromPoint(e.clientX,e.clientY);
+    const pn=el&&el.closest('.pnode');
+    if(pn!==lastHover){clearHover(); if(pn&&pn.getAttribute('data-id')!==id){pn.classList.add('plink-target');lastHover=pn;}}
+  };
+  const up=async e=>{
+    document.removeEventListener('pointermove',move);
+    document.removeEventListener('pointerup',up);
+    path.remove(); clearHover();
+    const el=document.elementFromPoint(e.clientX,e.clientY);
+    const pn=el&&el.closest('.pnode');
+    const toId=pn?pn.getAttribute('data-id'):null;
+    if(toId&&toId!==id){
+      if(cur.planEdges.some(x=>(x.from_node===id&&x.to_node===toId)||(x.from_node===toId&&x.to_node===id))){toast('Already linked');return;}
+      try{const {error}=await sb.from('bbe_plan_edges').insert({workspace_id:WS.id,board_id:S.board,from_node:id,to_node:toId});if(error)throw error;await loadBoard();render();}catch(err){fail(err);}
+    }else if(!moved){
+      _planConnect=true;_planConnectFrom=id;render();toast('Now click the step you want to link to');
+    }
+  };
+  document.addEventListener('pointermove',move);
+  document.addEventListener('pointerup',up);
 }
 async function addPlanNode(){
   if(!canManage())return;
