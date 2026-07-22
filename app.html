@@ -473,8 +473,9 @@ function navItems(){
     const b=BOARDS.find(x=>x.id===S.board);
     if(b){
       const m=b.modules||{content:true,inbox:true,money:true,team:true};
-      const items=[['btoday','sun','Today'],['board','board','Board']];
+      const items=[['btoday','sun','Today']];
       if(m.plan!==false)items.push(['plan','route','Plan']);
+      items.push(['board','board','Board']);
       if(m.content)items.push(['content','calendar','Content']);
       if(m.inbox)items.push(['binbox','mail','Inbox']);
       if(m.files)items.push(['files','note','Files']);
@@ -2419,9 +2420,62 @@ async function thConnect(){
   if(j.error){toast(j.error);return;}
   location.href=j.url;}catch(e){fail(e);}
 }
+/* ---- WhatsApp self-serve connect (Meta Embedded Signup) ---- */
+let _waAccounts=null;
+async function waApi(body){
+  const {data:{session}}=await sb.auth.getSession();
+  const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-wa-embedded`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,...body})});
+  return await r.json();
+}
+let _fbSdkP=null;
+function loadFbSdk(appId){
+  if(_fbSdkP)return _fbSdkP;
+  _fbSdkP=new Promise((resolve,reject)=>{
+    if(window.FB){FB.init({appId:String(appId),autoLogAppEvents:true,xfbml:false,version:'v21.0'});resolve(window.FB);return;}
+    window.fbAsyncInit=function(){FB.init({appId:String(appId),autoLogAppEvents:true,xfbml:false,version:'v21.0'});resolve(window.FB);};
+    const s=document.createElement('script');s.src='https://connect.facebook.net/en_US/sdk.js';s.async=true;s.defer=true;s.crossOrigin='anonymous';
+    s.onerror=()=>{_fbSdkP=null;reject(new Error('Could not load the Facebook SDK — check your connection and try again'));};
+    document.head.appendChild(s);
+  });
+  return _fbSdkP;
+}
+async function waEmbeddedConnect(){
+  try{
+    const cfg=await waApi({action:'config'});
+    if(!cfg||!cfg.config_id){toast("WhatsApp connect isn't switched on yet — Meta setup pending");return;}
+    await loadFbSdk(cfg.app_id);
+    let waPhoneId=null,waWabaId=null;
+    const onWaMsg=(event)=>{
+      if(!event.origin||!event.origin.endsWith('facebook.com'))return;
+      try{
+        const d=JSON.parse(event.data);
+        if(d&&d.type==='WA_EMBEDDED_SIGNUP'){
+          const dd=d.data||d;
+          if(dd.phone_number_id)waPhoneId=dd.phone_number_id;
+          if(dd.waba_id)waWabaId=dd.waba_id;
+        }
+      }catch(_){}
+    };
+    window.addEventListener('message',onWaMsg);
+    FB.login(async(response)=>{
+      try{
+        if(response&&response.authResponse&&response.authResponse.code){
+          toast('Finishing WhatsApp setup…');
+          const res=await waApi({action:'connect',code:response.authResponse.code,phone_number_id:waPhoneId,waba_id:waWabaId});
+          if(res&&res.ok){
+            toast('WhatsApp connected: '+(res.display_phone||res.business_name||'your number'));
+            if(typeof loadInboxConnects==='function')loadInboxConnects();else render();
+          }else{toast((res&&(res.message||res.error))||'WhatsApp connection failed');}
+        }else{toast('WhatsApp connection cancelled');}
+      }catch(e){fail(e);}
+      finally{window.removeEventListener('message',onWaMsg);}
+    },{config_id:cfg.config_id,response_type:'code',override_default_response_type:true,extras:{setup:{},featureType:'',sessionInfoVersion:'3'}});
+  }catch(e){fail(e);}
+}
 let _inboxLinks=null;
 async function loadInboxConnects(){
   try{const j=await metaApi({action:'links'}); _inboxLinks=(j&&j.links)||[];}catch(_){_inboxLinks=_inboxLinks||[];}
+  try{const w=await waApi({action:'links'}); _waAccounts=(w&&w.ok)?(w.accounts||[]):(_waAccounts||[]);}catch(_){_waAccounts=_waAccounts||[];}
   const el=document.getElementById('inbox-connects'); if(el)el.innerHTML=inboxConnectsHtml();
 }
 function inboxLinkFor(pl){return (_inboxLinks||[]).find(l=>l.platform===pl&&l.board_id===S.board);}
@@ -2434,10 +2488,15 @@ function inboxConnectsHtml(){
     const canDisc=(pl==='youtube'||pl==='threads');
     icons.push(`<span class="socic" title="${esc(tip)}">${platBadge(pl,24)}${canDisc?`<b class="x" title="Disconnect ${label}" onclick="inboxDisconnect('${pl}')">✕</b>`:''}</span>`);
   }
+  const waAcc=(_waAccounts||[]).filter(a=>a.status!=='disabled');
+  for(const a of waAcc){
+    icons.push(`<span class="socic" title="WhatsApp · ${esc(a.display_phone||a.business_name||'connected')}">${platBadge('whatsapp',24)}</span>`);
+  }
   if(WS&&WS.inbox_handle){
     icons.push(`<span class="socic" title="Email inbox: ${esc(WS.inbox_handle)}@in.brandexpert.co.za — click to copy" onclick="copyEmailInbox()" style="cursor:pointer">${platBadge('email',24)}</span>`);
   }
   const un=defs.filter(([pl])=>!inboxLinkFor(pl));
+  if(!waAcc.length)un.push(['whatsapp','WhatsApp']);
   let dd='';
   if(canManage()&&un.length){
     dd=`<select onchange="inboxConnectPick(this.value);this.value='';" title="Connect a source so its messages land in this board's Inbox" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Inbox source</option>${un.map(([pl,label])=>`<option value="${pl}">${label}</option>`).join('')}</select>`;
@@ -2446,7 +2505,7 @@ function inboxConnectsHtml(){
   const iconWrap=icons.length?`${lbl}<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${icons.join('')}</span>`:(dd?lbl:'');
   return iconWrap+dd;
 }
-function inboxConnectPick(v){ if(v==='facebook')fbConnect(); else if(v==='youtube')ytConnect(); else if(v==='threads')thConnect(); }
+function inboxConnectPick(v){ if(v==='facebook')fbConnect(); else if(v==='youtube')ytConnect(); else if(v==='threads')thConnect(); else if(v==='whatsapp')waEmbeddedConnect(); }
 async function inboxDisconnect(pl){
   if(!confirm('Disconnect this from the board? New messages will stop arriving. You can reconnect any time.'))return;
   try{
