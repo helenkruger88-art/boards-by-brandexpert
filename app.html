@@ -64,6 +64,8 @@ main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(
 .sb-item:hover{background:#F1EFEA;color:var(--ink)}
 .sb-item.on{background:var(--accent-soft);color:var(--accent)}
 .sb-item .sb-b{margin-left:auto;background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:800}
+.sb-sec{font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:14px 10px 5px}
+.sb-dot{width:10px;height:10px;border-radius:3px;flex:none}
 .sb-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line);margin-top:16px}
 .sb-cred{align-self:flex-start;background:var(--accent);color:#fff;border-radius:12px;padding:5px 12px;font-size:12px;font-weight:800}
 .tb-back{padding:2px 8px;color:var(--ink);font-size:20px;font-weight:700}
@@ -71,7 +73,10 @@ main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(
 .view-title h2{font-size:20px}
 .view-title .sub{font-size:12.5px;color:var(--muted);font-weight:500}
 .boards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px}
-.board-card{background:#fff;border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:var(--radius);padding:16px;cursor:pointer;transition:transform .12s,box-shadow .12s}
+.board-card{position:relative;background:#fff;border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:var(--radius);padding:16px;cursor:pointer;transition:transform .12s,box-shadow .12s}
+.board-del{position:absolute;top:8px;right:8px;opacity:0;color:var(--muted);padding:4px;border-radius:7px;line-height:0;transition:opacity .12s}
+.board-card:hover .board-del{opacity:.6}
+.board-del:hover{opacity:1;color:var(--danger);background:var(--bg)}
 .board-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(35,36,31,.08)}
 .board-card h3{font-size:15.5px;margin-bottom:3px}
 .board-card .meta{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-bottom:12px}
@@ -439,7 +444,7 @@ function render(){
       <div class="sb-bhead"><span class="sb-sw" style="background:${b?b.color||'var(--accent)':'var(--accent)'}"></span><select class="sb-switch" onchange="switchBoardTo(this.value)">${BOARDS.map(x=>`<option value="${x.id}" ${x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
   app.innerHTML=`
   <div class="appshell">
-    <aside class="sidebar">${sideHead}<div>${nav.items.map(sItem).join('')}</div>${foot}</aside>
+    <aside class="sidebar">${sideHead}<div>${nav.items.map(sItem).join('')}${nav.ws?boardsSideNav():''}</div>${foot}</aside>
     <div class="contentarea">
       <div class="topbar">
         ${nav.ws?`<div class="wordmark" onclick="go('boards')">${esc(WS.name)} <small>· Boards</small></div>`:`<button class="tb-back" onclick="leaveBoard()">‹</button><div class="wordmark">${esc(b?b.name:'')}</div>`}
@@ -622,15 +627,7 @@ function todayView(){
       ${n?`<button class="btn ghost sm" onclick="tdOpen('${t.id}')">open</button>`:''}
       <button style="color:var(--muted);padding:3px" title="Not today" onclick="tdRemove('${t.id}')">${ic('x',13)}</button>
     </div>`;};
-  const briefPanel=WS.plan!=='basic'?`<div class="card" style="margin-bottom:14px;border-left:4px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <b style="font-size:14px">✦ Your day, briefed</b><span style="flex:1"></span>
-      <button class="btn ghost sm" onclick="dayBrief(true)">↻</button>
-    </div>
-    <div id="brief-box" style="font-size:13.5px;line-height:1.65;white-space:pre-wrap;color:#4a483f">${(()=>{setTimeout(()=>{const k='bbe_brief_'+SESSION.user.id.slice(0,8)+'_'+saDate();const c=localStorage.getItem(k);const b=document.getElementById('brief-box');if(b&&c)b.textContent=c;},40);return localStorage.getItem('bbe_brief_'+SESSION.user.id.slice(0,8)+'_'+saDate())?'':'Tap ✦ Brief me and the AI reads every board and tells you what matters today.';})()}</div>
-    ${!localStorage.getItem('bbe_brief_'+SESSION.user.id.slice(0,8)+'_'+saDate())?`<button class="btn accent sm" style="margin-top:10px" onclick="dayBrief()">✦ Brief me (1 credit)</button>`:''}
-  </div>`:'';
-  return `${briefPanel}<div class="view-title"><h2>${ic('sun',18)} Today</h2>
+  return `<div class="view-title"><h2>${ic('sun',18)} Today</h2>
     <span class="sub">${new Date().toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long'})}</span>
     <span style="flex:1"></span><span class="pill" style="background:var(--ok)">${done.length}/${items.length} done</span></div>
   ${open.map(row).join('')||'<div class="empty">Nothing on your list — pull tasks in with the ☀ on any card, or add a quick job below.</div>'}
@@ -669,12 +666,29 @@ async function addToToday(noteId){
   }catch(e){fail(e);}
 }
 /* ============ BOARDS HOME ============ */
+function dayBriefPanel(){
+  if(WS.plan==='basic')return '';
+  const k='bbe_brief_'+SESSION.user.id.slice(0,8)+'_'+saDate();
+  return `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <b style="font-size:14px">✦ Your day, briefed</b><span style="flex:1"></span>
+      <button class="btn ghost sm" onclick="dayBrief(true)">↻</button>
+    </div>
+    <div id="brief-box" style="font-size:13.5px;line-height:1.65;white-space:pre-wrap;color:#4a483f">${(()=>{setTimeout(()=>{const c=localStorage.getItem(k);const b=document.getElementById('brief-box');if(b&&c)b.textContent=c;},40);return localStorage.getItem(k)?'':'Tap ✦ Brief me and the AI reads every board and tells you what matters today.';})()}</div>
+    ${!localStorage.getItem(k)?`<button class="btn accent sm" style="margin-top:10px" onclick="dayBrief()">✦ Brief me (1 credit)</button>`:''}
+  </div>`;
+}
+function boardsSideNav(){
+  return `<div class="sb-sec">Boards</div>
+    ${BOARDS.map(b=>`<button class="sb-item" onclick="openBoard('${b.id}')"><span class="sb-dot" style="background:${b.color||'var(--accent)'}"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.private_to?ic('lock',12)+' ':''}${esc(b.name)}</span></button>`).join('')}
+    <button class="sb-item" style="color:var(--muted)" onclick="newBoardModal()">${ic('plus',15)}<span>New board</span></button>`;
+}
 function statsFor(notes,colId){
   const ns=colId?notes.filter(n=>n.column_id===colId):notes;
   const d=ns.filter(n=>n.done).length,t=ns.length;
   return {d,t,p:t?Math.round(d/t*100):0};
 }
-let _home={tasks:[],inbox:[],posts:[],docs:[]};
+let _home={tasks:[],inbox:[],posts:[],docs:[],today:[]};
 function boardsView(){
   const first=esc((MEM&&MEM.name?MEM.name.split(' ')[0]:(WS&&WS.name))||'there');
   const h=new Date(Date.now()+2*3600*1000).getUTCHours();
@@ -682,6 +696,7 @@ function boardsView(){
   setTimeout(loadHome,40);
   return `<div class="view-title"><h2>${ic('sun',18)} ${greet}, ${first}</h2></div>
   <div id="home-brief" style="margin:-4px 0 16px;color:var(--muted);font-size:13.5px;font-weight:600">Pulling together your day…</div>
+  ${dayBriefPanel()}
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
     ${homeCard('check','Needs you today','home-tasks','')}
     ${homeCard('users','Inbox','home-inbox','<span id="home-inbox-count"></span>')}
@@ -691,6 +706,7 @@ function boardsView(){
   <div class="view-title" style="margin-top:26px"><h2 style="font-size:13px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase">${ic('board',14)} Your boards</h2><span class="sub">${BOARDS.length} board${BOARDS.length!==1?'s':''}</span></div>
   <div class="boards-grid">
     ${BOARDS.map(b=>`<div class="board-card" style="border-top-color:${b.color||'var(--accent)'}" onclick="openBoard('${b.id}')">
+      ${canManage()?`<button class="board-del" title="Delete board" onclick="delBoardCard(event,'${b.id}')">${ic('trash',13)}</button>`:''}
       <h3>${b.private_to?ic('lock',13)+' ':''}${esc(b.name)}</h3>
       <div class="meta">${ic('calendar',11)} ${esc(b.date_label||'no date')}</div>
       <div class="prog"><i id="bp-${b.id}" style="width:0%"></i></div>
@@ -725,6 +741,56 @@ function homeTasks(rows){
       <span style="flex:none;font-size:10.5px;font-weight:700;border-radius:8px;padding:3px 8px;background:${over?'var(--danger)':'var(--bg)'};color:${over?'#fff':'var(--muted)'}">${esc(n.due_date||'—')}</span>
     </div>`;
   }).join('');
+}
+function homeTasksBody(){
+  const jobs=(_home.today||[]).filter(t=>t.text_line&&!t.removed&&t.reason!=='__init__');
+  const tasks=_home.tasks||[];
+  const jobHtml=jobs.map(t=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--line)">
+    <button class="chk ${t.done?'on':''}" style="flex:none" onclick="homeTodayToggle('${t.id}')">${t.done?'✓':''}</button>
+    <div style="flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.text_line)}</div>
+    <button style="color:var(--muted);padding:3px;flex:none" title="Remove" onclick="homeTodayRemove('${t.id}')">${ic('x',12)}</button>
+  </div>`).join('');
+  const taskHtml=tasks.length?homeTasks(tasks):'';
+  const emptyHtml=(!jobs.length&&!tasks.length)?homeEmpty('Nothing yet — jot something for today below.'):'';
+  const add=`<div style="display:flex;gap:8px;margin-top:10px">
+    <input id="home-td" placeholder="Add something for today…" style="flex:1;padding:8px 10px;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();homeAddToday();}">
+    <button class="btn accent sm" style="flex:none;padding:8px 11px" title="Add" onclick="homeAddToday()">${ic('plus',13)}</button>
+  </div>`;
+  return jobHtml+taskHtml+emptyHtml+add;
+}
+async function homeAddToday(){
+  const el=$('home-td'),v=el?el.value.trim():''; if(!v)return;
+  try{
+    const {data,error}=await sb.from('bbe_today').insert({workspace_id:WS.id,user_id:SESSION.user.id,for_date:saDate(),text_line:v,position:(_home.today?_home.today.length:0)}).select().single();
+    if(error)throw error;
+    _home.today=(_home.today||[]).concat(data);
+    if(typeof TD!=='undefined'&&Array.isArray(TD))TD.push(data);
+    const bt=document.getElementById('home-tasks'); if(bt)bt.innerHTML=homeTasksBody();
+    const e2=$('home-td'); if(e2){e2.value='';e2.focus();}
+  }catch(e){fail(e);}
+}
+async function homeTodayToggle(id){
+  const t=(_home.today||[]).find(x=>x.id===id); if(!t)return;
+  try{const {error}=await sb.from('bbe_today').update({done:!t.done}).eq('id',id);if(error)throw error;t.done=!t.done;
+    const bt=document.getElementById('home-tasks'); if(bt)bt.innerHTML=homeTasksBody();
+  }catch(e){fail(e);}
+}
+async function homeTodayRemove(id){
+  try{const {error}=await sb.from('bbe_today').update({removed:true}).eq('id',id);if(error)throw error;
+    _home.today=(_home.today||[]).filter(x=>x.id!==id);
+    const bt=document.getElementById('home-tasks'); if(bt)bt.innerHTML=homeTasksBody();
+  }catch(e){fail(e);}
+}
+async function delBoardCard(ev,id){
+  ev.stopPropagation();
+  if(!canManage()){toast('Only the owner or an admin can delete a board');return;}
+  const b=BOARDS.find(x=>x.id===id);
+  if(!confirm(`Delete the whole board “${b?b.name:''}”? Everything on it goes too — this can't be undone.`))return;
+  try{
+    const {error}=await sb.from('bbe_boards').delete().eq('id',id); if(error)throw error;
+    if(S.board===id)S.board=null;
+    await loadWs(); render(); toast('Board deleted');
+  }catch(e){fail(e);}
 }
 function homeInbox(rows){
   if(!rows.length)return homeEmpty('Inbox zero.');
@@ -768,20 +834,21 @@ function homeDocs(rows){
   }).join('');
 }
 async function loadHome(){
-  let tasks=[],inbox=[],posts=[],docs=[];
+  let tasks=[],inbox=[],posts=[],docs=[],today=[];
   try{
-    const [t,i,p,d]=await Promise.all([
+    const [t,i,p,d,td]=await Promise.all([
       sb.from('bbe_notes').select('*').eq('workspace_id',WS.id).eq('done',false).eq('archived',false).lte('due_date',saDate()).order('due_date').limit(8),
       sb.from('bbe_interactions').select('*').eq('workspace_id',WS.id).order('received_at',{ascending:false}).limit(6),
       sb.from('bbe_posts').select('*').eq('workspace_id',WS.id).gte('post_date',saDate()).neq('status','posted').order('post_date').limit(6),
       sb.from('bbe_board_files').select('*').eq('workspace_id',WS.id).order('created_at',{ascending:false}).limit(6),
+      sb.from('bbe_today').select('*').eq('user_id',SESSION.user.id).eq('workspace_id',WS.id).eq('for_date',saDate()).eq('removed',false).order('position'),
     ]);
-    tasks=t.data||[];inbox=i.data||[];posts=p.data||[];docs=d.data||[];
+    tasks=t.data||[];inbox=i.data||[];posts=p.data||[];docs=d.data||[];today=(td.data||[]).filter(r=>r.text_line&&r.reason!=='__init__');
   }catch(e){console.error(e);}
-  _home={tasks,inbox,posts,docs};
+  _home={tasks,inbox,posts,docs,today};
   const newc=inbox.filter(x=>x.status==='new').length;
   const todayPosts=posts.filter(p=>p.post_date===saDate()).length;
-  const bt=document.getElementById('home-tasks'); if(bt)bt.innerHTML=homeTasks(tasks);
+  const bt=document.getElementById('home-tasks'); if(bt)bt.innerHTML=homeTasksBody();
   const bi=document.getElementById('home-inbox'); if(bi)bi.innerHTML=homeInbox(inbox);
   const bc=document.getElementById('home-inbox-count'); if(bc)bc.innerHTML=newc?`<span style="background:var(--accent);color:#fff;font-size:10px;font-weight:800;border-radius:10px;padding:2px 7px">${newc} new</span>`:'';
   const bp=document.getElementById('home-posts'); if(bp)bp.innerHTML=homePosts(posts);
