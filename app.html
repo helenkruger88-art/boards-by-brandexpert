@@ -186,23 +186,26 @@ main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(
 /* plan canvas */
 .plan-stage{position:relative;height:560px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);
   background-image:radial-gradient(var(--line-strong) 1px,transparent 1px);background-size:20px 20px;background-color:#fcfbf9}
-.pnode{position:absolute;width:150px;background:#fff;border:1px solid var(--line-strong);border-left:4px solid var(--pc,#888);border-radius:11px;padding:9px 11px;box-shadow:0 2px 6px rgba(30,20,10,.06);cursor:grab;user-select:none;touch-action:none}
+.pnode{position:absolute;z-index:3;width:150px;background:#fff;border:1px solid var(--line-strong);border-left:4px solid var(--pc,#888);border-radius:11px;padding:9px 11px;box-shadow:0 2px 6px rgba(30,20,10,.06);cursor:grab;user-select:none;touch-action:none}
 .pnode:active{cursor:grabbing}
 .pnode .pt{font-size:12.5px;font-weight:700;line-height:1.25;pointer-events:none}
 .pnode .pd{font-size:10.5px;color:var(--muted);margin-top:3px;pointer-events:none}
 .pnode.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 6px 16px rgba(199,91,18,.18)}
 .pnode.done{opacity:.55}
 .pnode.done .pt{text-decoration:line-through}
-.plink{position:absolute;right:-11px;top:20px;width:22px;height:22px;border-radius:50%;background:#fff;border:1.5px solid var(--accent);color:var(--accent);font-size:12px;font-weight:800;line-height:19px;text-align:center;cursor:crosshair;box-shadow:0 1px 4px rgba(0,0,0,.18);padding:0;z-index:6;opacity:.55;transition:opacity .12s}
-.pnode:hover .plink{opacity:1}
-.plink:hover{background:var(--accent);color:#fff}
-.pnode.plink-target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .pbadge{position:absolute;top:-9px;right:-8px;background:var(--ok);color:#fff;font-size:9px;font-weight:800;border-radius:20px;padding:2px 7px;box-shadow:0 1px 3px rgba(0,0,0,.2);pointer-events:none}
 .pwire-x{position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;border:1px solid var(--line-strong);color:var(--muted);font-size:10px;font-weight:800;line-height:16px;text-align:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.12);padding:0;z-index:4}
 .pwire-x:hover{color:var(--danger);border-color:var(--danger)}
 .pswatch{display:flex;gap:8px;margin-top:4px}
 .pswatch button{width:26px;height:26px;border-radius:8px;border:2px solid transparent;padding:0}
 .pswatch button.sel{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.pframe{position:absolute;z-index:1;border:1.5px dashed;border-radius:14px;user-select:none;touch-action:none;cursor:grab}
+.pframe:active{cursor:grabbing}
+.pframe-lbl{position:absolute;top:-10px;left:12px;color:#fff;font-size:10px;font-weight:800;border-radius:20px;padding:2px 9px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.15);z-index:2;white-space:nowrap}
+.pframe-rs{position:absolute;right:-6px;bottom:-6px;width:12px;height:12px;border-radius:4px;background:#fff;border:1.5px solid var(--line-strong);cursor:nwse-resize;z-index:2;touch-action:none}
+.pbadge.post{background:#C4356B;left:-8px;right:auto}
+.pchan{border:2px solid transparent;border-radius:9px;padding:3px;background:transparent;cursor:pointer;opacity:.4}
+.pchan.on{opacity:1;border-color:var(--ink)}
 @media(max-width:640px){
   .bcols{grid-template-columns:1fr 1fr;gap:8px 12px}
   .bcols>div:first-child{grid-column:1/3}
@@ -264,7 +267,7 @@ function gridColor(id,fallback){
 }
 let SESSION=null, WS=null, MEM=null, MEMBERS=[], BOARDS=[], MYWS=[];
 let S={view:'boards',board:null,col:null,scope:'workspace'};
-let cur={cols:[],notes:[],msgs:[],invs:[],pins:[],posts:[],budget:[],planNodes:[],planEdges:[]};
+let cur={cols:[],notes:[],msgs:[],invs:[],pins:[],posts:[],budget:[],planNodes:[],planEdges:[],planFrames:[]};
 let TD=[], TDN={}, TDC={};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -350,8 +353,8 @@ async function loadWs(){
   applyTheme();
 }
 async function loadBoard(){
-  if(!S.board){cur={cols:[],notes:[],msgs:[],invs:[],pins:[],posts:[],budget:[],planNodes:[],planEdges:[]};return;}
-  const [c,n,m,iv,p,po,bd,pn,pe]=await Promise.all([
+  if(!S.board){cur={cols:[],notes:[],msgs:[],invs:[],pins:[],posts:[],budget:[],planNodes:[],planEdges:[],planFrames:[]};return;}
+  const [c,n,m,iv,p,po,bd,pn,pe,pf]=await Promise.all([
     sb.from('bbe_columns').select('*').eq('board_id',S.board).order('position'),
     sb.from('bbe_notes').select('*').eq('board_id',S.board),
     sb.from('bbe_messages').select('*').eq('board_id',S.board).order('created_at',{ascending:false}).limit(40),
@@ -361,9 +364,10 @@ async function loadBoard(){
     sb.from('bbe_budget').select('*').eq('board_id',S.board).order('position'),
     sb.from('bbe_plan_nodes').select('*').eq('board_id',S.board).order('position'),
     sb.from('bbe_plan_edges').select('*').eq('board_id',S.board),
+    sb.from('bbe_plan_frames').select('*').eq('board_id',S.board).order('position'),
   ]);
   if(c.error)throw c.error;
-  cur={cols:c.data||[],notes:n.data||[],msgs:(m.data||[]).reverse(),invs:iv.data||[],pins:p.data||[],posts:po.data||[],budget:bd.data||[],planNodes:pn.data||[],planEdges:pe.data||[]};
+  cur={cols:c.data||[],notes:n.data||[],msgs:(m.data||[]).reverse(),invs:iv.data||[],pins:p.data||[],posts:po.data||[],budget:bd.data||[],planNodes:pn.data||[],planEdges:pe.data||[],planFrames:pf.data||[]};
 }
 async function refresh(){try{await loadWs();await loadBoard();await loadToday();render();}catch(e){fail(e);}}
 /* today */
@@ -464,9 +468,8 @@ function navItems(){
     const b=BOARDS.find(x=>x.id===S.board);
     if(b){
       const m=b.modules||{content:true,inbox:true,money:true,team:true};
-      const items=[['btoday','sun','Today']];
+      const items=[['btoday','sun','Today'],['board','board','Board']];
       if(m.plan!==false)items.push(['plan','route','Plan']);
-      items.push(['board','board','Board']);
       if(m.content)items.push(['content','calendar','Content']);
       if(m.inbox)items.push(['binbox','mail','Inbox']);
       if(m.files)items.push(['files','note','Files']);
@@ -876,13 +879,15 @@ async function saveBoardSetup(){
 }
 /* ============ PLAN CANVAS ============ */
 const PLAN_COLORS=['#0F6E56','#185FA5','#C4356B','#BA7517','#534AB7','#C75B12'];
-let _planConnect=false,_planConnectFrom=null,_planColor=null,_pd=null;
+let _planConnect=false,_planConnectFrom=null,_planColor=null,_pd=null,_planChannels=null,_planFrameColor=null,_pf=null;
+const PLAN_CHANNELS=['instagram','facebook','youtube','tiktok','threads','linkedin'];
 function planView(){
   const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
-  const nodes=cur.planNodes||[],edges=cur.planEdges||[];
+  const nodes=cur.planNodes||[],edges=cur.planEdges||[],frames=cur.planFrames||[];
   const NW=150,NH=54;
-  const W=Math.max(900,...nodes.map(n=>(Number(n.x)||0)+NW+80));
-  const H=Math.max(560,...nodes.map(n=>(Number(n.y)||0)+NH+80));
+  const W=Math.max(900,...nodes.map(n=>(Number(n.x)||0)+NW+80),...frames.map(f=>(Number(f.x)||0)+(Number(f.w)||0)+80));
+  const H=Math.max(560,...nodes.map(n=>(Number(n.y)||0)+NH+80),...frames.map(f=>(Number(f.y)||0)+(Number(f.h)||0)+80));
+  const costSum=nodes.reduce((s,n)=>s+(Number(n.cost)||0),0);
   const noteById={}; cur.notes.forEach(n=>noteById[n.id]=n);
   const pos=id=>{const n=nodes.find(x=>x.id===id);return n?{x:Number(n.x)||0,y:Number(n.y)||0}:null;};
   const pDate=d=>d?new Date(d+'T12:00').toLocaleDateString('en-ZA',{day:'numeric',month:'short'}):'';
@@ -895,28 +900,41 @@ function planView(){
   const nodeHtml=nodes.map(n=>{
     const linked=n.note_id?noteById[n.note_id]:null;
     const isDone=!!(linked&&linked.done);
-    return `<div class="pnode${_planConnectFrom===n.id?' sel':''}${isDone?' done':''}" data-id="${n.id}" style="left:${Number(n.x)||0}px;top:${Number(n.y)||0}px;--pc:${esc(n.color||'#888')}" onpointerdown="planDragStart(event,'${n.id}')">
+    const isPost=(n.kind||'step')==='post';
+    return `<div class="pnode${_planConnectFrom===n.id?' sel':''}${isDone?' done':''}" style="left:${Number(n.x)||0}px;top:${Number(n.y)||0}px;--pc:${esc(n.color||'#888')}" onpointerdown="planDragStart(event,'${n.id}')">
       ${n.note_id?`<span class="pbadge">${isDone?'✓ done':'✓ task'}</span>`:''}
+      ${isPost?`<span class="pbadge post">📷 post</span>`:''}
+      ${n.scheduled?`<span class="pbadge">✓ scheduled</span>`:''}
       <div class="pt">${esc(n.title)}</div>
       ${n.note?`<div class="pd">${esc(n.note.length>64?n.note.slice(0,64)+'…':n.note)}</div>`:''}
       ${n.start_date||n.due_date?`<div class="pd">📅 ${[pDate(n.start_date),pDate(n.due_date)].filter(Boolean).join(' – ')}</div>`:''}
-      ${canManage()?`<button class="plink" title="Drag me onto another step to link them" onpointerdown="planLinkStart(event,'${n.id}')">↳</button>`:''}
+      ${isPost&&(n.channels||[]).length?`<div style="display:flex;gap:3px;margin-top:4px;pointer-events:none">${(n.channels||[]).map(p=>platBadge(p,14)).join('')}</div>`:''}
+      ${Number(n.cost)>0?`<div style="margin-top:4px;pointer-events:none"><span style="display:inline-block;background:var(--warn);color:#fff;font-size:9.5px;font-weight:800;border-radius:20px;padding:1px 7px">${Rand(n.cost)}</span></div>`:''}
+    </div>`;}).join('');
+  const frameHtml=frames.map(f=>{
+    const fc=esc(f.color||'#8a887e');
+    return `<div class="pframe" style="left:${Number(f.x)||0}px;top:${Number(f.y)||0}px;width:${Number(f.w)||340}px;height:${Number(f.h)||240}px;border-color:${fc};background:${fc}14" onpointerdown="planFrameDragStart(event,'${f.id}')">
+      <span class="pframe-lbl" style="background:${fc}" ${canManage()?`onclick="planFrameModal('${f.id}')"`:''}>${esc(f.name||'Zone')}</span>
+      ${canManage()?`<span class="pframe-rs" onpointerdown="planFrameResizeStart(event,'${f.id}')"></span>`:''}
     </div>`;}).join('');
   return `<div class="view-title">
-    <h2>${ic('route',18)} Plan <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2>
+    <h2>${ic('route',18)} Plan <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span>${costSum>0?` <span style="color:var(--muted);font-weight:600;font-size:13px">· Plan est · ${Rand(costSum)}</span>`:''}</h2>
     <span style="flex:1"></span>
     ${canManage()?`<button class="btn ghost sm" onclick="addPlanNode()">＋ Step</button>
+    <button class="btn ghost sm" onclick="addPlanFrame()">＋ Frame</button>
     <button class="btn ${_planConnect?'accent':'ghost'} sm" onclick="planToggleConnect()">↳ Connect</button>
+    <button class="btn ghost sm" onclick="planPushBudget()">✦ Push to Budget</button>
+    <button class="btn ghost sm" onclick="planScheduleAll()">✦ Schedule posts</button>
     <button class="btn accent sm" onclick="planToBoard()">✦ Turn into board →</button>`:''}
   </div>
   ${_planConnect?`<div style="font-size:12px;font-weight:700;color:var(--accent);margin:-4px 0 10px">Click a node, then another, to link them (Esc to stop).</div>`:''}
   <div class="plan-stage" id="plan-stage">
-    <div class="plan-inner" style="position:relative;width:${W}px;height:${H}px">
-      <svg style="position:absolute;inset:0;pointer-events:none" width="${W}" height="${H}">
+    <div style="position:relative;width:${W}px;height:${H}px">
+      ${frameHtml}
+      <svg style="position:absolute;inset:0;pointer-events:none;z-index:2" width="${W}" height="${H}">
         <defs><marker id="planar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#C2BEB2"/></marker></defs>
         <g fill="none" stroke="#C2BEB2" stroke-width="2" marker-end="url(#planar)">${wires}</g>
       </svg>
-      <svg class="plan-templayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible" width="${W}" height="${H}"></svg>
       ${wireX}
       ${nodeHtml}
       ${nodes.length?'':`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px">
@@ -928,71 +946,31 @@ function planView(){
   </div>`;
 }
 function planDragStart(ev,id){
-  if(ev.target.closest('button')||ev.target.closest('.plink'))return;
+  if(ev.target.closest('button'))return;
   if(_planConnect){planPickConnect(id);return;}
   const node=cur.planNodes.find(x=>x.id===id); if(!node)return;
   ev.preventDefault();
   const el=ev.currentTarget;
-  const st={sx:ev.clientX,sy:ev.clientY,ox:Number(node.x)||0,oy:Number(node.y)||0,moved:false};
-  const move=e=>{
-    const dx=e.clientX-st.sx,dy=e.clientY-st.sy;
-    if(Math.abs(dx)>4||Math.abs(dy)>4)st.moved=true;
-    if(!st.moved||!canManage())return;
-    el.style.left=Math.max(0,st.ox+dx)+'px';
-    el.style.top=Math.max(0,st.oy+dy)+'px';
-    el.style.zIndex=7;
+  _pd={id,el,sx:ev.clientX,sy:ev.clientY,ox:Number(node.x)||0,oy:Number(node.y)||0,moved:false};
+  if(el.setPointerCapture)try{el.setPointerCapture(ev.pointerId);}catch(_){}
+  el.onpointermove=e=>{
+    if(!_pd)return;
+    const dx=e.clientX-_pd.sx,dy=e.clientY-_pd.sy;
+    if(Math.abs(dx)>4||Math.abs(dy)>4)_pd.moved=true;
+    if(!_pd.moved||!canManage())return;
+    el.style.left=Math.max(0,_pd.ox+dx)+'px';
+    el.style.top=Math.max(0,_pd.oy+dy)+'px';
   };
-  const up=async e=>{
-    document.removeEventListener('pointermove',move);
-    document.removeEventListener('pointerup',up);
-    if(!st.moved){planNodeModal(id);return;}
+  el.onpointerup=async e=>{
+    el.onpointermove=null; el.onpointerup=null;
+    const d=_pd; _pd=null; if(!d)return;
+    if(!d.moved){planNodeModal(id);return;}
     if(!canManage())return;
-    const nx=Math.max(0,Math.round(st.ox+(e.clientX-st.sx))),ny=Math.max(0,Math.round(st.oy+(e.clientY-st.sy)));
+    const nx=Math.max(0,Math.round(d.ox+(e.clientX-d.sx))),ny=Math.max(0,Math.round(d.oy+(e.clientY-d.sy)));
     const n2=cur.planNodes.find(x=>x.id===id); if(n2){n2.x=nx;n2.y=ny;}
     render();
     try{const {error}=await sb.from('bbe_plan_nodes').update({x:nx,y:ny}).eq('id',id);if(error)throw error;}catch(err){fail(err);}
   };
-  document.addEventListener('pointermove',move);
-  document.addEventListener('pointerup',up);
-}
-// Drag the ↳ handle onto another step to link them (or just click it, then click a target).
-function planLinkStart(ev,id){
-  if(!canManage())return;
-  ev.preventDefault(); ev.stopPropagation();
-  const inner=document.querySelector('#plan-stage .plan-inner');
-  const layer=document.querySelector('#plan-stage .plan-templayer');
-  const node=cur.planNodes.find(x=>x.id===id); if(!node||!inner||!layer)return;
-  const ax=(Number(node.x)||0)+150, ay=(Number(node.y)||0)+24;
-  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-  path.setAttribute('stroke','var(--accent)');path.setAttribute('stroke-width','2.5');path.setAttribute('fill','none');path.setAttribute('stroke-dasharray','6 4');
-  layer.appendChild(path);
-  let moved=false,lastHover=null;
-  const clearHover=()=>{if(lastHover){lastHover.classList.remove('plink-target');lastHover=null;}};
-  const move=e=>{
-    moved=true;
-    const r=inner.getBoundingClientRect();
-    const cx=e.clientX-r.left, cy=e.clientY-r.top;
-    path.setAttribute('d',`M${ax},${ay} C${ax+40},${ay} ${cx-40},${cy} ${cx},${cy}`);
-    const el=document.elementFromPoint(e.clientX,e.clientY);
-    const pn=el&&el.closest('.pnode');
-    if(pn!==lastHover){clearHover(); if(pn&&pn.getAttribute('data-id')!==id){pn.classList.add('plink-target');lastHover=pn;}}
-  };
-  const up=async e=>{
-    document.removeEventListener('pointermove',move);
-    document.removeEventListener('pointerup',up);
-    path.remove(); clearHover();
-    const el=document.elementFromPoint(e.clientX,e.clientY);
-    const pn=el&&el.closest('.pnode');
-    const toId=pn?pn.getAttribute('data-id'):null;
-    if(toId&&toId!==id){
-      if(cur.planEdges.some(x=>(x.from_node===id&&x.to_node===toId)||(x.from_node===toId&&x.to_node===id))){toast('Already linked');return;}
-      try{const {error}=await sb.from('bbe_plan_edges').insert({workspace_id:WS.id,board_id:S.board,from_node:id,to_node:toId});if(error)throw error;await loadBoard();render();}catch(err){fail(err);}
-    }else if(!moved){
-      _planConnect=true;_planConnectFrom=id;render();toast('Now click the step you want to link to');
-    }
-  };
-  document.addEventListener('pointermove',move);
-  document.addEventListener('pointerup',up);
 }
 async function addPlanNode(){
   if(!canManage())return;
@@ -1008,19 +986,36 @@ async function addPlanNode(){
 function planNodeModal(id){
   const n=cur.planNodes.find(x=>x.id===id); if(!n)return;
   _planColor=n.color||PLAN_COLORS[0];
+  _planChannels=(n.channels||[]).slice();
   openModal(`<h3>Plan step</h3>
     <label>Title</label><input id="pn-title" value="${esc(n.title)}">
     <label>Note</label><textarea id="pn-note" rows="2" placeholder="What is this step about?">${esc(n.note||'')}</textarea>
+    <label>Type</label>
+    <select id="pn-kind" onchange="const r=$('pn-chanrow');if(r)r.style.display=this.value==='post'?'':'none'">
+      <option value="step"${(n.kind||'step')!=='post'?' selected':''}>Step (task)</option>
+      <option value="post"${n.kind==='post'?' selected':''}>Post (content)</option>
+    </select>
+    <div id="pn-chanrow" style="display:${n.kind==='post'?'':'none'}">
+      <label>Channels</label>
+      <div id="pn-chans" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${PLAN_CHANNELS.map(p=>`<button type="button" class="pchan${(_planChannels||[]).includes(p)?' on':''}" data-p="${p}" title="${p}" onclick="planToggleChan('${p}')">${platBadge(p,20)}</button>`).join('')}</div>
+    </div>
     <label>Colour</label>
     <div class="pswatch" id="pn-colors">${PLAN_COLORS.map(c=>`<button type="button" class="${c.toLowerCase()===(_planColor||'').toLowerCase()?'sel':''}" style="background:${c}" data-c="${c}" onclick="planSetColor(this)"></button>`).join('')}</div>
     <div style="display:flex;gap:10px">
       <div style="flex:1"><label>Start date</label><input type="date" id="pn-start" value="${n.start_date||''}"></div>
       <div style="flex:1"><label>Due date</label><input type="date" id="pn-due" value="${n.due_date||''}"></div>
     </div>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label>Cost (R)</label><input type="number" id="pn-cost" min="0" step="any" placeholder="0" value="${n.cost!=null?n.cost:''}"></div>
+      <div style="flex:1"><label>Budget category</label><input id="pn-bcat" list="pn-bcats" placeholder="e.g. Marketing" value="${esc(n.budget_cat||'')}">
+        <datalist id="pn-bcats">${cur.budget.filter(b=>!b.parent_id).map(b=>`<option value="${esc(b.name)}">`).join('')}</datalist></div>
+    </div>
     ${n.note_id?`<div style="font-size:12px;color:var(--ok);font-weight:700;margin-top:12px">✓ Already on the board</div>`:''}
+    ${n.scheduled?`<div style="font-size:12px;color:var(--ok);font-weight:700;margin-top:12px">✓ Scheduled to the calendar</div>`:''}
     <div class="row">
       ${canManage()?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="planDelNode('${id}')">${ic('trash',13)}</button>`:''}
-      ${canManage()&&!n.note_id?`<button class="btn ghost" onclick="savePlanNode('${id}',true)">✦ Make task</button>`:''}
+      ${canManage()&&!n.note_id&&(n.kind||'step')!=='post'?`<button class="btn ghost" onclick="savePlanNode('${id}',true)">✦ Make task</button>`:''}
+      ${canManage()&&n.kind==='post'&&!n.scheduled?`<button class="btn ghost" onclick="planSchedulePost('${id}')">✦ Schedule to calendar</button>`:''}
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
       ${canManage()?`<button class="btn accent" onclick="savePlanNode('${id}')">Save</button>`:''}
     </div>`);
@@ -1033,7 +1028,7 @@ function planSetColor(btn){
 async function savePlanNode(id,mk){
   if(!canManage())return;
   const n=cur.planNodes.find(x=>x.id===id); if(!n)return;
-  const patch={title:($('pn-title').value||'').trim()||n.title,note:($('pn-note').value||'').trim()||null,color:_planColor||n.color,start_date:$('pn-start').value||null,due_date:$('pn-due').value||null};
+  const patch={title:($('pn-title').value||'').trim()||n.title,note:($('pn-note').value||'').trim()||null,color:_planColor||n.color,start_date:$('pn-start').value||null,due_date:$('pn-due').value||null,kind:($('pn-kind')&&$('pn-kind').value)||n.kind||'step',cost:Number($('pn-cost').value)||null,budget_cat:($('pn-bcat').value||'').trim()||null,channels:_planChannels||n.channels||[]};
   try{
     const {error}=await sb.from('bbe_plan_nodes').update(patch).eq('id',id); if(error)throw error;
     Object.assign(n,patch);
@@ -1099,15 +1094,191 @@ async function planMakeTask(id){
 }
 async function planToBoard(){
   if(!canManage())return;
-  const todo=cur.planNodes.filter(n=>!n.note_id);
+  const todo=cur.planNodes.filter(n=>!n.note_id&&(n.kind||'step')!=='post');
   if(!todo.length){toast('Every step is already on the board');return;}
   try{
-    const colId=await planFirstCol();
-    let added=0;
-    for(const n of todo){await planInsertTask(n,colId);added++;}
+    const frames=cur.planFrames||[];
+    const frameFor=n=>{
+      const cx=(Number(n.x)||0)+75,cy=(Number(n.y)||0)+27;
+      return frames.find(f=>{const fx=Number(f.x)||0,fy=Number(f.y)||0;return cx>=fx&&cx<=fx+(Number(f.w)||0)&&cy>=fy&&cy<=fy+(Number(f.h)||0);});
+    };
+    const colCache={};
+    const colFor=async f=>{
+      const key=(f.name||'zone').trim().toLowerCase();
+      if(colCache[key])return colCache[key];
+      let col=cur.cols.find(c=>(c.name||'').trim().toLowerCase()===key);
+      if(!col){
+        const {data,error}=await sb.from('bbe_columns').insert({workspace_id:WS.id,board_id:S.board,name:(f.name||'Zone').trim(),color:f.color||CYCLE[cur.cols.length%CYCLE.length],position:cur.cols.length}).select().single();
+        if(error)throw error;
+        cur.cols.push(data); col=data;
+      }
+      colCache[key]=col.id; return col.id;
+    };
+    let firstCol=null,added=0;
+    for(const n of todo){
+      const f=frameFor(n);
+      let colId;
+      if(f)colId=await colFor(f);
+      else{if(!firstCol)firstCol=await planFirstCol();colId=firstCol;}
+      await planInsertTask(n,colId);added++;
+    }
     await loadBoard();render();
     toast(added+' step'+(added!==1?'s':'')+' added to the board');
   }catch(e){fail(e);}
+}
+/* plan: cost → budget */
+async function planPushBudget(){
+  if(!canManage())return;
+  const sums={};
+  (cur.planNodes||[]).forEach(n=>{
+    const c=Number(n.cost)||0,cat=(n.budget_cat||'').trim();
+    if(c>0&&cat)sums[cat]=(sums[cat]||0)+c;
+  });
+  const names=Object.keys(sums);
+  if(!names.length){toast('Add a cost and a budget category to steps first');return;}
+  try{
+    let pos=cur.budget.filter(b=>!b.parent_id).length;
+    for(const name of names){
+      const ex=cur.budget.find(b=>!b.parent_id&&(b.name||'').trim().toLowerCase()===name.toLowerCase());
+      if(ex){const {error}=await sb.from('bbe_budget').update({planned:sums[name]}).eq('id',ex.id);if(error)throw error;}
+      else{const {error}=await sb.from('bbe_budget').insert({workspace_id:WS.id,board_id:S.board,name,planned:sums[name],position:pos++});if(error)throw error;}
+    }
+    await loadBoard();render();
+    toast('Budget updated from plan ('+names.length+(names.length!==1?' categories':' category')+')');
+  }catch(e){fail(e);}
+}
+/* plan: post → content calendar */
+function planToggleChan(p){
+  if(!_planChannels)_planChannels=[];
+  const i=_planChannels.indexOf(p);
+  if(i>=0)_planChannels.splice(i,1); else _planChannels.push(p);
+  const g=$('pn-chans'); if(g)g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',_planChannels.includes(b.dataset.p)));
+}
+async function planInsertPosts(n,chans,date){
+  for(const ch of chans){
+    const {error}=await sb.from('bbe_posts').insert({workspace_id:WS.id,board_id:S.board,platform:ch,caption:(n.title+(n.note?('\n'+n.note):'')),media_note:null,media:[],post_date:date,post_time:'09:00',status:'draft',created_by:SESSION.user.id});
+    if(error)throw error;
+  }
+  const {error:e2}=await sb.from('bbe_plan_nodes').update({scheduled:true}).eq('id',n.id);
+  if(e2)throw e2;
+  return chans.length;
+}
+async function planSchedulePost(id){
+  if(!canManage())return;
+  const n=cur.planNodes.find(x=>x.id===id); if(!n)return;
+  const chans=($('pn-chans')&&_planChannels)?_planChannels:(n.channels||[]);
+  const date=($('pn-due')&&($('pn-due').value||$('pn-start').value))||n.due_date||n.start_date;
+  if(!chans.length){toast('Pick at least one channel for this post first');return;}
+  if(!date){toast('Give this post a due or start date first');return;}
+  try{
+    const k=await planInsertPosts(n,chans,date);
+    closeModal();
+    await loadBoard();render();
+    toast('Scheduled '+k+' post'+(k!==1?'s':'')+' to the calendar');
+  }catch(e){fail(e);}
+}
+async function planScheduleAll(){
+  if(!canManage())return;
+  const todo=(cur.planNodes||[]).filter(n=>n.kind==='post'&&!n.scheduled&&(n.channels||[]).length&&(n.due_date||n.start_date));
+  if(!todo.length){toast('No unscheduled posts with channels and a date');return;}
+  try{
+    let k=0;
+    for(const n of todo)k+=await planInsertPosts(n,n.channels||[],n.due_date||n.start_date);
+    await loadBoard();render();
+    toast('Scheduled '+k+' post'+(k!==1?'s':'')+' to the calendar');
+  }catch(e){fail(e);}
+}
+/* plan: frames */
+async function addPlanFrame(){
+  if(!canManage())return;
+  try{
+    const {data,error}=await sb.from('bbe_plan_frames').insert({workspace_id:WS.id,board_id:S.board,name:'Zone',color:'#8a887e',x:40,y:40,w:340,h:240,position:(cur.planFrames||[]).length}).select().single();
+    if(error)throw error;
+    await loadBoard();render();
+    planFrameModal(data.id);
+  }catch(e){fail(e);}
+}
+function planFrameModal(id){
+  if(!canManage())return;
+  const f=cur.planFrames.find(x=>x.id===id); if(!f)return;
+  _planFrameColor=f.color||PLAN_COLORS[0];
+  openModal(`<h3>Frame</h3>
+    <label>Name</label><input id="pf-name" value="${esc(f.name||'')}" placeholder="e.g. Week 1, Content, Setup">
+    <label>Colour</label>
+    <div class="pswatch" id="pf-colors">${PLAN_COLORS.map(c=>`<button type="button" class="${c.toLowerCase()===(_planFrameColor||'').toLowerCase()?'sel':''}" style="background:${c}" data-c="${c}" onclick="planSetFrameColor(this)"></button>`).join('')}</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:10px">Steps inside a frame become a column with this name when you turn the plan into a board.</div>
+    <div class="row">
+      <button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="planDelFrame('${id}')">${ic('trash',13)}</button>
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn accent" onclick="savePlanFrame('${id}')">Save</button>
+    </div>`);
+  setTimeout(()=>{const e=$('pf-name');if(e){e.focus();e.select();}},60);
+}
+function planSetFrameColor(btn){
+  _planFrameColor=btn.dataset.c;
+  const g=$('pf-colors'); if(g)g.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b===btn));
+}
+async function savePlanFrame(id){
+  if(!canManage())return;
+  const f=cur.planFrames.find(x=>x.id===id); if(!f)return;
+  try{
+    const {error}=await sb.from('bbe_plan_frames').update({name:($('pf-name').value||'').trim()||f.name||'Zone',color:_planFrameColor||f.color}).eq('id',id);
+    if(error)throw error;
+    closeModal();await loadBoard();render();
+  }catch(e){fail(e);}
+}
+async function planDelFrame(id){
+  if(!canManage())return;
+  const f=cur.planFrames.find(x=>x.id===id);
+  if(!confirm(`Delete frame “${f?f.name:''}”? The steps inside stay on the canvas.`))return;
+  try{
+    const {error}=await sb.from('bbe_plan_frames').delete().eq('id',id); if(error)throw error;
+    closeModal();await loadBoard();render();toast('Frame deleted');
+  }catch(e){fail(e);}
+}
+function planFrameDragStart(ev,id){
+  if(ev.target.closest('.pframe-lbl,.pframe-rs,.pnode,button'))return;
+  if(!canManage())return;
+  const f=cur.planFrames.find(x=>x.id===id); if(!f)return;
+  ev.preventDefault();
+  const el=ev.currentTarget;
+  _pf={id,el,sx:ev.clientX,sy:ev.clientY,ox:Number(f.x)||0,oy:Number(f.y)||0,moved:false};
+  if(el.setPointerCapture)try{el.setPointerCapture(ev.pointerId);}catch(_){}
+  el.onpointermove=e=>{
+    if(!_pf)return;
+    const dx=e.clientX-_pf.sx,dy=e.clientY-_pf.sy;
+    if(Math.abs(dx)>4||Math.abs(dy)>4)_pf.moved=true;
+    if(!_pf.moved)return;
+    el.style.left=Math.max(0,_pf.ox+dx)+'px';
+    el.style.top=Math.max(0,_pf.oy+dy)+'px';
+  };
+  el.onpointerup=async e=>{
+    el.onpointermove=null; el.onpointerup=null;
+    const d=_pf; _pf=null; if(!d||!d.moved)return;
+    const nx=Math.max(0,Math.round(d.ox+(e.clientX-d.sx))),ny=Math.max(0,Math.round(d.oy+(e.clientY-d.sy)));
+    const f2=cur.planFrames.find(x=>x.id===id); if(f2){f2.x=nx;f2.y=ny;}
+    render();
+    try{const {error}=await sb.from('bbe_plan_frames').update({x:nx,y:ny}).eq('id',id);if(error)throw error;}catch(err){fail(err);}
+  };
+}
+function planFrameResizeStart(ev,id){
+  if(!canManage())return;
+  const f=cur.planFrames.find(x=>x.id===id); if(!f)return;
+  ev.preventDefault(); ev.stopPropagation();
+  const el=ev.currentTarget,frameEl=el.closest('.pframe');
+  const st={sx:ev.clientX,sy:ev.clientY,ow:Number(f.w)||340,oh:Number(f.h)||240};
+  if(el.setPointerCapture)try{el.setPointerCapture(ev.pointerId);}catch(_){}
+  el.onpointermove=e=>{
+    const w=Math.max(160,Math.round(st.ow+(e.clientX-st.sx))),h=Math.max(120,Math.round(st.oh+(e.clientY-st.sy)));
+    if(frameEl){frameEl.style.width=w+'px';frameEl.style.height=h+'px';}
+  };
+  el.onpointerup=async e=>{
+    el.onpointermove=null; el.onpointerup=null;
+    const w=Math.max(160,Math.round(st.ow+(e.clientX-st.sx))),h=Math.max(120,Math.round(st.oh+(e.clientY-st.sy)));
+    const f2=cur.planFrames.find(x=>x.id===id); if(f2){f2.w=w;f2.h=h;}
+    render();
+    try{const {error}=await sb.from('bbe_plan_frames').update({w,h}).eq('id',id);if(error)throw error;}catch(err){fail(err);}
+  };
 }
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&_planConnect){_planConnect=false;_planConnectFrom=null;if(S.view==='plan')render();}
