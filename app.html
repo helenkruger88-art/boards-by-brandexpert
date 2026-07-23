@@ -1408,6 +1408,7 @@ function boardView(){
     <button class="btn ghost sm" onclick="renameBoard()">${ic('pencil',12)}</button>
     <button class="btn ghost sm" onclick="delBoard()">${ic('trash',12)}</button>
     <button class="btn ghost sm" onclick="addCol()">${ic('plus',12)} Column</button>
+    <button class="btn ghost sm" style="color:var(--accent)" onclick="openImportBrief()" title="Paste a brief — AI turns it into tasks and content drafts">✦ Import brief</button>
     <button class="btn ${_boardInbox?'accent':'ghost'} sm" onclick="_boardInbox=!_boardInbox;render()" title="Incoming comments & messages for this board">${ic('mail',12)} Inbox</button>
   </div>
   <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
@@ -2203,6 +2204,7 @@ function contentView(){
     <button class="btn ${_cShow.tasks?'accent':'ghost'} sm" onclick="colToggle('tasks')" title="Show or hide the Tasks column">${ic('board',12)} Tasks</button>
     <button class="btn ${_cShow.cal?'accent':'ghost'} sm" onclick="colToggle('cal')" title="Show or hide the Calendar column">${ic('calendar',12)} Calendar</button>
     <button class="btn ${_cShow.inbox?'accent':'ghost'} sm" onclick="colToggle('inbox')" title="Show or hide the Inbox column">${ic('mail',12)} Inbox</button>
+    <button class="btn ghost sm" style="color:var(--accent)" onclick="openImportBrief()" title="Paste a brief — AI turns it into tasks and content drafts">✦ Import brief</button>
     <button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button></div>
   ${paidAI()?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -2927,6 +2929,95 @@ async function dayBrief(force){
     box.textContent=j.text;
     if(typeof j.credits_left==='number')_credits=j.credits_left;
   }catch(e){box.textContent='⚠ '+(e.message||e);}
+}
+
+/* ---- Import brief (AI → tasks + content drafts) ---- */
+let _ibData=null,_ibBrief='',_ibPlat='instagram';
+const IB_PLATS=['instagram','facebook','threads','tiktok','linkedin','youtube'];
+async function importBriefApi(body){
+  const {data:{session}}=await sb.auth.getSession();
+  const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-import-brief`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,board_id:S.board,...body})});
+  return await r.json();
+}
+function ibFormHtml(){
+  return `<h3>Import a brief</h3>
+    <div style="font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.5">Paste a marketing brief and I'll turn it into tasks and ready-to-schedule content on this board. Uses AI credits.</div>
+    <label>Brief</label>
+    <textarea id="ib-brief" rows="7" placeholder="Paste your brief here…">${esc(_ibBrief)}</textarea>
+    <label>Default platform (when the brief doesn't say)</label>
+    <select id="ib-plat">${IB_PLATS.map(p=>`<option value="${p}" ${p===_ibPlat?'selected':''}>${(typeof PLAT!=='undefined'&&PLAT[p])?PLAT[p][0]:p}</option>`).join('')}</select>
+    <div class="row">
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn accent" id="ib-go" onclick="importBriefGenerate()">✦ Generate</button>
+    </div>`;
+}
+function ibShowForm(){
+  openModal(ibFormHtml());
+  setTimeout(()=>{const e=$('ib-brief');if(e)e.focus();},60);
+}
+function openImportBrief(){
+  if(!S.board){toast('Open a board first');return;}
+  _ibData=null; ibShowForm();
+}
+async function importBriefGenerate(){
+  const brief=($('ib-brief')?$('ib-brief').value:'').trim();
+  if(!brief){toast('Paste a brief first');return;}
+  _ibBrief=brief; _ibPlat=$('ib-plat')?$('ib-plat').value:_ibPlat;
+  openModal(`<h3>Import a brief</h3>
+    <div class="empty" style="text-align:center;padding:38px 10px">✦ Reading your brief… this takes a few seconds</div>`);
+  try{
+    const j=await importBriefApi({action:'preview',brief,platform_default:_ibPlat});
+    if(j&&j.error){toast(j.message||j.error);ibShowForm();return;}
+    _ibData={summary:(j&&j.summary)||'',tasks:(j&&j.tasks)||[],posts:(j&&j.posts)||[],plan:(j&&j.plan)||null};
+    ibReview();
+  }catch(e){fail(e);ibShowForm();}
+}
+function ibReview(){
+  const d=_ibData; if(!d)return;
+  const rowS='display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:7px';
+  const cbS='width:16px;height:16px;flex:none;accent-color:var(--accent);cursor:pointer';
+  const empty=!d.tasks.length&&!d.posts.length&&!(d.plan&&d.plan.nodes&&d.plan.nodes.length);
+  openModal(`<h3>Import a brief</h3>
+    ${d.summary?`<div style="font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5">${esc(d.summary)}</div>`:''}
+    ${empty?'<div class="empty" style="text-align:center;padding:30px 10px">Nothing could be extracted — try a more detailed brief.</div>':''}
+    ${d.tasks.length?`<label>Tasks (${d.tasks.length})</label>
+      ${d.tasks.map((t,i)=>`<div style="${rowS}">
+        <input type="checkbox" id="ib-t-${i}" checked style="${cbS}">
+        <span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title||'')}</span>
+        ${t.due_in_days>0?`<span style="flex:none;font-size:11px;font-weight:600;color:var(--muted)">· due in ${t.due_in_days}d</span>`:''}
+      </div>`).join('')}`:''}
+    ${d.posts.length?`<label>Content drafts (${d.posts.length})</label>
+      ${d.posts.map((p,i)=>{const pm=(typeof PLAT!=='undefined'&&PLAT[p.platform])?PLAT[p.platform]:null;
+        return `<div style="${rowS}">
+        <input type="checkbox" id="ib-p-${i}" checked style="${cbS}">
+        <span class="pill" style="flex:none;background:${pm?pm[1]:'var(--muted)'}">${esc(pm?pm[0]:(p.platform||'?'))}</span>
+        <span style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(((p.caption||'').split('\n')[0]).slice(0,80))}</span>
+      </div>`;}).join('')}`:''}
+    ${(d.plan&&d.plan.nodes&&d.plan.nodes.length)?`<label>Plan canvas</label>
+      <div style="${rowS}">
+        <input type="checkbox" id="ib-plan" style="${cbS}">
+        <span style="flex:1;min-width:0;font-size:13.5px;font-weight:600">Build a Plan canvas — ${d.plan.nodes.length} steps</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin:-2px 0 4px 2px">A visual left-to-right map of the campaign on the board's Plan tab.</div>`:''}
+    <div class="row">
+      <button class="btn ghost" onclick="ibShowForm()">Back</button>
+      ${empty?'':`<button class="btn accent" id="ib-add" onclick="importBriefConfirm()">Add to board</button>`}
+    </div>`);
+}
+async function importBriefConfirm(){
+  const d=_ibData; if(!d){toast('Nothing to add');return;}
+  const tasks=d.tasks.filter((t,i)=>{const c=$('ib-t-'+i);return c&&c.checked;});
+  const posts=d.posts.filter((p,i)=>{const c=$('ib-p-'+i);return c&&c.checked;});
+  const wantPlan=!!(document.getElementById('ib-plan')&&document.getElementById('ib-plan').checked);
+  if(!tasks.length&&!posts.length&&!wantPlan){toast('Tick at least one item to add');return;}
+  const b=$('ib-add'); if(b){b.disabled=true;b.textContent='Adding…';}
+  try{
+    const j=await importBriefApi({action:'import',tasks,posts,want_tasks:tasks.length>0,want_posts:posts.length>0,want_plan:wantPlan,plan:wantPlan?_ibData.plan:undefined,platform_default:_ibPlat});
+    if(j&&j.error){toast(j.message||j.error);if(b){b.disabled=false;b.textContent='Add to board';}return;}
+    closeModal(); _ibData=null; _ibBrief='';
+    toast(`Added ${(j&&j.tasks_added)||0} tasks, ${(j&&j.posts_added)||0} drafts${(j&&j.plan_added)?`, ${j.plan_added}-step plan`:''}`);
+    await loadBoard(); render();
+  }catch(e){fail(e);if(b){b.disabled=false;b.textContent='Add to board';}}
 }
 
 /* ============ MODAL / REALTIME / BOOT ============ */
