@@ -2212,6 +2212,8 @@ function contentView(){
       ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
     </div>
   </div>`:''}
+  <div id="wa-tpl-panel">${waTplPanelHtml()}</div>
+  <div id="th-insights"></div>
   ${(_socAccounts&&_socAccounts.length)?`<div class="card" style="padding:14px;margin-bottom:14px" id="perf-card">
     <div style="display:flex;align-items:center;gap:8px">
       <b style="font-size:11px;letter-spacing:.05em;color:var(--muted)">LAST 30 DAYS</b>
@@ -2393,6 +2395,26 @@ async function fbConnect(){
   metaApi({action:'setup'});
   location.href=j.url;}catch(e){fail(e);}
 }
+function fbComposeModal(){
+  const l=inboxLinkFor('facebook'); if(!l){toast('Connect a Facebook Page first');return;}
+  openModal(`<h3>Post to Facebook <span style="font-weight:500;font-size:12.5px;color:var(--muted)">· ${esc(l.name||'your Page')}</span></h3>
+    <label>Message</label><textarea id="fb-pub-msg" rows="5" placeholder="What do you want to say?"></textarea>
+    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn accent" id="fb-pub-go" onclick="fbPublishNow()">Publish to Facebook</button></div>`);
+  setTimeout(()=>{const e=$('fb-pub-msg');if(e)e.focus();},60);
+}
+async function fbPublishNow(){
+  const msg=($('fb-pub-msg')?$('fb-pub-msg').value:'').trim();
+  if(!msg){toast('Write the post first');return;}
+  const b=$('fb-pub-go'); if(b){b.disabled=true;b.textContent='Publishing…';}
+  try{
+    const j=await metaApi({action:'publish',board_id:S.board,message:msg});
+    if(j&&j.error){toast(j.message||j.error);if(b){b.disabled=false;b.textContent='Publish to Facebook';}return;}
+    closeModal();
+    if(j&&j.permalink){console.log('Facebook post:',j.permalink);toast('Posted to Facebook','Open ↗',()=>window.open(j.permalink,'_blank'));}
+    else toast('Posted to Facebook');
+  }catch(e){fail(e);if(b){b.disabled=false;b.textContent='Publish to Facebook';}}
+}
 async function ytApi(body){
   const {data:{session}}=await sb.auth.getSession();
   const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-youtube`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,...body})});
@@ -2420,12 +2442,102 @@ async function thConnect(){
   if(j.error){toast(j.error);return;}
   location.href=j.url;}catch(e){fail(e);}
 }
+async function thInsights(){
+  const el=document.getElementById('th-insights');
+  if(el)el.innerHTML='<div class="empty">Fetching Threads insights…</div>';
+  try{
+    const j=await thApi({action:'insights',board_id:S.board});
+    if(j&&j.error){if(el)el.innerHTML='';toast(j.message||j.error);return;}
+    const m=(j&&j.metrics)||{};
+    const items=[['Views',m.views],['Likes',m.likes],['Replies',m.replies],['Followers',m.followers_count]].filter(x=>x[1]!==undefined&&x[1]!==null);
+    const row=items.map(([l,v])=>`<div><b style="font-size:17px;display:block">${statNum(v)}</b><span style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.03em">${l.toUpperCase()}</span></div>`).join('')||'<span style="font-size:12.5px;color:var(--muted)">No metrics yet.</span>';
+    if(el){el.innerHTML=`<div class="card" style="padding:12px 16px;margin-bottom:14px;display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+      ${platBadge('threads',20)}<b style="font-size:11px;letter-spacing:.05em;color:var(--muted)">THREADS INSIGHTS</b>
+      ${row}
+      <span style="flex:1"></span><button style="color:var(--muted);padding:3px" title="Hide" onclick="const e=document.getElementById('th-insights');if(e)e.innerHTML=''">${ic('x',13)}</button>
+    </div>`;}
+    else toast('Threads · '+(items.map(([l,v])=>l+' '+statNum(v)).join(' · ')||'no metrics yet'));
+  }catch(e){if(el)el.innerHTML='';fail(e);}
+}
 /* ---- WhatsApp self-serve connect (Meta Embedded Signup) ---- */
 let _waAccounts=null;
 async function waApi(body){
   const {data:{session}}=await sb.auth.getSession();
   const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-wa-embedded`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,...body})});
   return await r.json();
+}
+/* ---- WhatsApp message templates ---- */
+let _waTemplates=null,_waTplLoading=false;
+async function waTplApi(body){
+  const {data:{session}}=await sb.auth.getSession();
+  const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-wa-templates`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,...body})});
+  return await r.json();
+}
+function waTplBadge(status){
+  const s=String(status||'PENDING').toUpperCase();
+  const c=s==='APPROVED'?'var(--ok)':s==='REJECTED'?'var(--danger)':'var(--warn)';
+  return `<span class="pill" style="background:${c};flex:none;font-size:9.5px">${esc(s)}</span>`;
+}
+function waTplListHtml(){
+  if(_waTemplates===null)return '<div class="empty" style="padding:6px 0">Loading templates…</div>';
+  if(!_waTemplates.length)return '<div class="empty" style="padding:6px 0">No templates yet — create your first one above.</div>';
+  return _waTemplates.map(t=>`<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--line)">
+    <span style="flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name)}</span>
+    <span style="font-size:10.5px;color:var(--muted);font-weight:600;flex:none">${esc(t.category||'')}${t.language?' · '+esc(t.language):''}</span>
+    ${waTplBadge(t.status)}
+  </div>`).join('');
+}
+async function loadWaTemplates(force){
+  if(_waTplLoading)return; _waTplLoading=true;
+  try{
+    const j=await waTplApi({action:'list'});
+    if(j&&j.ok)_waTemplates=j.templates||[];
+    else if(j&&j.error==='NOT_CONNECTED')_waTemplates=[];
+    else if(j&&j.error){_waTemplates=_waTemplates||[];if(force)toast(j.message||j.error);}
+  }catch(e){if(force)fail(e);}
+  _waTplLoading=false;
+  const el=document.getElementById('wa-tpl-list'); if(el)el.innerHTML=waTplListHtml();
+}
+function waTplPanelHtml(){
+  const acc=(_waAccounts||[]).filter(a=>a.status!=='disabled');
+  if(!acc.length)return '';
+  if(_waTemplates===null)setTimeout(loadWaTemplates,60);
+  return `<div class="card" style="padding:14px 16px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      ${platBadge('whatsapp',18)}
+      <b style="font-size:11.5px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Message templates</b>
+      <span style="font-size:11px;color:var(--muted)">· ${esc(acc[0].display_phone||acc[0].business_name||'connected number')}</span>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" onclick="loadWaTemplates(true)" title="Refresh templates">↻</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div style="flex:1.3;min-width:160px"><label>Template name</label><input id="wa-tpl-name" placeholder="e.g. order_update"></div>
+      <div style="flex:1;min-width:130px"><label>Category</label><select id="wa-tpl-cat"><option value="MARKETING">Marketing</option><option value="UTILITY">Utility</option></select></div>
+      <div style="flex:1;min-width:130px"><label>Language</label><select id="wa-tpl-lang"><option value="en_US">English (US)</option><option value="en_GB">English (UK)</option></select></div>
+    </div>
+    <label>Message body</label><textarea id="wa-tpl-body" rows="3" placeholder="e.g. Hi! Your order is ready for collection."></textarea>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn accent sm" id="wa-tpl-go" onclick="waTplCreate()">Create template</button></div>
+    <div id="wa-tpl-list" style="margin-top:10px;border-top:1px solid var(--line);padding-top:6px">${waTplListHtml()}</div>
+  </div>`;
+}
+async function waTplCreate(){
+  const name=($('wa-tpl-name')?$('wa-tpl-name').value:'').trim();
+  const body=($('wa-tpl-body')?$('wa-tpl-body').value:'').trim();
+  if(!name||!body){toast('Give the template a name and a message body');return;}
+  const btn=$('wa-tpl-go'); if(btn){btn.disabled=true;btn.textContent='Creating…';}
+  try{
+    const j=await waTplApi({action:'create',name,category:$('wa-tpl-cat').value,language:$('wa-tpl-lang').value,body});
+    if(j&&j.error)toast(j.message||j.error);
+    else{
+      toast('Template submitted — status: '+((j&&j.status)||'PENDING'));
+      if($('wa-tpl-name'))$('wa-tpl-name').value='';
+      if($('wa-tpl-body'))$('wa-tpl-body').value='';
+      _waTemplates=null;
+      const el=document.getElementById('wa-tpl-list'); if(el)el.innerHTML=waTplListHtml();
+      await loadWaTemplates();
+    }
+  }catch(e){fail(e);}
+  if(btn){btn.disabled=false;btn.textContent='Create template';}
 }
 let _fbSdkP=null;
 function loadFbSdk(appId){
@@ -2477,6 +2589,7 @@ async function loadInboxConnects(){
   try{const j=await metaApi({action:'links'}); _inboxLinks=(j&&j.links)||[];}catch(_){_inboxLinks=_inboxLinks||[];}
   try{const w=await waApi({action:'links'}); _waAccounts=(w&&w.ok)?(w.accounts||[]):(_waAccounts||[]);}catch(_){_waAccounts=_waAccounts||[];}
   const el=document.getElementById('inbox-connects'); if(el)el.innerHTML=inboxConnectsHtml();
+  const tp=document.getElementById('wa-tpl-panel'); if(tp)tp.innerHTML=waTplPanelHtml();
 }
 function inboxLinkFor(pl){return (_inboxLinks||[]).find(l=>l.platform===pl&&l.board_id===S.board);}
 function inboxConnectsHtml(){
@@ -2503,7 +2616,10 @@ function inboxConnectsHtml(){
   }
   const lbl=`<b style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.04em;margin:0 4px 0 10px">INBOX</b>`;
   const iconWrap=icons.length?`${lbl}<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${icons.join('')}</span>`:(dd?lbl:'');
-  return iconWrap+dd;
+  let acts='';
+  if(inboxLinkFor('facebook'))acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Publish a post straight to the connected Facebook Page" onclick="fbComposeModal()">${ic('pencil',12)} Post to Facebook</button>`;
+  if(inboxLinkFor('threads'))acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Views, likes & replies for the connected Threads account" onclick="thInsights()">View insights</button>`;
+  return iconWrap+dd+acts;
 }
 function inboxConnectPick(v){ if(v==='facebook')fbConnect(); else if(v==='youtube')ytConnect(); else if(v==='threads')thConnect(); else if(v==='whatsapp')waEmbeddedConnect(); }
 async function inboxDisconnect(pl){
@@ -2534,6 +2650,26 @@ async function waReply(id,to,pfx){
     toast('Sent on WhatsApp ✓'); inboxSet(id,'answered');
   }catch(e){fail(e);}
 }
+/* inline replies: Facebook comments & DMs, Threads */
+function inboxReplyBox(i,pfx){
+  const can=(i.platform==='facebook'&&(i.kind==='comment'||i.kind==='message'))||i.platform==='threads';
+  if(!can)return '';
+  return `<div style="display:flex;gap:5px;margin-top:5px"><input id="${pfx}${i.id}" placeholder="Reply on ${(PLAT[i.platform]||PLAT.other)[0]}…" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')socialReply('${i.id}','${pfx}')"><button class="btn accent sm" style="padding:2px 9px;font-size:11px;flex:none" onclick="socialReply('${i.id}','${pfx}')">Reply</button></div>`;
+}
+async function socialReply(id,pfx){
+  const inp=document.getElementById(pfx+id); const text=(inp?inp.value:'').trim();
+  if(!text){toast('Type a reply first');return;}
+  const it=(_inbox||[]).find(x=>x.id===id); if(!it)return;
+  try{
+    let j;
+    if(it.platform==='threads')j=await thApi({action:'reply',interaction_id:id,text});
+    else if(it.kind==='message')j=await metaApi({action:'reply_message',interaction_id:id,message:text});
+    else j=await metaApi({action:'reply_comment',interaction_id:id,message:text});
+    if(j&&j.error){toast(j.message||j.error);return;}
+    if(inp)inp.value='';
+    toast('Reply sent'); inboxSet(id,'answered');
+  }catch(e){fail(e);}
+}
 let _inbox=[];let _inboxFilter='new';let _boardInbox=false;
 async function loadInbox(){
   const {data}=await sb.from('bbe_interactions').select('*').eq('workspace_id',WS.id).order('received_at',{ascending:false}).limit(200);
@@ -2556,6 +2692,7 @@ function inboxListHtml(){
       <div style="font-size:13.5px;margin-top:3px">${esc(i.text||'')}</div>
       ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11.5px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
       ${i.platform==='whatsapp'?`<div style="display:flex;gap:6px;margin-top:6px"><input id="wa-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12.5px;padding:5px 9px;border:1px solid var(--line);border-radius:7px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${i.author_external_id||''}')"><button class="btn accent sm" style="flex:none" onclick="waReply('${i.id}','${i.author_external_id||''}')">Send</button></div>`:''}
+      ${inboxReplyBox(i,'soc-reply-')}
     </div>
     <div style="display:flex;gap:6px;flex:none">
       ${i.status!=='answered'?`<button class="btn ghost sm" onclick="inboxSet('${i.id}','answered')">✓ Answered</button>`:''}
@@ -2594,6 +2731,7 @@ function boardInboxBody(boardId){
       ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
     </div>
     ${i.platform==='whatsapp'?`<div style="display:flex;gap:5px;margin-top:5px"><input id="wab-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${i.author_external_id||''}','wab-reply-')"><button class="btn accent sm" style="padding:2px 9px;font-size:11px" onclick="waReply('${i.id}','${i.author_external_id||''}','wab-reply-')">Send</button></div>`:''}
+    ${inboxReplyBox(i,'socb-reply-')}
   </div>`).join('');
 }
 async function syncInbox(){
