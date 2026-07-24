@@ -2946,7 +2946,11 @@ function ibFormHtml(){
     <input type="file" id="ib-files" multiple accept=".txt,.md,.markdown,.csv,.json,.html,.htm,.docx,.pdf" onchange="ibFilesPicked(event)">
     <div id="ib-files-note" style="font-size:11.5px;color:var(--muted);margin:4px 0 0 2px"></div>
     <label>Brief</label>
-    <textarea id="ib-brief" rows="7" placeholder="Paste your brief here…">${esc(_ibBrief)}</textarea>
+    <textarea id="ib-brief" rows="7" placeholder="Paste your brief here…" oninput="ibCount()">${esc(_ibBrief)}</textarea>
+    <div style="display:flex;gap:10px;align-items:baseline;margin:4px 0 0 2px">
+      <span style="flex:1;font-size:11px;color:var(--muted);line-height:1.4">Works best with one brief or campaign per generate. Long briefs are trimmed at ~14,000 characters — split big ones into separate generates.</span>
+      <span id="ib-count" style="flex:none;font-size:11px;color:var(--muted);white-space:nowrap"></span>
+    </div>
     <label>Default platform (when the brief doesn't say)</label>
     <select id="ib-plat"><option value="general" ${_ibPlat==='general'?'selected':''}>General — no channel yet</option>${IB_PLATS.map(p=>`<option value="${p}" ${p===_ibPlat?'selected':''}>${(typeof PLAT!=='undefined'&&PLAT[p])?PLAT[p][0]:p}</option>`).join('')}</select>
     <div class="row">
@@ -2957,6 +2961,17 @@ function ibFormHtml(){
 function ibShowForm(){
   openModal(ibFormHtml());
   setTimeout(()=>{const e=$('ib-brief');if(e)e.focus();},60);
+  ibCount();
+}
+function ibCount(){
+  const el=document.getElementById('ib-brief');
+  const c=document.getElementById('ib-count');
+  if(!el||!c)return;
+  const n=el.value.length;
+  c.textContent=n.toLocaleString()+' / 14,000 chars';
+  c.style.color = n>14000 ? 'var(--danger)' : 'var(--muted)';
+  c.style.fontWeight = n>14000 ? '700':'400';
+  if(n>14000) c.textContent += ' — will be trimmed';
 }
 function loadScriptOnce(src){
   return new Promise((resolve,reject)=>{
@@ -3015,6 +3030,7 @@ async function ibFilesPicked(ev){
   if(ta){ta.value=cur;} _ibBrief=cur;
   if(note)note.textContent='';
   if(ev.target)ev.target.value='';
+  ibCount();
   if(ok)toast(`Added text from ${ok} file(s)`);
 }
 function openImportBrief(){
