@@ -460,7 +460,19 @@ function render(){
     </div>
   </div>
   ${planEff()==='free'?`<a class="cobrand" href="https://brandexpert.co.za" target="_blank" rel="noopener">powered by <b>Brand Expert</b></a>`:''}`;
+  enhancePasswords();
 }
+function pwToggle(inp){
+  if(!inp || inp.dataset.pweye) return; inp.dataset.pweye='1';
+  inp.style.paddingRight='60px';
+  const wrap=document.createElement('span'); wrap.style.cssText='position:relative;display:block';
+  inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+  const btn=document.createElement('button'); btn.type='button'; btn.textContent='Show';
+  btn.style.cssText='position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:11.5px;font-weight:700;cursor:pointer;padding:2px 4px';
+  btn.onclick=function(){ const show=inp.type==='password'; inp.type=show?'text':'password'; btn.textContent=show?'Hide':'Show'; inp.focus(); };
+  wrap.appendChild(btn);
+}
+function enhancePasswords(){ try{ document.querySelectorAll('input[type="password"]').forEach(pwToggle); }catch(_e){} }
 function go(v){
   const bv=['btoday','board','plan','content','binbox','files','money','team','setup'];
   S.scope=bv.includes(v)?'board':'workspace';
@@ -2649,9 +2661,12 @@ function copyEmailInbox(){
 }
 /* ---- Connect your own mailbox over IMAP ---- */
 async function emailApi(body){
-  const {data:{session}}=await sb.auth.getSession();
-  const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-email-connect`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,board_id:S.board,...body})});
-  return r.json();
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-email-connect`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,board_id:S.board,...body})});
+    try{ return await r.json(); }
+    catch(_e){ return {error: r.ok?'Unexpected server response — please try again.':('Server error ('+r.status+') — please try again in a moment.')}; }
+  }catch(e){ return {error:'Network problem — check your connection and try again.'}; }
 }
 let _emDetect=null;
 async function openEmailConnect(){ _emDetect=null; const accs=await emailApi({action:'list'}); emailShowForm((accs&&accs.accounts)||[]); }
@@ -3155,7 +3170,7 @@ async function importBriefConfirm(){
 }
 
 /* ============ MODAL / REALTIME / BOOT ============ */
-function openModal(html){$('modal').innerHTML=html;$('overlay').classList.add('open');}
+function openModal(html){$('modal').innerHTML=html;$('overlay').classList.add('open');enhancePasswords();}
 function closeModal(){$('overlay').classList.remove('open');}
 $('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
 let rt=null,rtT=null;
