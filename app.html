@@ -2612,9 +2612,11 @@ async function waEmbeddedConnect(){
   }catch(e){fail(e);}
 }
 let _inboxLinks=null;
+let _emailAccts=null;
 async function loadInboxConnects(){
   try{const j=await metaApi({action:'links'}); _inboxLinks=(j&&j.links)||[];}catch(_){_inboxLinks=_inboxLinks||[];}
   try{const w=await waApi({action:'links'}); _waAccounts=(w&&w.ok)?(w.accounts||[]):(_waAccounts||[]);}catch(_){_waAccounts=_waAccounts||[];}
+  try{const e=await emailApi({action:'list'}); _emailAccts=(e&&e.accounts)||[];}catch(_){_emailAccts=_emailAccts||[];}
   const el=document.getElementById('inbox-connects'); if(el)el.innerHTML=inboxConnectsHtml();
   const tp=document.getElementById('wa-tpl-panel'); if(tp)tp.innerHTML=waTplPanelHtml();
 }
@@ -2632,8 +2634,13 @@ function inboxConnectsHtml(){
   for(const a of waAcc){
     icons.push(`<span class="socic" title="WhatsApp · ${esc(a.display_phone||a.business_name||'connected')}">${platBadge('whatsapp',24)}</span>`);
   }
+  for(const a of (_emailAccts||[])){
+    const prov=a.oauth_provider==='microsoft'?'Outlook':((a.oauth_provider==='google'||a.imap_host==='imap.gmail.com')?'Gmail':'Email');
+    const bad=a.status==='error';
+    icons.push(`<span class="socic" title="${prov} connected: ${esc(a.email)}${bad?' — connection error, open Email setup':' — receiving mail'}" onclick="openEmailConnect()" style="cursor:pointer${bad?';outline:1.5px solid var(--danger);outline-offset:1px;border-radius:6px':''}">${platBadge('email',24)}${bad?'<b class="x" style="background:var(--danger)">!</b>':'<b class="x" style="background:var(--ok)">✓</b>'}</span>`);
+  }
   if(WS&&WS.inbox_handle){
-    icons.push(`<span class="socic" title="Email inbox: ${esc(WS.inbox_handle)}@in.brandexpert.co.za — click to copy" onclick="copyEmailInbox()" style="cursor:pointer">${platBadge('email',24)}</span>`);
+    icons.push(`<span class="socic" title="Forwarding address: ${esc(WS.inbox_handle)}@in.brandexpert.co.za — click to copy, then forward your mail here" onclick="copyEmailInbox()" style="cursor:pointer">${platBadge('email',24)}</span>`);
   }
   const un=defs.filter(([pl])=>!inboxLinkFor(pl));
   if(!waAcc.length)un.push(['whatsapp','WhatsApp']);
@@ -2646,7 +2653,7 @@ function inboxConnectsHtml(){
   let acts='';
   if(inboxLinkFor('facebook'))acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Publish a post straight to the connected Facebook Page" onclick="fbComposeModal()">${ic('pencil',12)} Post to Facebook</button>`;
   if(inboxLinkFor('threads'))acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Views, likes & replies for the connected Threads account" onclick="thInsights()">View insights</button>`;
-  if(canManage())acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Pull your own mailbox into this board's Inbox over IMAP" onclick="openEmailConnect()">${ic('mail',12)} Connect a mailbox</button>`;
+  if(canManage())acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Forward, connect Gmail, or add any mailbox to this board's Inbox" onclick="openEmailConnect()">${ic('mail',12)} Email setup</button>`;
   return iconWrap+dd+acts;
 }
 function inboxConnectPick(v){ if(v==='facebook')fbConnect(); else if(v==='youtube')ytConnect(); else if(v==='threads')thConnect(); else if(v==='whatsapp')waEmbeddedConnect(); else if(v==='email')openEmailConnect(); }
@@ -2683,22 +2690,51 @@ async function gmailConnect(){
     toast((j&&j.error)||'Could not start Google sign-in — is it set up yet?');
   }catch(e){ toast('Network problem starting Google sign-in'); }
 }
+async function msConnect(){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){toast('Please sign in first');return;}
+    toast('Opening Microsoft sign-in…');
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-ms-oauth`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({action:'start',workspace_id:WS.id,board_id:S.board})});
+    const j=await r.json();
+    if(j&&j.url){ location.href=j.url; return; }
+    toast((j&&j.error)||'Could not start Microsoft sign-in — is it set up yet?');
+  }catch(e){ toast('Network problem starting Microsoft sign-in'); }
+}
 let _emDetect=null;
 async function openEmailConnect(){ _emDetect=null; const accs=await emailApi({action:'list'}); emailShowForm((accs&&accs.accounts)||[]); }
 function emailShowForm(accounts){
-  openModal(`<h3>Connect an email inbox</h3>
-    <div style="font-size:13px;color:var(--muted);margin:2px 0 12px;line-height:1.5">Pull a mailbox into this board's Inbox. New mail then arrives here automatically.</div>
-    <button class="btn" style="width:100%;justify-content:center;gap:9px;padding:11px;border:1px solid var(--line);background:#fff;color:#3c4043;font-weight:600;font-size:13.5px" onclick="gmailConnect()"><svg width="17" height="17" viewBox="0 0 48 48" style="flex:none"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.4 13.3 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16.4z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.2C1 16.5 0 20.1 0 24s1 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.1-5.5c-2 1.3-4.6 2.1-8.4 2.1-6.3 0-11.6-3.8-13.5-9.1l-7.9 6.2C6.5 42.6 14.6 48 24 48z"/></svg>Sign in with Google (Gmail)</button>
-    <div style="text-align:center;font-size:11px;color:var(--muted);margin:8px 0 12px">— or connect any other mailbox —</div>
-    ${accounts.length?`<label>Connected</label>${accounts.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px">
-      <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.email)}</span>
-      <span class="pill" style="background:${a.status==='error'?'var(--danger)':'var(--ok)'}">${a.status==='error'?'error':'active'}</span>
+  const fwd=(WS&&WS.inbox_handle)?WS.inbox_handle+'@in.brandexpert.co.za':'';
+  const acctRow=a=>{
+    const prov=a.oauth_provider==='microsoft'?'Microsoft':((a.oauth_provider==='google'||a.imap_host==='imap.gmail.com')?'Google':'IMAP');
+    const bad=a.status==='error';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px">
+      <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.email)} <span style="color:var(--muted);font-weight:500">· ${prov}</span></span>
+      <span class="pill" style="background:${bad?'var(--danger)':'var(--ok)'}">${bad?'error':'connected'}</span>
       <button class="btn ghost sm" onclick="emailSyncNow()">Sync</button>
       <button class="btn ghost sm" onclick="emailDisconnect('${a.id}')">Remove</button>
-    </div>${a.last_error?`<div style="font-size:11px;color:var(--danger);margin:-2px 0 8px 2px">${esc(a.last_error)}</div>`:''}`).join('')}`:''}
-    <label>Email address</label><input id="em-addr" type="email" placeholder="you@yourcompany.com" autocomplete="off">
-    <label>Display name (optional)</label><input id="em-name" type="text" placeholder="Support inbox">
-    <div class="row"><button class="btn ghost" onclick="closeModal()">Close</button><button class="btn accent" onclick="emailDetect()">Detect &amp; continue</button></div>`);
+    </div>${a.last_error?`<div style="font-size:11px;color:var(--danger);margin:-2px 0 8px 2px">${esc(a.last_error)}</div>`:''}`;
+  };
+  openModal(`<h3>Email setup</h3>
+    ${accounts.length?`<label>Connected mailboxes</label>${accounts.map(acctRow).join('')}<div style="height:12px"></div>`:'<div style="font-size:13px;color:var(--muted);margin:2px 0 12px;line-height:1.5">Get your email landing in this board’s Inbox. Pick whichever is easiest — forwarding needs no password and works everywhere.</div>'}
+    ${fwd?`<div style="border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-bottom:12px;background:#F6FBF7">
+      <div style="font-weight:800;font-size:13px;margin-bottom:3px">Easiest — forward your mail here (no password)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">Works with any provider. In your email account settings, add a forwarding rule to this address — new mail then lands here automatically:</div>
+      <div style="display:flex;gap:7px;align-items:center">
+        <code style="flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(fwd)}</code>
+        <button class="btn ghost sm" onclick="copyEmailInbox()">Copy</button>
+      </div>
+    </div>`:''}
+    <div style="font-weight:800;font-size:12.5px;margin:2px 0 7px;color:var(--muted)">Or connect directly</div>
+    <button class="btn" style="width:100%;justify-content:center;gap:9px;padding:11px;border:1px solid var(--line);background:#fff;color:#3c4043;font-weight:600;font-size:13.5px" onclick="gmailConnect()"><svg width="17" height="17" viewBox="0 0 48 48" style="flex:none"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.4 13.3 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16.4z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.2C1 16.5 0 20.1 0 24s1 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.1-5.5c-2 1.3-4.6 2.1-8.4 2.1-6.3 0-11.6-3.8-13.5-9.1l-7.9 6.2C6.5 42.6 14.6 48 24 48z"/></svg>Sign in with Google (Gmail)</button>
+    <button class="btn" style="width:100%;justify-content:center;gap:9px;padding:11px;border:1px solid var(--line);background:#fff;color:#3c4043;font-weight:600;font-size:13.5px;margin-top:8px" onclick="msConnect()"><svg width="17" height="17" viewBox="0 0 23 23" style="flex:none"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>Sign in with Microsoft (Outlook)</button>
+    <details style="margin:10px 0 0"><summary style="cursor:pointer;font-size:12.5px;color:var(--muted);font-weight:600">Other mailbox with a password (IMAP)</summary>
+      <div style="font-size:12px;color:var(--muted);margin:8px 0 8px;line-height:1.5">For Outlook, cPanel or custom domains. Note: some hosts block outside access or need an app password — if it won’t connect, use forwarding above, it always works.</div>
+      <label>Email address</label><input id="em-addr" type="email" placeholder="you@yourcompany.com" autocomplete="off">
+      <label>Display name (optional)</label><input id="em-name" type="text" placeholder="Support inbox">
+      <div style="margin-top:10px"><button class="btn accent" onclick="emailDetect()">Detect &amp; continue</button></div>
+    </details>
+    <div class="row" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">Close</button></div>`);
 }
 async function emailDetect(){
   const email=($('em-addr')?$('em-addr').value:'').trim(); const name=$('em-name')?$('em-name').value.trim():'';
@@ -2765,6 +2801,30 @@ async function loadInbox(){
   const {data}=await sb.from('bbe_interactions').select('*').eq('workspace_id',WS.id).order('received_at',{ascending:false}).limit(200);
   _inbox=data||[];
 }
+let _inboxOpen=new Set();
+function inboxToggle(id){
+  if(_inboxOpen.has(id))_inboxOpen.delete(id); else _inboxOpen.add(id);
+  const el=document.getElementById('board-inbox-body'); if(el&&S.board)el.innerHTML=boardInboxBody(S.board);
+  const el2=document.getElementById('inbox-list'); if(el2)el2.outerHTML=inboxListHtml();
+}
+function emlClean(t){
+  t=String(t||'');
+  t=t.replace(/<!--[\s\S]*?-->/g,' ');
+  t=t.replace(/<!\[[^\]]*\]>/g,' ').replace(/<!\[[^\]]*$/g,' ');
+  t=t.replace(/\[if[^\]]*\]/gi,' ').replace(/<!--|-->|<!\[|\]>/g,' ');
+  t=t.replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<script[\s\S]*?<\/script>/gi,' ');
+  t=t.replace(/<[^>]*>/g,' ');
+  t=t.replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/&#39;|&rsquo;|&lsquo;/gi,"'").replace(/&quot;|&ldquo;|&rdquo;/gi,'"').replace(/&mdash;/gi,'—').replace(/&middot;/gi,'·').replace(/&[a-z]+;/gi,' ');
+  t=t.replace(/https?:\/\/\S{45,}/g,'[link]');
+  t=t.replace(/[ \t]+/g,' ').replace(/\s*\n\s*\n\s*/g,'\n\n').replace(/[ \n]{3,}/g,' ').trim();
+  return t;
+}
+function emlParts(i){
+  let t=String(i.text||''); let subj='';
+  const m=t.match(/^Subject:\s*(.*?)(?:\n|$)/);
+  if(m){subj=m[1].trim(); t=t.slice(m[0].length);}
+  return {subj, body:emlClean(t)};
+}
 function inboxView(){
   setTimeout(async()=>{await loadInbox();const el=document.getElementById('inbox-list');if(el)el.outerHTML=inboxListHtml();},60);
   return `<div class="view-title"><h2>${ic('mail',18)} Inbox</h2>
@@ -2775,11 +2835,14 @@ function inboxView(){
 function inboxListHtml(){
   const rows=_inbox.filter(i=>_inboxFilter==='all'||i.status===_inboxFilter);
   const bn=id=>{const b=BOARDS.find(x=>x.id===id);return b?b.name:'';};
-  return `<div id="inbox-list">${rows.map(i=>`<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;border-left:4px solid ${(PLAT[i.platform]||PLAT.other)[1]}">
+  return `<div id="inbox-list">${rows.map(i=>{const P=emlParts(i);const open=_inboxOpen.has(i.id);const isE=i.platform==='email';const title=isE?(P.subj||'(no subject)'):P.body;return `<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;border-left:4px solid ${(PLAT[i.platform]||PLAT.other)[1]}">
     ${platBadge(i.platform,24)}
     <div style="flex:1;min-width:0">
-      <div style="font-size:11.5px;color:var(--muted);font-weight:700"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉ Direct message':'💬 Comment'} · ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})} ${bn(i.board_id)?'· '+esc(bn(i.board_id)):''}</div>
-      <div style="font-size:13.5px;margin-top:3px">${esc(i.text||'')}</div>
+      <div onclick="inboxToggle('${i.id}')" style="cursor:pointer">
+      <div style="font-size:11.5px;color:var(--muted);font-weight:700"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉ Direct message':'💬 Comment'} · ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})} ${bn(i.board_id)?'· '+esc(bn(i.board_id)):''}<span style="float:right">${open?'▾':'▸'}</span></div>
+      <div style="font-size:13.5px;font-weight:${isE?'700':'400'};margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)||'(no content)'}</div>
+      ${open?`<div style="font-size:13px;margin-top:5px;white-space:pre-wrap;word-break:break-word">${esc(P.body)||'(no text)'}</div>`:(isE&&P.body?`<div style="font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(P.body.slice(0,120))}${P.body.length>120?'…':''}</div>`:'')}
+      </div>
       ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11.5px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
       ${i.platform==='whatsapp'?`<div style="display:flex;gap:6px;margin-top:6px"><input id="wa-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12.5px;padding:5px 9px;border:1px solid var(--line);border-radius:7px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${i.author_external_id||''}')"><button class="btn accent sm" style="flex:none" onclick="waReply('${i.id}','${i.author_external_id||''}')">Send</button></div>`:''}
       ${inboxReplyBox(i,'soc-reply-')}
@@ -2789,7 +2852,7 @@ function inboxListHtml(){
       ${i.status!=='dismissed'?`<button class="btn ghost sm" style="color:var(--muted)" onclick="inboxSet('${i.id}','dismissed')">Dismiss</button>`:''}
       ${i.status!=='new'?`<button class="btn ghost sm" onclick="inboxSet('${i.id}','new')">↩</button>`:''}
     </div>
-  </div>`).join('')||`<div class="empty" style="text-align:center;padding:40px">${_inboxFilter==='new'?'Nothing waiting — inbox zero 🎉<br><br><span style="font-size:12px">Connect your Facebook Page on the Content tab and new comments &amp; messages will land here.</span>':'Nothing here.'}</div>`}</div>`;
+  </div>`;}).join('')||`<div class="empty" style="text-align:center;padding:40px">${_inboxFilter==='new'?'Nothing waiting — inbox zero 🎉<br><br><span style="font-size:12px">Connect your Facebook Page on the Content tab and new comments &amp; messages will land here.</span>':'Nothing here.'}</div>`}</div>`;
 }
 async function inboxSet(id,status){
   const patch={status};
@@ -2812,17 +2875,20 @@ function boardInboxHtml(boardId){
 function boardInboxBody(boardId){
   const rows=(_inbox||[]).filter(i=>(i.board_id===boardId||(!i.board_id&&(i.platform==='whatsapp'||i.platform==='email')))&&i.status!=='dismissed');
   if(!rows.length)return '<div class="empty" style="padding:20px 8px;text-align:center;font-size:12px">No messages yet.<br>New comments on this board&rsquo;s connected pages will land here.</div>';
-  return rows.map(i=>`<div style="border-left:3px solid ${(PLAT[i.platform]||PLAT.other)[1]};padding:7px 9px;margin-bottom:7px;background:var(--panel,#F4F3EE);border-radius:7px">
-    <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);font-weight:700">${platBadge(i.platform,16)}<span><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉':'💬'} ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})}</span></div>
-    <div style="font-size:12.5px;margin:3px 0">${esc(i.text||'')}</div>
-    <div style="display:flex;gap:5px;align-items:center">
+  return rows.map(i=>{const P=emlParts(i);const open=_inboxOpen.has(i.id);const isE=i.platform==='email';const title=isE?(P.subj||'(no subject)'):P.body;return `<div style="border-left:3px solid ${(PLAT[i.platform]||PLAT.other)[1]};padding:7px 9px;margin-bottom:7px;background:var(--panel,#F4F3EE);border-radius:7px">
+    <div onclick="inboxToggle('${i.id}')" style="cursor:pointer">
+      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);font-weight:700">${platBadge(i.platform,16)}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉':'💬'} ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})}</span><span style="flex:1"></span><span style="color:var(--muted);flex:none">${open?'▾':'▸'}</span></div>
+      <div style="font-size:12.5px;font-weight:${isE?'700':'500'};margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)||'(no content)'}</div>
+      ${open?`<div style="font-size:12px;color:var(--ink);margin:4px 0 2px;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto">${esc(P.body)||'(no text)'}</div>`:(isE&&P.body?`<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(P.body.slice(0,90))}${P.body.length>90?'…':''}</div>`:'')}
+    </div>
+    <div style="display:flex;gap:5px;align-items:center;margin-top:4px">
       ${i.status!=='answered'?`<button class="btn ghost sm" style="padding:2px 7px;font-size:11px" onclick="inboxSet('${i.id}','answered')">✓ Done</button>`:'<span style="font-size:10.5px;color:var(--ok);font-weight:700">answered</span>'}
       <button class="btn ghost sm" style="padding:2px 7px;font-size:11px;color:var(--muted)" onclick="inboxSet('${i.id}','dismissed')">Dismiss</button>
       ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
     </div>
     ${i.platform==='whatsapp'?`<div style="display:flex;gap:5px;margin-top:5px"><input id="wab-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${i.author_external_id||''}','wab-reply-')"><button class="btn accent sm" style="padding:2px 9px;font-size:11px" onclick="waReply('${i.id}','${i.author_external_id||''}','wab-reply-')">Send</button></div>`:''}
     ${inboxReplyBox(i,'socb-reply-')}
-  </div>`).join('');
+  </div>`;}).join('');
 }
 async function syncInbox(){
   toast('Checking for new messages…');
@@ -3215,6 +3281,8 @@ async function authLinkCheck(){
   if(fbc){history.replaceState({},'',location.pathname);setTimeout(()=>toast(fbc==='err'?'Facebook connection failed — try again':'✅ Facebook Page linked — comments & messages will now land in your Inbox'),800);}
   const gm=q.get('gmail');
   if(gm){history.replaceState({},'',location.pathname);const gmEmail=q.get('email')||'';const gmReason=q.get('reason')||'';setTimeout(()=>{if(gm==='connected'){toast('✅ Gmail connected'+(gmEmail?' — '+gmEmail:'')+' — new mail will land in your Inbox');if(typeof loadInbox==='function'){loadInbox().then(()=>{if(typeof render==='function')render();});}}else{toast('Gmail sign-in didn\'t finish'+(gmReason?' ('+gmReason+')':'')+' — please try again');}},800);}
+  const msc=q.get('ms');
+  if(msc){history.replaceState({},'',location.pathname);const msEmail=q.get('email')||'';const msReason=q.get('reason')||'';setTimeout(()=>{if(msc==='connected'){toast('✅ Microsoft/Outlook connected'+(msEmail?' — '+msEmail:'')+' — new mail will land in your Inbox');if(typeof loadInbox==='function'){loadInbox().then(()=>{if(typeof render==='function')render();});}}else{toast('Microsoft sign-in didn\'t finish'+(msReason?' ('+msReason+')':'')+' — please try again');}},800);}
   if(!confirm&&!pwreset)return false;
   history.replaceState({},'',location.pathname);
   // The token is only consumed when the person clicks — email security scanners
