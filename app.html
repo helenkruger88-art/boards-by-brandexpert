@@ -307,6 +307,7 @@ const ICONS={
   undo:'<path d="M3.5 7.5v5.5h5.5"/><path d="M20.5 16.5a8.5 8.5 0 0 0-14.2-6.3L3.5 13"/>',
   link:'<path d="M10 13.3a5 5 0 0 0 7.5.6l2.9-2.9a5 5 0 0 0-7-7L11.7 5.6"/><path d="M14 10.7a5 5 0 0 0-7.5-.6l-3 3a5 5 0 0 0 7 7l1.8-1.6"/>',
   home:'<path d="M3 11.5 12 3l9 8.5"/><path d="M5.5 10.5V21h4.8v-6h3.4v6h4.8V10.5"/>',
+  chat:'<path d="M21 11.5a8 8 0 0 1-11.6 7.1L3.5 20.5l1.9-5.9A8 8 0 1 1 21 11.5z"/>',
 };
 const ic=(n,s=15,st=1.8)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${st}" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex:none">${ICONS[n]||''}</svg>`;
 /* toast with optional undo action */
@@ -432,7 +433,7 @@ function render(){
   const tdOpen=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&!tdDone(t)).length;
   const nav=navItems();
   const b=nav.board;
-  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,settings:settingsView,btoday:boardTodayView,board:boardView,plan:planView,content:contentView,binbox:boardInboxView,files:filesView,money:moneyView,team:teamView,setup:boardSetupView};
+  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,wa:whatsappView,settings:settingsView,btoday:boardTodayView,board:boardView,plan:planView,content:contentView,binbox:boardInboxView,files:filesView,money:moneyView,team:teamView,setup:boardSetupView};
   const viewFn=VIEWS[S.view]||boardsView;
   const sItem=([v,i,l])=>`<button class="sb-item ${S.view===v?'on':''}" onclick="go('${v}')">${ic(i,16)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="sb-b">${tdOpen}</span>`:''}</button>`;
   const bItem=([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,19)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="bdot">${tdOpen}</span>`:''}</button>`;
@@ -500,7 +501,9 @@ function navItems(){
       return {ws:false,items,board:b};
     }
   }
-  return {ws:true,items:[['boards','home','Dashboard'],['today','sun','Today'],['inbox','mail','Inbox']]};
+  const wsItems=[['boards','home','Dashboard'],['today','sun','Today'],['inbox','mail','Inbox']];
+  if((_waAccounts||[]).some(a=>a&&a.status!=='disabled'))wsItems.push(['wa','chat','WhatsApp Usage']);
+  return {ws:true,items:wsItems};
 }
 /* ============ AUTH ============ */
 let _authMode='in';
@@ -2603,7 +2606,7 @@ async function waEmbeddedConnect(){
           const res=await waApi({action:'connect',code:response.authResponse.code,phone_number_id:waPhoneId,waba_id:waWabaId});
           if(res&&res.ok){
             toast('WhatsApp connected: '+(res.display_phone||res.business_name||'your number'));
-            if(typeof loadInboxConnects==='function')loadInboxConnects();else render();
+            if(typeof loadInboxConnects==='function'){await loadInboxConnects();} render();
           }else{toast((res&&(res.message||res.error))||'WhatsApp connection failed');}
         }else{toast('WhatsApp connection cancelled');}
       }catch(e){fail(e);}
@@ -2724,6 +2727,17 @@ function emailShowForm(accounts){
         <code style="flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(fwd)}</code>
         <button class="btn ghost sm" onclick="copyEmailInbox()">Copy</button>
       </div>
+      <details style="margin-top:9px"><summary style="cursor:pointer;font-size:12px;color:var(--accent);font-weight:700">How do I set up a forwarding rule?</summary>
+      <div style="font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:7px">
+        <b style="color:var(--ink)">Gmail</b><br>1. Copy the address above. 2. In Gmail: ⚙ → <b>See all settings</b> → <b>Forwarding and POP/IMAP</b>. 3. Click <b>Add a forwarding address</b>, paste it, Next → Proceed. 4. Gmail emails a confirmation code — it arrives right here in this Inbox; open it, copy the code and paste it back in Gmail. 5. Select <b>Forward a copy of incoming mail to</b> that address, then <b>Save Changes</b> at the bottom.
+        <div style="height:8px"></div>
+        <b style="color:var(--ink)">Outlook.com / Hotmail</b><br>Settings ⚙ → <b>Mail → Forwarding</b> → tick <b>Enable forwarding</b>, paste the address → <b>Save</b>.
+        <div style="height:8px"></div>
+        <b style="color:var(--ink)">Microsoft 365 (work/school)</b><br>Outlook → ⚙ → <b>Mail → Forwarding</b> → enable and paste the address → Save. If it&rsquo;s blocked, use <b>Rules → Redirect to</b>, or ask your IT admin to allow forwarding.
+        <div style="height:8px"></div>
+        <b style="color:var(--ink)">cPanel / your own domain</b><br>cPanel → <b>Email → Forwarders</b> → <b>Add Forwarder</b> → enter your mailbox and forward it to the address above → <b>Add Forwarder</b>.
+      </div>
+      </details>
     </div>`:''}
     <div style="font-weight:800;font-size:12.5px;margin:2px 0 7px;color:var(--muted)">Or connect directly</div>
     <button class="btn" style="width:100%;justify-content:center;gap:9px;padding:11px;border:1px solid var(--line);background:#fff;color:#3c4043;font-weight:600;font-size:13.5px" onclick="gmailConnect()"><svg width="17" height="17" viewBox="0 0 48 48" style="flex:none"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.4 13.3 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16.4z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.2C1 16.5 0 20.1 0 24s1 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.1-5.5c-2 1.3-4.6 2.1-8.4 2.1-6.3 0-11.6-3.8-13.5-9.1l-7.9 6.2C6.5 42.6 14.6 48 24 48z"/></svg>Sign in with Google (Gmail)</button>
@@ -2821,9 +2835,55 @@ function emlClean(t){
 }
 function emlParts(i){
   let t=String(i.text||''); let subj='';
-  const m=t.match(/^Subject:\s*(.*?)(?:\n|$)/);
+  const m=t.match(/^Subject:[ \t]*([^\r\n]*)/);
   if(m){subj=m[1].trim(); t=t.slice(m[0].length);}
   return {subj, body:emlClean(t)};
+}
+const WA_RATE=200;
+function whatsappView(){
+  setTimeout(async()=>{
+    try{const w=await waApi({action:'links'}); _waAccounts=(w&&w.ok)?(w.accounts||[]):(_waAccounts||[]);}catch(_){}
+    let counts={total:0,byBoard:{}};
+    try{
+      const start=new Date(); start.setDate(1); start.setHours(0,0,0,0);
+      const {data}=await sb.from('bbe_interactions').select('id,board_id').eq('workspace_id',WS.id).eq('platform','whatsapp').gte('received_at',start.toISOString());
+      (data||[]).forEach(r=>{counts.total++; const k=r.board_id||'_'; counts.byBoard[k]=(counts.byBoard[k]||0)+1;});
+    }catch(_){}
+    const el=document.getElementById('wa-usage-body'); if(el)el.innerHTML=whatsappBody(counts);
+  },60);
+  return `<div class="view-title"><h2>${ic('chat',18)} WhatsApp Usage</h2>
+    <span class="sub">connected numbers, usage &amp; billing across all your boards</span><span style="flex:1"></span>
+    ${canManage()?`<button class="btn accent sm" onclick="waEmbeddedConnect()">+ Connect a number</button>`:''}
+  </div><div id="wa-usage-body">${whatsappBody(null)}</div>`;
+}
+function whatsappBody(counts){
+  const acc=(_waAccounts||[]).filter(a=>a.status!=='disabled');
+  const n=acc.length; const sub=n*WA_RATE;
+  const bn=id=>{const b=BOARDS.find(x=>x.id===id);return b?b.name:'—';};
+  const stat=(v,l)=>`<div style="min-width:110px"><b style="font-size:23px;display:block;line-height:1.1">${v}</b><span style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.04em">${l}</span></div>`;
+  return `
+  <div class="card" style="padding:16px 18px;margin-bottom:12px">
+    <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
+      ${stat(n,'CONNECTED NUMBER'+(n===1?'':'S'))}
+      ${stat('R'+sub,'PER MONTH · R'+WA_RATE+'/NUMBER')}
+      ${stat(counts?counts.total:'…','MESSAGES THIS MONTH')}
+    </div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.55;border-top:1px solid var(--line);padding-top:10px">
+      You&rsquo;re billed <b style="color:var(--ink)">R${WA_RATE}/month per connected number</b>. Actual WhatsApp message charges (marketing &amp; templates) are billed <b>directly by Meta to each client&rsquo;s own WhatsApp account</b> at Meta&rsquo;s standard rates — nothing is marked up here. Replies to customers within 24&nbsp;hours are free (until Meta&rsquo;s 1&nbsp;Oct&nbsp;2026 change, after which they bill at the low utility rate).
+    </div>
+  </div>
+  <div class="card" style="padding:14px 18px">
+    <b style="font-size:11px;letter-spacing:.05em;color:var(--muted)">CONNECTED NUMBERS</b>
+    ${n?acc.map(a=>`<div style="display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid var(--line)">
+      ${platBadge('whatsapp',24)}
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.display_phone||a.business_name||'WhatsApp number')}</div>
+        <div style="font-size:11.5px;color:var(--muted)">${esc(a.business_name||'')}${a.board_id?(a.business_name?' · ':'')+esc(bn(a.board_id)):''}${counts&&a.board_id&&counts.byBoard[a.board_id]?' · '+counts.byBoard[a.board_id]+' msgs this month':''}</div>
+      </div>
+      <span class="pill" style="background:${a.status==='error'?'var(--danger)':'var(--ok)'}">${a.status==='error'?'error':'active'}</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:700;flex:none">R${WA_RATE}/mo</span>
+    </div>`).join(''):`<div class="empty" style="padding:24px 8px;text-align:center;font-size:12.5px">No WhatsApp numbers connected yet.<br><span style="font-size:11.5px;color:var(--muted)">Connect a client&rsquo;s number here or from any board&rsquo;s Inbox — each connected number is R${WA_RATE}/month, and message costs go straight to that client&rsquo;s own Meta account.</span></div>`}
+  </div>`;
 }
 function inboxView(){
   setTimeout(async()=>{await loadInbox();const el=document.getElementById('inbox-list');if(el)el.outerHTML=inboxListHtml();},60);
@@ -3269,7 +3329,8 @@ async function boot(){
   try{
     await loadWs();
     if(WS){await loadBoard();await ensureToday();subscribeRealtime();
-      if(WS.plan!=='basic')loadCredits().then(render);}
+      if(WS.plan!=='basic')loadCredits().then(render);
+      waApi({action:'links'}).then(w=>{_waAccounts=(w&&w.ok)?(w.accounts||[]):(_waAccounts||[]);render();}).catch(()=>{});}
     render();
   }catch(e){fail(e);render();}
 }
