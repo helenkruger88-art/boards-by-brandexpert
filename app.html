@@ -433,7 +433,7 @@ function render(){
   const tdOpen=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&!tdDone(t)).length;
   const nav=navItems();
   const b=nav.board;
-  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,wa:whatsappView,settings:settingsView,btoday:boardTodayView,board:boardView,plan:planView,content:contentView,binbox:boardInboxView,files:filesView,money:moneyView,team:teamView,setup:boardSetupView};
+  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,wa:whatsappView,settings:settingsView,btoday:boardTodayView,board:boardView,plan:planView,content:contentView,analytics:analyticsView,binbox:boardInboxView,files:filesView,money:moneyView,team:teamView,setup:boardSetupView};
   const viewFn=VIEWS[S.view]||boardsView;
   const sItem=([v,i,l])=>`<button class="sb-item ${S.view===v?'on':''}" onclick="go('${v}')">${ic(i,16)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="sb-b">${tdOpen}</span>`:''}</button>`;
   const bItem=([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,19)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="bdot">${tdOpen}</span>`:''}</button>`;
@@ -493,6 +493,7 @@ function navItems(){
       if(m.plan!==false)items.push(['plan','route','Plan']);
       items.push(['board','board','Board']);
       if(m.content)items.push(['content','calendar','Content']);
+      if(m.content)items.push(['analytics','chart','Analytics']);
       if(m.inbox)items.push(['binbox','mail','Inbox']);
       if(m.files)items.push(['files','note','Files']);
       if(m.money)items.push(['money','money','Money']);
@@ -540,6 +541,7 @@ ICONS.mail='<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7 8
 ICONS.eye='<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>';
 ICONS.eyeoff='<path d="M2.5 12s3.5-6.5 9.5-6.5c1.8 0 3.4.55 4.7 1.3M21.5 12s-3.5 6.5-9.5 6.5c-1.8 0-3.4-.55-4.7-1.3"/><path d="M4 20 20 4"/>';
 ICONS.route='<circle cx="5" cy="6" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="18" r="2"/><path d="M7 6h6a3 3 0 0 1 3 3v0M7 18h6a3 3 0 0 0 3-3v0"/>';
+ICONS.chart='<path d="M4 20V4M4 20h16M8 16v-5M12.5 16V8M17 16v-7"/>';
 function pwField(id,autocomplete,onEnter){
   return `<div style="position:relative"><input id="${id}" type="password" autocomplete="${autocomplete}" style="padding-right:40px" ${onEnter?`onkeydown="if(event.key==='Enter')${onEnter}()"`:''}>
     <button type="button" tabindex="-1" title="Show/hide password" style="position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--muted);display:flex" onclick="togglePw('${id}',this)">${ic('eye',16)}</button></div>`;
@@ -2058,7 +2060,7 @@ async function saveAccent(){
   await sb.from('bbe_workspaces').update({theme}).eq('id',WS.id);WS.theme=theme;applyTheme();render();toast('Accent applied');}catch(e){fail(e);}
 }
 /* ============ CONTENT (social calendar) ============ */
-const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],whatsapp:['WhatsApp','#1FA855'],email:['Email','#6E6A62'],other:['Other','#8a887e']};
+const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],whatsapp:['WhatsApp','#1FA855'],email:['Email','#6E6A62'],appstore:['App Store','#0A84FF'],other:['Other','#8a887e']};
 const PICON={
   facebook:'<svg viewBox="0 0 24 24" width="60%" height="60%" fill="#fff"><path d="M13.5 21v-7h2.3l.4-2.9h-2.7V9.3c0-.8.3-1.4 1.5-1.4H16.4V5.3c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H8.1V14h2.4v7h3z"/></svg>',
   instagram:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17.2" cy="6.8" r="1.15" fill="#fff" stroke="none"/></svg>',
@@ -2068,6 +2070,7 @@ const PICON={
   threads:'<svg viewBox="0 0 24 24" width="62%" height="62%" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"><path d="M12 20c-3.7 0-6-2.7-6-8s2.3-8 6-8c2.7 0 4.4 1.3 5.1 3.4M9.6 13.6c.4 1.6 1.7 2.2 3 2.1 1.6-.1 2.6-1.1 2.6-2.6 0-1.8-1.6-2.6-3.3-2.4-1.5.1-2.3 1-2.1 2"/></svg>',
   whatsapp:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="#fff"><path d="M12 4a8 8 0 0 0-6.9 12L4 19.6l3.7-1A8 8 0 1 0 12 4zm4.3 11.2c-.2.5-1 .9-1.4.9-.4.1-.8.3-2.8-.6-2.4-1-3.9-3.4-4-3.6-.1-.2-1-1.3-1-2.4 0-1.1.6-1.7.8-1.9.2-.2.4-.3.6-.3H9c.1 0 .3 0 .5.4l.7 1.7c.1.1.1.3 0 .4l-.3.5c-.2.2-.3.3-.1.6.1.3.7 1.1 1.5 1.7 1 .8 1.7.9 2 .8.2-.1.5-.6.7-.8.2-.3.4-.2.6-.2l1.6.8c.2.1.4.2.4.3.1.2.1.6 0 .8z"/></svg>',
   email:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="none" stroke="#fff" stroke-width="2"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 5.5L20 7"/></svg>',
+  appstore:'<svg viewBox="0 0 24 24" width="58%" height="58%" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.5l4.2-7.3a1 1 0 0 1 1.7 0l4.1 7.3"/><path d="M6 16.5h6.2M15.4 13.6l1.8 2.9"/></svg>',
   other:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="#fff"><circle cx="12" cy="12" r="4"/></svg>'
 };
 function platBadge(p,size){size=size||20;const c=(PLAT[p]||PLAT.other)[1];return `<span title="${(PLAT[p]||PLAT.other)[0]}" style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:6px;background:${c};flex:none">${PICON[p]||PICON.other}</span>`;}
@@ -2273,6 +2276,7 @@ function postModal(id,dateStr){
     <select id="po-plat">${Object.entries(PLAT).map(([k,[n]])=>`<option value="${k}" ${p&&p.platform===k?'selected':''}>${n}</option>`).join('')}</select>
     <label>Caption ${paidAI()?`<button type="button" style="float:right;color:var(--accent);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0" onclick="draftAI()">✦ Draft with AI</button>`:''}</label>
     <textarea id="po-cap" rows="6" placeholder="Write it yourself — or tell the AI what the post is about and press ✦">${p?esc(p.caption):''}</textarea>
+    ${paidAI()?`<div style="margin:4px 0 2px"><button type="button" class="btn ghost sm" onclick="scoreDraft(${p?`'${p.id}'`:'null'})" title="Predict how this will do versus your account's own history. First check per saved draft is free; re-checks use a credit.">✦ Predict performance</button><span id="po-score"></span></div>`:''}
     <label>Media note (what image/video goes with it)</label>
     <input id="po-media" value="${p?esc(p.media_note||''):''}" placeholder="e.g. medal design photo, 1080x1080">
     <label>Images / video <span style="font-weight:500;text-transform:none;letter-spacing:0">— attached media publishes with the post</span></label>
@@ -2316,6 +2320,17 @@ async function draftAI(){
     if(typeof j.credits_left==='number'){_credits=j.credits_left;toast(`✦ Drafted — ${j.credits_left} credits left`);}
   }catch(e){cap.value=brief;fail(e);}
   cap.disabled=false;
+}
+async function scoreDraft(pid){
+  const text=($('po-cap')&&$('po-cap').value||'').trim(); const platform=$('po-plat')?$('po-plat').value:'other';
+  const out=$('po-score');
+  if(!text){if(out)out.innerHTML=' <span style="color:var(--danger);font-size:11.5px">Add a caption first.</span>';return;}
+  if(out)out.innerHTML=' <span style="font-size:11.5px;color:var(--muted)">✦ Scoring…</span>';
+  const r=await anApi({action:'score',text,platform,post_id:pid});
+  if(!r||!r.ok){if(out)out.innerHTML=' <span style="color:var(--danger);font-size:11.5px">'+esc((r&&(r.message||r.error))||'Could not score')+'</span>';return;}
+  const sc=Math.round(r.score||0); const col=sc>=66?'var(--ok)':(sc>=40?'#C7952b':'var(--danger)');
+  const v=r.verdict||{}; const tips=(v.tips||[]).map(t=>`<li>${esc(t)}</li>`).join('');
+  if(out)out.innerHTML=`<div style="margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--panel,#F4F3EE)"><div style="display:flex;align-items:center;gap:8px"><b style="color:${col};font-size:16px">${sc}/100</b><span style="font-size:12px">${esc(v.verdict||'')}</span>${r.cached?'<span style="font-size:10px;color:var(--muted)">· cached</span>':''}</div>${tips?`<ul style="margin:6px 0 0;padding-left:18px;font-size:11.5px;color:var(--muted)">${tips}</ul>`:''}</div>`;
 }
 let _postMedia=[];
 function mediaThumb(m,ix){
@@ -2496,6 +2511,10 @@ async function waApi(body){
   const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-wa-embedded`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,...body})});
   return await r.json();
 }
+async function waDisconnect(id){
+  if(!confirm('Disconnect this WhatsApp number? Incoming messages will stop landing in the board.'))return;
+  try{await waApi({action:'disconnect',account_id:id});toast('WhatsApp number removed');try{const w=await waApi({action:'links'});_waAccounts=(w&&w.ok)?(w.accounts||[]):_waAccounts;}catch(_){}render();}catch(e){fail(e);}
+}
 /* ---- WhatsApp message templates ---- */
 let _waTemplates=null,_waTplLoading=false;
 async function waTplApi(body){
@@ -2603,7 +2622,7 @@ async function waEmbeddedConnect(){
       try{
         if(response&&response.authResponse&&response.authResponse.code){
           toast('Finishing WhatsApp setup…');
-          const res=await waApi({action:'connect',code:response.authResponse.code,phone_number_id:waPhoneId,waba_id:waWabaId});
+          const res=await waApi({action:'connect',code:response.authResponse.code,phone_number_id:waPhoneId,waba_id:waWabaId,board_id:S.board||null});
           if(res&&res.ok){
             toast('WhatsApp connected: '+(res.display_phone||res.business_name||'your number'));
             if(typeof loadInboxConnects==='function'){await loadInboxConnects();} render();
@@ -2616,10 +2635,12 @@ async function waEmbeddedConnect(){
 }
 let _inboxLinks=null;
 let _emailAccts=null;
+let _reviewSrcs=null;
 async function loadInboxConnects(){
   try{const j=await metaApi({action:'links'}); _inboxLinks=(j&&j.links)||[];}catch(_){_inboxLinks=_inboxLinks||[];}
   try{const w=await waApi({action:'links'}); _waAccounts=(w&&w.ok)?(w.accounts||[]):(_waAccounts||[]);}catch(_){_waAccounts=_waAccounts||[];}
   try{const e=await emailApi({action:'list'}); _emailAccts=(e&&e.accounts)||[];}catch(_){_emailAccts=_emailAccts||[];}
+  try{const rv=await reviewsApi({action:'list'}); _reviewSrcs=(rv&&rv.sources)||[];}catch(_){_reviewSrcs=_reviewSrcs||[];}
   const el=document.getElementById('inbox-connects'); if(el)el.innerHTML=inboxConnectsHtml();
   const tp=document.getElementById('wa-tpl-panel'); if(tp)tp.innerHTML=waTplPanelHtml();
 }
@@ -2645,8 +2666,13 @@ function inboxConnectsHtml(){
   if(WS&&WS.inbox_handle){
     icons.push(`<span class="socic" title="Forwarding address: ${esc(WS.inbox_handle)}@in.brandexpert.co.za — click to copy, then forward your mail here" onclick="copyEmailInbox()" style="cursor:pointer">${platBadge('email',24)}</span>`);
   }
+  for(const s of (_reviewSrcs||[])){
+    const bad=s.status==='error';
+    icons.push(`<span class="socic" title="App Store reviews${s.name?' · '+esc(s.name):''}${bad?' — error, click to reconnect':' — pulling in new reviews'}" onclick="appStoreConnect()" style="cursor:pointer">${platBadge('appstore',24)}<b class="x" title="Remove App Store reviews" onclick="event.stopPropagation();reviewsDisconnect('${s.id}')">✕</b></span>`);
+  }
   const un=defs.filter(([pl])=>!inboxLinkFor(pl));
   if(!waAcc.length)un.push(['whatsapp','WhatsApp']);
+  un.push(['appstore','App Store reviews']);
   let dd='';
   if(canManage()&&un.length){
     dd=`<select onchange="inboxConnectPick(this.value);this.value='';" title="Connect a source so its messages land in this board's Inbox" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Inbox source</option>${un.map(([pl,label])=>`<option value="${pl}">${label}</option>`).join('')}</select>`;
@@ -2659,7 +2685,11 @@ function inboxConnectsHtml(){
   if(canManage())acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Forward, connect Gmail, or add any mailbox to this board's Inbox" onclick="openEmailConnect()">${ic('mail',12)} Email setup</button>`;
   return iconWrap+dd+acts;
 }
-function inboxConnectPick(v){ if(v==='facebook')fbConnect(); else if(v==='youtube')ytConnect(); else if(v==='threads')thConnect(); else if(v==='whatsapp')waEmbeddedConnect(); else if(v==='email')openEmailConnect(); }
+function inboxConnectPick(v){ if(v==='facebook')fbConnect(); else if(v==='youtube')ytConnect(); else if(v==='threads')thConnect(); else if(v==='whatsapp')waEmbeddedConnect(); else if(v==='email')openEmailConnect(); else if(v==='appstore')appStoreConnect(); }
+async function reviewsDisconnect(id){
+  if(!confirm('Stop pulling reviews from this app? Existing reviews stay in your Inbox.'))return;
+  try{ await reviewsApi({action:'disconnect',source_id:id}); await loadInboxConnects(); toast('App Store reviews removed'); }catch(e){fail(e);}
+}
 async function inboxDisconnect(pl){
   if(!confirm('Disconnect this from the board? New messages will stop arriving. You can reconnect any time.'))return;
   try{
@@ -2681,6 +2711,38 @@ async function emailApi(body){
     try{ return await r.json(); }
     catch(_e){ return {error: r.ok?'Unexpected server response — please try again.':('Server error ('+r.status+') — please try again in a moment.')}; }
   }catch(e){ return {error:'Network problem — check your connection and try again.'}; }
+}
+async function reviewsApi(body){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-reviews`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,board_id:S.board,...body})});
+    try{ return await r.json(); }
+    catch(_e){ return {error: r.ok?'Unexpected server response — please try again.':('Server error ('+r.status+') — please try again in a moment.')}; }
+  }catch(e){ return {error:'Network problem — check your connection and try again.'}; }
+}
+function appStoreConnect(){
+  openModal(`<h3>${platBadge('appstore',22)} App Store reviews</h3>
+    <div style="font-size:13px;color:var(--muted);margin:2px 0 12px;line-height:1.5">New customer reviews from Apple&rsquo;s App Store land in this board&rsquo;s Inbox, star-rated, so you never miss one. Paste your app&rsquo;s App Store link (or its numeric App&nbsp;ID).</div>
+    <input id="appstore-input" placeholder="https://apps.apple.com/za/app/yourapp/id123456789" style="width:100%;font-size:13px;padding:9px 11px;border:1px solid var(--line-strong);border-radius:8px;box-sizing:border-box">
+    <div id="appstore-msg" style="font-size:12px;color:var(--muted);margin-top:8px;min-height:16px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn accent" id="appstore-go" onclick="appStoreConnectGo()">Connect reviews</button>
+    </div>`);
+}
+async function appStoreConnectGo(){
+  const inp=document.getElementById('appstore-input'); const msg=document.getElementById('appstore-msg'); const btn=document.getElementById('appstore-go');
+  const v=(inp&&inp.value||'').trim();
+  if(!v){ if(msg)msg.textContent='Paste your App Store link or App ID first.'; return; }
+  if(btn){btn.disabled=true;btn.textContent='Connecting…';} if(msg){msg.style.color='var(--muted)';msg.textContent='Looking up your app…';}
+  const res=await reviewsApi({action:'connect',input:v});
+  if(res&&res.ok){
+    toast((res.name?('“'+res.name+'” '):'App ')+'connected'+(res.added?(' — '+res.added+' review'+(res.added===1?'':'s')+' pulled in'):''));
+    closeModal&&closeModal(); await loadInboxConnects(); if(typeof loadInbox==='function')loadInbox(); render();
+  }else{
+    if(btn){btn.disabled=false;btn.textContent='Connect reviews';}
+    if(msg){msg.style.color='var(--danger)';msg.textContent=(res&&(res.error||res.message))||'Could not connect — check the link and try again.';}
+  }
 }
 async function gmailConnect(){
   try{
@@ -2869,7 +2931,7 @@ function whatsappBody(counts){
       ${stat(counts?counts.total:'…','MESSAGES THIS MONTH')}
     </div>
     <div style="font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.55;border-top:1px solid var(--line);padding-top:10px">
-      You&rsquo;re billed <b style="color:var(--ink)">R${WA_RATE}/month per connected number</b>. Actual WhatsApp message charges (marketing &amp; templates) are billed <b>directly by Meta to each client&rsquo;s own WhatsApp account</b> at Meta&rsquo;s standard rates — nothing is marked up here. Replies to customers within 24&nbsp;hours are free (until Meta&rsquo;s 1&nbsp;Oct&nbsp;2026 change, after which they bill at the low utility rate).
+      You&rsquo;re billed <b style="color:var(--ink)">R${WA_RATE}/month per connected number</b>. Actual WhatsApp message charges (marketing &amp; templates) are billed <b>directly by Meta to each client&rsquo;s own WhatsApp account</b> at Meta&rsquo;s standard rates — nothing is marked up here. Replies to customers within 24&nbsp;hours are free (until Meta&rsquo;s 1&nbsp;Oct&nbsp;2026 change, after which they bill at the low utility rate). Each client adds a payment method in their own Meta account to enable sending.
     </div>
   </div>
   <div class="card" style="padding:14px 18px">
@@ -2882,8 +2944,115 @@ function whatsappBody(counts){
       </div>
       <span class="pill" style="background:${a.status==='error'?'var(--danger)':'var(--ok)'}">${a.status==='error'?'error':'active'}</span>
       <span style="font-size:12px;color:var(--muted);font-weight:700;flex:none">R${WA_RATE}/mo</span>
+      ${canManage()?`<button class="btn ghost sm" style="flex:none" onclick="waDisconnect('${a.id}')">Remove</button>`:''}
     </div>`).join(''):`<div class="empty" style="padding:24px 8px;text-align:center;font-size:12.5px">No WhatsApp numbers connected yet.<br><span style="font-size:11.5px;color:var(--muted)">Connect a client&rsquo;s number here or from any board&rsquo;s Inbox — each connected number is R${WA_RATE}/month, and message costs go straight to that client&rsquo;s own Meta account.</span></div>`}
   </div>`;
+}
+/* ============ ANALYTICS ============ */
+const AN_GOALS=[['awareness','Awareness'],['engagement','Engagement'],['traffic','Website traffic'],['installs','App installs'],['leads','Leads & sales'],['reputation','Reputation']];
+const AN_MNAME={impressions:'Impressions',reach:'Reach',likes:'Likes',comments:'Comments',shares:'Shares',saves:'Saves',clicks:'Clicks',views:'Views',posts:'Posts'};
+let _an=null;
+function anFail(r){ toast((r&&(r.message||r.error))||'Something went wrong — try again.'); }
+async function anApi(body){
+  try{const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-analytics`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,board_id:S.board,...body})});
+    try{return await r.json();}catch(_e){return {error:'Server error — please try again.'};}
+  }catch(e){return {error:'Network problem — check your connection.'};}
+}
+function anNum(n){n=Number(n)||0;if(n>=1e6)return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';if(n>=1e3)return (n/1e3).toFixed(1).replace(/\.0$/,'')+'k';return String(Math.round(n));}
+function anSpark(series,color){
+  const vals=(series||[]).map(p=>Number(p.v)||0);
+  if(vals.length<2)return '<div style="font-size:11px;color:var(--muted)">Not enough history yet — your trend line builds up over the next few days.</div>';
+  const w=280,h=46,mn=Math.min(...vals),mx=Math.max(...vals),rng=(mx-mn)||1;
+  const pts=vals.map((v,i)=>`${(i/(vals.length-1)*w).toFixed(1)},${(h-((v-mn)/rng)*h).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none"><polyline fill="none" stroke="${color}" stroke-width="2" points="${pts}"/></svg>`;
+}
+function analyticsView(){
+  const b=BOARDS.find(x=>x.id===S.board);
+  if(!b)return `<div class="empty" style="text-align:center;padding:60px">No board selected.</div>`;
+  setTimeout(()=>anLoad(),50);
+  const goalSel=canManage()?`<select onchange="anSetGoal(this.value)" title="What is this board trying to achieve? The dashboard reframes around it." style="width:auto;padding:6px 12px;font-size:12px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">Set a goal…</option>${AN_GOALS.map(([v,l])=>`<option value="${v}" ${(_an&&_an.goal===v)?'selected':''}>${l}</option>`).join('')}</select>`:'';
+  return `<div class="view-title"><h2>${ic('chart',18)} Analytics</h2><span class="sub">${esc(b.name)}</span><span style="flex:1"></span>${goalSel}<button class="btn ghost sm" onclick="anLoad(true)" title="Refresh from your socials">↻</button></div>
+    <div id="an-body">${_an?anBody():'<div class="empty" style="padding:40px;text-align:center">Loading your numbers…</div>'}</div>`;
+}
+async function anLoad(){
+  const r=await anApi({action:'overview'}); _an=r;
+  const h=document.getElementById('an-body'); if(h)h.innerHTML=anBody();
+}
+function anBody(){
+  const r=_an; if(!r||r.error)return `<div class="empty" style="padding:40px;text-align:center">${esc((r&&r.error)||'Could not load analytics.')}</div>`;
+  const a=r.analytics; const hasAcc=a&&a.accounts>0; const goal=r.goal; const ns=r.north_stars||['reach'];
+  let ai;
+  if(r.digest&&r.digest.body){
+    ai=`<div class="card" style="padding:14px 16px;margin-bottom:12px;border-left:4px solid var(--accent);background:#FbFaF6">
+      <div style="font-size:10.5px;font-weight:800;letter-spacing:.05em;color:var(--accent);margin-bottom:4px">✦ AI WEEKLY INSIGHT${goal?' · '+esc(r.goal_label):''}</div>
+      <div style="font-size:13.5px;line-height:1.55">${esc(r.digest.body)}</div>
+      ${canManage()?`<button class="btn ghost sm" style="margin-top:8px" onclick="anInsight(true)" title="Regenerate — uses 1 credit">↻ Refresh insight (1 credit)</button>`:''}</div>`;
+  }else{
+    ai=`<div class="card" style="padding:14px 16px;margin-bottom:12px;border-left:4px solid var(--accent);background:#FbFaF6">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Your first weekly insight is included — let AI read your numbers and tell you the one thing that matters.</div>
+      ${canManage()?`<button class="btn accent sm" onclick="anInsight(false)">✦ Generate weekly insight</button>`:''}</div>`;
+  }
+  const kpis=r.kpis||[];
+  const kpiCards=kpis.map(k=>{
+    const pct=Math.round((k.pct||0)*100); const onTrack=k.projected>=k.target; const barc=onTrack?'var(--ok)':(pct>60?'#C7952b':'var(--danger)');
+    return `<div class="card" style="padding:12px 14px;flex:1;min-width:190px">
+      <div style="display:flex;align-items:center;gap:6px"><b style="font-size:13px">${AN_MNAME[k.metric]||k.metric}</b>${k.origin==='ai'?'<span class="pill" style="background:var(--accent);font-size:9px">AI</span>':''}<span style="flex:1"></span>${canManage()?`<button style="color:var(--muted)" title="Remove KPI" onclick="anKpiRemove('${k.id}')">${ic('x',12)}</button>`:''}</div>
+      <div style="font-size:20px;font-weight:800;margin:4px 0 2px">${anNum(k.current)} <span style="font-size:12px;font-weight:600;color:var(--muted)">/ ${anNum(k.target)}</span></div>
+      <div style="height:7px;background:rgba(0,0,0,.07);border-radius:4px;overflow:hidden;margin:5px 0"><i style="display:block;height:100%;width:${Math.min(100,pct)}%;background:${barc};border-radius:4px"></i></div>
+      <div style="font-size:11px;color:var(--muted)">Projected <b style="color:${onTrack?'var(--ok)':'var(--danger)'}">${anNum(k.projected)}</b>${k.period_end?' by '+new Date(k.period_end).toLocaleDateString('en-ZA',{day:'numeric',month:'short'}):''} · ${onTrack?'on track ✓':(k.gap>0?('short by '+anNum(k.gap)):'—')}</div>
+    </div>`;
+  }).join('');
+  const kpiBand=`<div style="margin-bottom:12px"><div style="display:flex;align-items:center;margin-bottom:7px"><b style="font-size:11px;letter-spacing:.04em;color:var(--muted)">KPIs &amp; PACE</b><span style="flex:1"></span>${canManage()?`<button class="btn ghost sm" onclick="anKpiAdd()">${ic('plus',11)} Set a KPI</button>`:''}</div>
+    ${kpis.length?`<div style="display:flex;gap:10px;flex-wrap:wrap">${kpiCards}</div>`:`<div class="empty" style="padding:16px;text-align:center;font-size:12.5px">No KPI yet. ${canManage()?'Set a target and I will track your pace and predict whether you reach it.':''}</div>`}</div>`;
+  const trendBand=`<div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:6px">${(AN_MNAME[r.trend_metric]||r.trend_metric).toUpperCase()} — LAST 30 DAYS</div>
+    ${anSpark(r.trend,'var(--accent)')}</div>`;
+  const totals=(a&&a.totals)||{};
+  const tileMetrics=[...new Set([...ns,'likes','comments','views'])].slice(0,6);
+  const tiles=tileMetrics.map(m=>`<div class="card" style="padding:10px 12px;flex:1;min-width:104px;text-align:center"><div style="font-size:19px;font-weight:800">${anNum(totals[m]||0)}</div><div style="font-size:10.5px;color:var(--muted);font-weight:700">${AN_MNAME[m]||m}</div></div>`).join('');
+  const tileBand=hasAcc?`<div style="margin-bottom:12px"><b style="font-size:11px;letter-spacing:.04em;color:var(--muted)">LAST 30 DAYS${a.accounts?(' · '+a.accounts+' account'+(a.accounts>1?'s':'')):''}</b><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:7px">${tiles}</div></div>`:'';
+  const top=(a&&a.top)||[];
+  const topBand=top.length?`<div class="card" style="padding:12px 14px"><div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:8px">TOP POSTS</div>${top.map(p=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><span class="pill" style="background:${(typeof PLAT!=='undefined'&&PLAT[p.platform])?PLAT[p.platform][1]:'#888'};font-size:9px;flex:none">${(typeof PLAT!=='undefined'&&PLAT[p.platform])?PLAT[p.platform][0]:esc(p.platform||'')}</span><span style="flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.content||'(no caption)')}</span><span style="font-size:11px;color:var(--muted);flex:none">♥ ${anNum(p.likes)} · 💬 ${anNum(p.comments)}</span></div>`).join('')}</div>`:'';
+  if(!hasAcc){
+    return `<div class="empty" style="padding:34px 20px;text-align:center">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px">${goal?'No numbers yet':'Pick a goal to get started'}</div>
+      <div style="font-size:12.5px;color:var(--muted);max-width:440px;margin:0 auto;line-height:1.55">Connect a social account on the <b>Content</b> tab and publish through Boards — your reach, engagement and top posts appear here, with AI insights and KPI tracking framed around your goal.</div>
+      <div style="margin-top:14px">${ai}</div></div>`;
+  }
+  return ai+kpiBand+trendBand+tileBand+topBand;
+}
+async function anSetGoal(goal){ if(!goal)return; const r=await anApi({action:'set_goal',goal}); if(r&&r.ok){toast('Goal set');await anLoad();}else anFail(r); }
+function anKpiAdd(){
+  const opts=Object.keys(AN_MNAME).map(m=>`<option value="${m}">${AN_MNAME[m]}</option>`).join('');
+  openModal(`<h3>Set a KPI target</h3>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Pick a metric and a target for this period — I'll track your pace and predict whether you'll hit it.</div>
+    <label>Metric</label><select id="kpi-metric">${opts}</select>
+    <label style="margin-top:10px">Period</label><select id="kpi-period"><option value="month">This month</option><option value="quarter">This quarter</option></select>
+    <label style="margin-top:10px">Target</label>
+    <div style="display:flex;gap:8px"><input id="kpi-target" type="number" min="1" placeholder="e.g. 10000" style="flex:1"><button class="btn ghost" onclick="anKpiSuggest()" title="Let AI suggest a realistic target from your trend — uses 1 credit">✦ Suggest (1 credit)</button></div>
+    <div id="kpi-suggest-note" style="font-size:11.5px;color:var(--muted);margin-top:6px;min-height:15px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn accent" onclick="anKpiSave()">Save KPI</button></div>`);
+}
+async function anKpiSuggest(){
+  const metric=$('kpi-metric').value; const period=$('kpi-period').value; const note=$('kpi-suggest-note');
+  if(note){note.style.color='var(--muted)';note.textContent='Thinking…';}
+  const r=await anApi({action:'kpi_suggest',metric,period});
+  if(r&&r.ok){ if($('kpi-target'))$('kpi-target').value=r.suggestion; if(note){note.style.color='var(--muted)';note.textContent='✦ '+r.rationale;} }
+  else if(note){note.style.color='var(--danger)';note.textContent=(r&&(r.message||r.error))||'Could not suggest.';}
+}
+async function anKpiSave(){
+  const metric=$('kpi-metric').value; const period=$('kpi-period').value; const target=Number($('kpi-target').value);
+  if(!(target>0)){const n=$('kpi-suggest-note');if(n){n.style.color='var(--danger)';n.textContent='Enter a target number first.';}return;}
+  const r=await anApi({action:'kpi_set',metric,target,period});
+  if(r&&r.ok){closeModal();toast('KPI set');await anLoad();}else anFail(r);
+}
+async function anKpiRemove(id){ if(!confirm('Remove this KPI?'))return; const r=await anApi({action:'kpi_remove',kpi_id:id}); if(r&&r.ok){toast('Removed');await anLoad();}else anFail(r); }
+async function anInsight(force){
+  toast(force?'Refreshing insight…':'Reading your numbers…');
+  const r=await anApi({action:'insight',force:!!force});
+  if(r&&r.ok){ if(!_an)_an={}; _an.digest={body:r.insight,period:r.period}; const h=document.getElementById('an-body'); if(h)h.innerHTML=anBody(); if(force&&r.credits_left!=null)toast('Insight updated · '+r.credits_left+' credits left'); }
+  else anFail(r);
 }
 function inboxView(){
   setTimeout(async()=>{await loadInbox();const el=document.getElementById('inbox-list');if(el)el.outerHTML=inboxListHtml();},60);
@@ -2895,12 +3064,12 @@ function inboxView(){
 function inboxListHtml(){
   const rows=_inbox.filter(i=>_inboxFilter==='all'||i.status===_inboxFilter);
   const bn=id=>{const b=BOARDS.find(x=>x.id===id);return b?b.name:'';};
-  return `<div id="inbox-list">${rows.map(i=>{const P=emlParts(i);const open=_inboxOpen.has(i.id);const isE=i.platform==='email';const title=isE?(P.subj||'(no subject)'):P.body;return `<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;border-left:4px solid ${(PLAT[i.platform]||PLAT.other)[1]}">
+  return `<div id="inbox-list">${rows.map(i=>{const P=emlParts(i);const open=_inboxOpen.has(i.id);const isE=i.platform==='email';const isR=i.kind==='review';const title=isE?(P.subj||'(no subject)'):P.body;return `<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;border-left:4px solid ${(PLAT[i.platform]||PLAT.other)[1]}">
     ${platBadge(i.platform,24)}
     <div style="flex:1;min-width:0">
       <div onclick="inboxToggle('${i.id}')" style="cursor:pointer">
-      <div style="font-size:11.5px;color:var(--muted);font-weight:700"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉ Direct message':'💬 Comment'} · ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})} ${bn(i.board_id)?'· '+esc(bn(i.board_id)):''}<span style="float:right">${open?'▾':'▸'}</span></div>
-      <div style="font-size:13.5px;font-weight:${isE?'700':'400'};margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)||'(no content)'}</div>
+      <div style="font-size:11.5px;color:var(--muted);font-weight:700"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${isR?'★ Review':i.kind==='message'?'✉ Direct message':'💬 Comment'} · ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})} ${bn(i.board_id)?'· '+esc(bn(i.board_id)):''}<span style="float:right">${open?'▾':'▸'}</span></div>
+      <div style="font-size:13.5px;font-weight:${(isE||isR)?'700':'400'};margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)||'(no content)'}</div>
       ${open?`<div style="font-size:13px;margin-top:5px;white-space:pre-wrap;word-break:break-word">${esc(P.body)||'(no text)'}</div>`:(isE&&P.body?`<div style="font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(P.body.slice(0,120))}${P.body.length>120?'…':''}</div>`:'')}
       </div>
       ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11.5px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
@@ -2935,10 +3104,10 @@ function boardInboxHtml(boardId){
 function boardInboxBody(boardId){
   const rows=(_inbox||[]).filter(i=>(i.board_id===boardId||(!i.board_id&&(i.platform==='whatsapp'||i.platform==='email')))&&i.status!=='dismissed');
   if(!rows.length)return '<div class="empty" style="padding:20px 8px;text-align:center;font-size:12px">No messages yet.<br>New comments on this board&rsquo;s connected pages will land here.</div>';
-  return rows.map(i=>{const P=emlParts(i);const open=_inboxOpen.has(i.id);const isE=i.platform==='email';const title=isE?(P.subj||'(no subject)'):P.body;return `<div style="border-left:3px solid ${(PLAT[i.platform]||PLAT.other)[1]};padding:7px 9px;margin-bottom:7px;background:var(--panel,#F4F3EE);border-radius:7px">
+  return rows.map(i=>{const P=emlParts(i);const open=_inboxOpen.has(i.id);const isE=i.platform==='email';const isR=i.kind==='review';const title=isE?(P.subj||'(no subject)'):P.body;return `<div style="border-left:3px solid ${(PLAT[i.platform]||PLAT.other)[1]};padding:7px 9px;margin-bottom:7px;background:var(--panel,#F4F3EE);border-radius:7px">
     <div onclick="inboxToggle('${i.id}')" style="cursor:pointer">
-      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);font-weight:700">${platBadge(i.platform,16)}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${i.kind==='message'?'✉':'💬'} ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})}</span><span style="flex:1"></span><span style="color:var(--muted);flex:none">${open?'▾':'▸'}</span></div>
-      <div style="font-size:12.5px;font-weight:${isE?'700':'500'};margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)||'(no content)'}</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);font-weight:700">${platBadge(i.platform,16)}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${isR?'★':i.kind==='message'?'✉':'💬'} ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})}</span><span style="flex:1"></span><span style="color:var(--muted);flex:none">${open?'▾':'▸'}</span></div>
+      <div style="font-size:12.5px;font-weight:${(isE||isR)?'700':'500'};margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)||'(no content)'}</div>
       ${open?`<div style="font-size:12px;color:var(--ink);margin:4px 0 2px;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto">${esc(P.body)||'(no text)'}</div>`:(isE&&P.body?`<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(P.body.slice(0,90))}${P.body.length>90?'…':''}</div>`:'')}
     </div>
     <div style="display:flex;gap:5px;align-items:center;margin-top:4px">
