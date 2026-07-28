@@ -2289,11 +2289,14 @@ function postModal(id,dateStr){
       <div style="width:110px"><label>Time</label><input type="time" id="po-time" value="${p?(p.post_time||'09:00').slice(0,5):'09:00'}"></div>
     </div>
     ${p&&p.postpeer_id?`<div id="po-stats" style="display:flex;gap:14px;flex-wrap:wrap;background:var(--panel,#F4F3EE);border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:var(--muted)">Loading stats…${(()=>{setTimeout(()=>postStats(p.id),80);return '';})()}</div>`:''}
+    ${p&&p.status==='failed'&&p.stats&&p.stats._sched?`<div style="background:#FDECEA;border:1px solid #F5C6CB;border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:#8A1C1C">⚠ Auto-post failed: ${esc(p.stats._sched.last_error||'unknown error')}. Fix the issue, set the status back to Approved, then Auto-post again.</div>`:''}
     <label>Status</label>
     <select id="po-status">
       <option value="draft" ${!p||p.status==='draft'?'selected':''}>Draft</option>
       <option value="approved" ${p&&p.status==='approved'?'selected':''}>Approved — ready to post</option>
+      <option value="scheduled" ${p&&p.status==='scheduled'?'selected':''}>Scheduled — waiting to auto-post</option>
       <option value="posted" ${p&&p.status==='posted'?'selected':''}>Posted</option>
+      ${p&&p.status==='failed'?`<option value="failed" selected>Failed — needs attention</option>`:''}
     </select>
     <div class="row">
       ${p?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="delPost('${p.id}')">${ic('trash',13)}</button>`:''}
@@ -2422,12 +2425,21 @@ async function disconnectSocial(id){
   }catch(e){fail(e);}
 }
 async function connectSocial(platform){
+  // Facebook + Instagram connect through our own Meta app (not PostPeer).
+  // Instagram rides along with the Facebook Page connect (the Graph API reaches
+  // IG via its linked Page), so both use fbConnect.
+  if(platform==='facebook'||platform==='instagram'){ return fbConnect(); }
   try{
     const j=await socialApi({action:'connect',platform,board_id:S.board});
     if(j.error){toast(j.message||j.error);return;}
     window.open(j.url,'_blank');
     toast('Approve the connection in the new tab, then come back and refresh');
   }catch(e){fail(e);}
+}
+async function igApi(body){
+  const {data:{session}}=await sb.auth.getSession();
+  const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-instagram`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,board_id:S.board,...body})});
+  return await r.json();
 }
 async function metaApi(body){
   const {data:{session}}=await sb.auth.getSession();
@@ -3194,8 +3206,55 @@ async function dupPost(id){
 async function publishPost(id){
   const p=(cur.posts||[]).find(x=>x.id===id); if(!p)return;
   if(!confirm(`Send "${(p.caption.split('\n')[0]||'this post').slice(0,60)}" to ${(PLAT[p.platform]||PLAT.other)[0]} — ${p.post_date} at ${(p.post_time||'09:00').slice(0,5)}?`))return;
-  toast('Sending to the scheduler…');
+  const when=new Date(`${p.post_date}T${(p.post_time||'09:00').slice(0,5)}:00+02:00`);
+  const postNow=when.getTime()<=Date.now()+60000;
+  const media=Array.isArray(p.media)?p.media.filter(m=>m&&m.url):[];
   try{
+    // Post-now on Facebook / Instagram goes DIRECT through our Meta app (no PostPeer).
+    if(postNow && p.platform==='facebook'){
+      toast('Posting to Facebook…');
+      const j=await metaApi({action:'publish',board_id:S.board,message:p.caption});
+      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      await sb.from('bbe_posts').update({status:'posted',post_url:j.permalink||null}).eq('id',id);
+      closeModal();await loadBoard();render();
+      toast('Posted to Facebook — live now',j.permalink?'Open ↗':null,j.permalink?()=>window.open(j.permalink,'_blank'):null);
+      return;
+    }
+    if(postNow && p.platform==='instagram'){
+      const img=media.find(m=>m.type==='image'); const vid=media.find(m=>m.type==='video');
+      if(!img&&!vid){toast('Instagram needs an image or video attached to publish.');return;}
+      toast('Posting to Instagram…');
+      const j=await igApi({action:'publish',caption:p.caption,image_url:img?img.url:'',video_url:vid?vid.url:''});
+      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      await sb.from('bbe_posts').update({status:'posted'}).eq('id',id);
+      closeModal();await loadBoard();render();
+      toast('Posted to Instagram — live now');
+      return;
+    }
+    // Post-now on Threads goes DIRECT through our own Threads app (no PostPeer).
+    if(postNow && p.platform==='threads'){
+      const img=media.find(m=>m.type==='image'); const vid=media.find(m=>m.type==='video');
+      toast('Posting to Threads…');
+      const j=await thApi({action:'publish',board_id:S.board,caption:p.caption,image_url:img?img.url:'',video_url:vid?vid.url:''});
+      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      await sb.from('bbe_posts').update({status:'posted',post_url:j.permalink||null}).eq('id',id);
+      closeModal();await loadBoard();render();
+      toast('Posted to Threads — live now',j.permalink?'Open ↗':null,j.permalink?()=>window.open(j.permalink,'_blank'):null);
+      return;
+    }
+    // Future Facebook / Instagram / Threads posts schedule NATIVELY through our own apps
+    // (no PostPeer): we just mark the post 'scheduled' and a cron publishes it at the set time.
+    if(p.platform==='facebook'||p.platform==='instagram'||p.platform==='threads'){
+      if(p.platform==='instagram'&&!media.find(m=>m.type==='image'||m.type==='video')){
+        toast('Instagram needs an image or video attached to schedule.');return;
+      }
+      await sb.from('bbe_posts').update({status:'scheduled'}).eq('id',id);
+      closeModal();await loadBoard();render();
+      toast('⏱ Scheduled — it posts itself at '+(p.post_time||'09:00').slice(0,5)+' on '+p.post_date);
+      return;
+    }
+    // Everything else (TikTok/LinkedIn/etc.) still goes through PostPeer's scheduler.
+    toast('Sending to the scheduler…');
     const j=await socialApi({action:'publish',post_id:id});
     if(j.error==='NO_ACCOUNTS'){toast(j.message);return;}
     if(j.error){toast('⚠ '+(j.message||j.error));return;}
