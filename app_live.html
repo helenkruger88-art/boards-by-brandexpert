@@ -2493,8 +2493,25 @@ async function thApi(body){
   const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-threads`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,...body})});
   return await r.json();
 }
-async function thConnect(){
+function thConnect(){
   if(!S.board){toast('Open a board first');return;}
+  openModal(`<h3>Connect Threads</h3>
+    <p style="font-size:13px;color:var(--muted);margin:4px 0 12px;line-height:1.5">Threads uses your <b>Instagram</b> login — you'll approve the connection on threads.net in a moment. Make sure you're logged in to Threads as the account you want to post from.</p>
+    <div style="background:#FFF6E5;border:1px solid #F0D9A8;border-radius:11px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:12.5px;font-weight:800;color:#7A5B12;margin-bottom:6px">First time connecting this account? Accept the one-time invite first</div>
+      <div style="font-size:12.5px;color:#6B5410;line-height:1.65">While Threads posting is in early access, each account is invited once. In the <b>Threads app</b> (signed in as the account you're connecting):
+        <ol style="margin:7px 0 0;padding-left:18px">
+          <li>Tap your <b>profile</b> → the <b>☰ menu</b> (top right)</li>
+          <li><b>Settings</b> → <b>Account</b> → <b>Website permissions</b></li>
+          <li>Open the <b>Invites</b> tab → <b>Accept</b> the “Boards by Brand Expert” invite</li>
+        </ol>
+        <div style="margin-top:7px;font-size:11.5px;color:#8A6D1E">On a computer: threads.net → ☰ menu → Settings → Account → Website permissions → Invites. Already accepted, or your account was invited earlier? Just continue.</div>
+      </div>
+    </div>
+    <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn accent" onclick="thConnectGo()">Continue to Threads ↗</button></div>`);
+}
+async function thConnectGo(){
   try{const j=await thApi({action:'connect',board_id:S.board});
   if(j.error){toast(j.error);return;}
   location.href=j.url;}catch(e){fail(e);}
@@ -2864,9 +2881,9 @@ async function waReply(id,to,pfx){
     toast('Sent on WhatsApp ✓'); inboxSet(id,'answered');
   }catch(e){fail(e);}
 }
-/* inline replies: Facebook comments & DMs, Threads */
+/* inline replies: Facebook & Instagram comments & DMs, Threads */
 function inboxReplyBox(i,pfx){
-  const can=(i.platform==='facebook'&&(i.kind==='comment'||i.kind==='message'))||i.platform==='threads';
+  const can=((i.platform==='facebook'||i.platform==='instagram')&&(i.kind==='comment'||i.kind==='message'))||i.platform==='threads';
   if(!can)return '';
   return `<div style="display:flex;gap:5px;margin-top:5px"><input id="${pfx}${i.id}" placeholder="Reply on ${(PLAT[i.platform]||PLAT.other)[0]}…" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')socialReply('${i.id}','${pfx}')"><button class="btn accent sm" style="padding:2px 9px;font-size:11px;flex:none" onclick="socialReply('${i.id}','${pfx}')">Reply</button></div>`;
 }
