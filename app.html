@@ -2445,12 +2445,15 @@ async function connectSocial(platform){
   // Instagram rides along with the Facebook Page connect (the Graph API reaches
   // IG via its linked Page), so both use fbConnect.
   if(platform==='facebook'||platform==='instagram'){ return fbConnect(); }
-  // Threads / YouTube / TikTok also connect through our OWN apps (direct), not PostPeer,
+  // Threads / TikTok connect through our OWN apps (direct), not PostPeer,
   // so a later publishPost() finds the matching direct link.
   if(platform==='threads'){ return thConnect(); }
-  if(platform==='youtube'){ return ytPostConnect(); }
   if(platform==='tiktok'){ return ttConnect(); }
-  // LinkedIn / X / anything else keeps the existing PostPeer path untouched.
+  // YouTube posting + analytics stay on PostPeer (avoids Google's CASA security
+  // assessment, which is only triggered by uploading through our own server).
+  // YouTube COMMENTS come through Brand Expert separately via the by-handle reader
+  // (see the Inbox "Connect YouTube" affordance -> ytConnect). LinkedIn / X / anything
+  // else also keeps the existing PostPeer path untouched.
   try{
     const j=await socialApi({action:'connect',platform,board_id:S.board});
     if(j.error){toast(j.message||j.error);return;}
@@ -2739,12 +2742,11 @@ async function loadDirectLinks(){
     if(l.platform==='facebook')set.add('facebook');
     else if(l.platform==='instagram')set.add('instagram');
     else if(l.platform==='threads')set.add('threads');
-    else if(l.platform==='youtube')set.add('youtube'); // by-handle reader still counts as connected
+    // NOTE: YouTube posts via PostPeer (shows through _socAccounts), so it is NOT a
+    // "direct" platform. The by-handle reader is a comment-only Inbox connection.
   }
   // Threads — dedicated endpoint (in case meta links doesn't carry it).
   try{const j=await thApi({action:'links'}); if(((j&&j.links)||[]).some(l=>l.board_id===board))set.add('threads');}catch(_){}
-  // YouTube posting OAuth (bbe-youtube-post, platform youtube_oauth) -> base 'youtube'.
-  try{const j=await ytPostApi({action:'links'}); if(((j&&j.links)||[]).some(l=>l.board_id===board))set.add('youtube');}catch(_){}
   // TikTok (bbe-tiktok).
   try{const j=await ttApi({action:'links'}); if(((j&&j.links)||[]).some(l=>l.board_id===board))set.add('tiktok');}catch(_){}
   _directPlatforms=[...set];
@@ -2958,8 +2960,9 @@ async function waReply(id,to,pfx){
 }
 /* inline replies: Facebook & Instagram comments & DMs, Threads */
 function inboxReplyBox(i,pfx){
-  // YouTube: comments only (no DMs) — replies go DIRECT via bbe-youtube-post.
-  const can=((i.platform==='facebook'||i.platform==='instagram')&&(i.kind==='comment'||i.kind==='message'))||i.platform==='threads'||(i.platform==='youtube'&&i.kind==='comment');
+  // YouTube inbox is READ-ONLY: replying needs the youtube.force-ssl restricted scope
+  // (which would trigger Google's CASA assessment), so no reply box for YouTube.
+  const can=((i.platform==='facebook'||i.platform==='instagram')&&(i.kind==='comment'||i.kind==='message'))||i.platform==='threads';
   if(!can)return '';
   return `<div style="display:flex;gap:5px;margin-top:5px"><input id="${pfx}${i.id}" placeholder="Reply on ${(PLAT[i.platform]||PLAT.other)[0]}…" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')socialReply('${i.id}','${pfx}')"><button class="btn accent sm" style="padding:2px 9px;font-size:11px;flex:none" onclick="socialReply('${i.id}','${pfx}')">Reply</button></div>`;
 }
@@ -2970,7 +2973,6 @@ async function socialReply(id,pfx){
   try{
     let j;
     if(it.platform==='threads')j=await thApi({action:'reply',interaction_id:id,text});
-    else if(it.platform==='youtube')j=await ytPostApi({action:'reply',interaction_id:id,text}); // YouTube comment reply, direct
     else if(it.kind==='message')j=await metaApi({action:'reply_message',interaction_id:id,message:text});
     else j=await metaApi({action:'reply_comment',interaction_id:id,message:text});
     if(j&&j.error){toast(j.message||j.error);return;}
@@ -3336,18 +3338,9 @@ async function publishPost(id){
       toast('Posted to Threads — live now',j.permalink?'Open ↗':null,j.permalink?()=>window.open(j.permalink,'_blank'):null);
       return;
     }
-    // Post-now on YouTube goes DIRECT through our own Google app (bbe-youtube-post). Needs a video.
-    if(postNow && p.platform==='youtube'){
-      const vid=media.find(m=>m.type==='video');
-      if(!vid){toast('YouTube needs a video to publish.');return;}
-      toast('Uploading to YouTube…');
-      const j=await ytPostApi({action:'publish',board_id:S.board,caption:p.caption,video_url:vid.url,shorts:false});
-      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
-      await sb.from('bbe_posts').update({status:'posted',post_url:j.permalink||null}).eq('id',id);
-      closeModal();await loadBoard();render();
-      toast('Posted to YouTube — live now',j.permalink?'Open ↗':null,j.permalink?()=>window.open(j.permalink,'_blank'):null);
-      return;
-    }
+    // YouTube posting stays on PostPeer (falls through to the PostPeer path below) —
+    // this keeps the restricted youtube.upload scope (and Google's CASA assessment) off
+    // Brand Expert. Brand Expert only reads YouTube comments (Inbox) + analytics.
     // Post-now on TikTok goes DIRECT through the TikTok app (bbe-tiktok). Needs a video.
     // (Unaudited apps post as SELF_ONLY/private — the backend enforces & explains this.)
     if(postNow && p.platform==='tiktok'){
@@ -3361,15 +3354,16 @@ async function publishPost(id){
       toast('Sent to TikTok — posts as private (SELF_ONLY) until the app is TikTok-audited');
       return;
     }
-    // Future Facebook / Instagram / Threads / YouTube / TikTok posts schedule NATIVELY through
+    // Future Facebook / Instagram / Threads / TikTok posts schedule NATIVELY through
     // our own apps (no PostPeer): we mark the post 'scheduled' and a cron publishes it at the set time.
-    if(p.platform==='facebook'||p.platform==='instagram'||p.platform==='threads'||p.platform==='youtube'||p.platform==='tiktok'){
+    // (YouTube is NOT here — it schedules through PostPeer via the path below.)
+    if(p.platform==='facebook'||p.platform==='instagram'||p.platform==='threads'||p.platform==='tiktok'){
       if(p.platform==='instagram'&&!media.find(m=>m.type==='image'||m.type==='video')){
         toast('Instagram needs an image or video attached to schedule.');return;
       }
-      // YouTube & TikTok schedule natively too, but they require a video (mirrors the IG guard).
-      if((p.platform==='youtube'||p.platform==='tiktok')&&!media.find(m=>m.type==='video')){
-        toast((p.platform==='youtube'?'YouTube':'TikTok')+' needs a video attached to schedule.');return;
+      // TikTok schedules natively too, but requires a video (mirrors the IG guard).
+      if(p.platform==='tiktok'&&!media.find(m=>m.type==='video')){
+        toast('TikTok needs a video attached to schedule.');return;
       }
       await sb.from('bbe_posts').update({status:'scheduled'}).eq('id',id);
       closeModal();await loadBoard();render();
