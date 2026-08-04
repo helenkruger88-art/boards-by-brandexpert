@@ -2304,7 +2304,8 @@ function postModal(id,dateStr){
       ${p?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="delPost('${p.id}')">${ic('trash',13)}</button>`:''}
       ${p?`<button class="btn ghost" onclick="copyCaption('${p.id}')">Copy caption</button>`:''}
       ${p?`<button class="btn ghost" onclick="dupModal('${p.id}')" title="Create copies of this post for other platforms — tweak each caption before it goes out">⧉ Also post on…</button>`:''}
-      ${p&&paidAI()&&p.status!=='posted'&&p.platform!=='other'?`<button class="btn" onclick="publishPost('${p.id}')">⏱ Auto-post</button>`:''}
+      ${canManage()&&paidAI()&&(!p||p.status!=='posted')?`<button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="postNowComposer(${p?`'${p.id}'`:'null'})" title="Publish right now — Facebook, Instagram & Threads go live; TikTok uploads to your inbox as a draft to caption & publish in the app">↗ Post now</button>`:''}
+      ${p&&paidAI()&&p.status!=='posted'&&p.platform!=='other'?`<button class="btn" onclick="publishPost('${p.id}')" title="For a future date/time: schedules it to auto-post then">⏱ Auto-post</button>`:''}
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
       <button class="btn accent" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save':'Add to calendar'}</button>
     </div>`);
@@ -2365,6 +2366,42 @@ async function savePost(id){
     if(id){const {error}=await sb.from('bbe_posts').update(row).eq('id',id);if(error)throw error;}
     else{const {error}=await sb.from('bbe_posts').insert(row);if(error)throw error;}
     closeModal();await loadBoard();render();toast(id?'Post updated':'On the calendar');
+  }catch(e){fail(e);}
+}
+// Publish IMMEDIATELY from the composer — works on a brand-new (unsaved) post too.
+// Facebook / Instagram / Threads go live now; TikTok uploads the video to the
+// creator's TikTok inbox as a DRAFT (Content Posting API) to caption & publish in-app.
+async function postNowComposer(existingId){
+  const platform=$('po-plat').value;
+  const caption=$('po-cap').value.trim();
+  const media=_postMedia.filter(m=>m&&m.url);
+  const nm=(PLAT[platform]||PLAT.other)[0];
+  if(!['facebook','instagram','threads','tiktok'].includes(platform)){
+    toast('Post now works for Facebook, Instagram, Threads and TikTok. For '+nm+', set the status to Scheduled instead.');return;
+  }
+  if(platform==='tiktok'&&!media.find(m=>m.type==='video')){toast('TikTok needs a video attached — add one under Images / video first.');return;}
+  if(platform==='instagram'&&!media.find(m=>m.type==='image'||m.type==='video')){toast('Instagram needs an image or video attached first.');return;}
+  if((platform==='facebook'||platform==='threads')&&!caption&&!media.length){toast('Add a caption or media first.');return;}
+  const ask=platform==='tiktok'?'Upload this video to your TikTok inbox as a draft now?':('Publish this to '+nm+' live right now?');
+  if(!confirm(ask))return;
+  const row={workspace_id:WS.id,board_id:S.board,platform,caption,media_note:$('po-media').value.trim(),
+    post_date:$('po-date').value||saDate(),post_time:$('po-time').value||'09:00',created_by:SESSION.user.id,media:_postMedia};
+  let id=existingId;
+  try{
+    if(id){const {error}=await sb.from('bbe_posts').update(row).eq('id',id);if(error)throw error;}
+    else{const {data,error}=await sb.from('bbe_posts').insert(row).select('id').single();if(error)throw error;id=data.id;}
+  }catch(e){fail(e);return;}
+  try{
+    let j;
+    if(platform==='facebook'){toast('Posting to Facebook…');j=await metaApi({action:'publish',board_id:S.board,message:caption});}
+    else if(platform==='instagram'){const img=media.find(m=>m.type==='image');const vid=media.find(m=>m.type==='video');toast('Posting to Instagram…');j=await igApi({action:'publish',caption,image_url:img?img.url:'',video_url:vid?vid.url:''});}
+    else if(platform==='threads'){const img=media.find(m=>m.type==='image');const vid=media.find(m=>m.type==='video');toast('Posting to Threads…');j=await thApi({action:'publish',board_id:S.board,caption,image_url:img?img.url:'',video_url:vid?vid.url:''});}
+    else if(platform==='tiktok'){const vid=media.find(m=>m.type==='video');toast('Uploading to TikTok…');j=await ttApi({action:'publish',board_id:S.board,caption,video_url:vid.url});}
+    if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+    await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',id);
+    closeModal();await loadBoard();render();
+    if(platform==='tiktok')toast('✓ Uploaded to your TikTok inbox as a draft — open the TikTok app to add a caption and publish it.');
+    else toast('Posted to '+nm+' — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
   }catch(e){fail(e);}
 }
 async function delPost(id){
