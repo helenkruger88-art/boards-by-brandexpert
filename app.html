@@ -2419,11 +2419,11 @@ function socStripChips(){
     return `<span class="socic" title="${esc(tip)}">${platBadge(a.platform,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="disconnectSocial('${a.id}')">✕</b>`:''}</span>`;
   });
   // Directly-connected platforms (our own apps) not already shown via PostPeer — de-duped.
-  // View-only chip here; disconnect for these lives in the INBOX row (inboxConnectsHtml).
+  // Each carries its own disconnect ✕ (routes via directDisconnect -> the matching direct API).
   for(const pl of (_directPlatforms||[])){
     if(shown.has(pl))continue; shown.add(pl);
     const nm=(PLAT[pl]||PLAT.other)[0];
-    items.push(`<span class="socic" title="${esc(nm+' · connected')}">${platBadge(pl,26)}</span>`);
+    items.push(`<span class="socic" title="${esc(nm+' · connected')}">${platBadge(pl,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="directDisconnect('${pl}')">✕</b>`:''}</span>`);
   }
   const html=items.join('');
   return html?`<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${html}</span>`:'';
@@ -2438,6 +2438,31 @@ async function disconnectSocial(id){
     const strip=$('soc-strip');
     if(strip)strip.innerHTML=socStripChips()||'<span style="font-size:12.5px;color:var(--muted)">nothing yet — connect below</span>';
     toast(`Disconnected ${j.user||a.user||a.platform}`);
+  }catch(e){fail(e);}
+}
+// Disconnect a DIRECTLY-connected platform (our own apps) from the current board.
+// Facebook & Instagram share one Meta connection (IG rides on the FB Page), so
+// disconnecting either removes both together.
+async function directDisconnect(pl){
+  const nm=(PLAT[pl]||PLAT.other)[0];
+  const metaPair=(pl==='facebook'||pl==='instagram');
+  const msg=metaPair
+    ? 'Disconnect Facebook & Instagram from this board? They share one Meta connection, so both stop together. Auto-posting and Inbox for them stop immediately. You can reconnect any time.'
+    : `Disconnect ${nm} from this board? Auto-posting to it stops immediately. You can reconnect any time.`;
+  if(!confirm(msg))return;
+  try{
+    let j;
+    if(pl==='tiktok')j=await ttApi({action:'disconnect',board_id:S.board});
+    else if(pl==='threads')j=await thApi({action:'disconnect',board_id:S.board});
+    else if(metaPair)j=await metaApi({action:'disconnect',board_id:S.board});
+    else return;
+    if(j&&j.error){toast(j.message||j.error);return;}
+    _inboxLinks=null;
+    await loadDirectLinks();
+    try{await loadInboxConnects();}catch(_){}
+    const strip=$('soc-strip');
+    if(strip)strip.innerHTML=socStripChips()||'<span style="font-size:12.5px;color:var(--muted)">nothing yet — connect below</span>';
+    toast(`Disconnected ${metaPair?'Facebook & Instagram':nm}`);
   }catch(e){fail(e);}
 }
 async function connectSocial(platform){
@@ -3341,17 +3366,18 @@ async function publishPost(id){
     // YouTube posting stays on PostPeer (falls through to the PostPeer path below) —
     // this keeps the restricted youtube.upload scope (and Google's CASA assessment) off
     // Brand Expert. Brand Expert only reads YouTube comments (Inbox) + analytics.
-    // Post-now on TikTok goes DIRECT through the TikTok app (bbe-tiktok). Needs a video.
-    // (Unaudited apps post as SELF_ONLY/private — the backend enforces & explains this.)
+    // Post-now on TikTok uploads the video to the creator's TikTok inbox as a DRAFT
+    // via bbe-tiktok (Content Posting API, video.upload). Needs a video. The creator
+    // opens the TikTok app and taps once to caption + publish it.
     if(postNow && p.platform==='tiktok'){
       const vid=media.find(m=>m.type==='video');
       if(!vid){toast('TikTok needs a video to publish.');return;}
-      toast('Sending to TikTok…');
+      toast('Uploading to TikTok…');
       const j=await ttApi({action:'publish',board_id:S.board,caption:p.caption,video_url:vid.url});
       if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
       await sb.from('bbe_posts').update({status:'posted'}).eq('id',id);
       closeModal();await loadBoard();render();
-      toast('Sent to TikTok — posts as private (SELF_ONLY) until the app is TikTok-audited');
+      toast('✓ Uploaded to your TikTok inbox as a draft — open the TikTok app to add a caption and publish it.');
       return;
     }
     // Future Facebook / Instagram / Threads / TikTok posts schedule NATIVELY through
