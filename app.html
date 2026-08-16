@@ -236,6 +236,40 @@ main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(
   .cobrand{bottom:14px}
   .settings-grid{grid-template-columns:1fr 1fr}
 }
+
+/* ===== Boards Analytics redesign (injected) ===== */
+#perf-card{display:none!important}
+.an-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+.an-two{display:grid;grid-template-columns:1.35fr 1fr;gap:12px;margin-bottom:12px}
+.an-plats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+.an-kpi{padding:11px 13px}
+.an-kpi .lab{font-size:10.5px;font-weight:800;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
+.an-kpi .num{font-size:23px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.an-kpi .rw{display:flex;align-items:flex-end;justify-content:space-between;gap:6px}
+.an-d{font-size:11.5px;font-weight:800;display:inline-flex;gap:2px;align-items:center}
+.an-d.up{color:var(--ok)}.an-d.dn{color:var(--danger)}
+.an-cardhd{font-size:11px;font-weight:800;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.an-sec{font-size:11px;font-weight:800;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin:16px 2px 8px}
+.an-lg{display:inline-flex;gap:6px;align-items:center;font-size:12px;font-weight:600;color:var(--muted)}
+.an-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+.an-recs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.an-rec{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.an-rec .rk{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+.an-rec .rv{font-size:12.5px;line-height:1.45;color:var(--ink)}
+.an-plat{padding:12px 13px}
+.an-plat .ph{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.an-badge{width:27px;height:27px;border-radius:8px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:11px}
+.an-plat .pn{font-weight:800;font-size:13.5px}
+.an-plat .big{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.an-plat .cap{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.an-mrow{display:flex;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+.an-mrow .mk{font-size:9.5px;color:var(--muted);font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+.an-mrow .mv{font-size:13px;font-weight:800}
+.an-tip{position:fixed;pointer-events:none;background:#23241f;color:#fff;font-size:12px;padding:7px 9px;border-radius:8px;opacity:0;transition:opacity .08s;z-index:99;font-weight:600;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.an-tip .tt{font-size:10.5px;color:#c9c7bd;margin-bottom:3px}
+.an-tip .tr{display:flex;gap:10px;align-items:center;justify-content:space-between}
+@media(max-width:860px){.an-kpis,.an-plats,.an-recs{grid-template-columns:1fr}.an-two{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -974,7 +1008,7 @@ async function saveBoardSetup(){
 /* ============ PLAN CANVAS ============ */
 const PLAN_COLORS=['#0F6E56','#185FA5','#C4356B','#BA7517','#534AB7','#C75B12'];
 let _planConnect=false,_planConnectFrom=null,_planColor=null,_pd=null,_planChannels=null,_planFrameColor=null,_pf=null;
-const PLAN_CHANNELS=['instagram','facebook','youtube','tiktok','threads','linkedin'];
+const PLAN_CHANNELS=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter'];
 function planView(){
   const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
   const nodes=cur.planNodes||[],edges=cur.planEdges||[],frames=cur.planFrames||[];
@@ -2062,7 +2096,7 @@ async function saveAccent(){
   await sb.from('bbe_workspaces').update({theme}).eq('id',WS.id);WS.theme=theme;applyTheme();render();toast('Accent applied');}catch(e){fail(e);}
 }
 /* ============ CONTENT (social calendar) ============ */
-const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],whatsapp:['WhatsApp','#1FA855'],email:['Email','#6E6A62'],appstore:['App Store','#0A84FF'],other:['Other','#8a887e']};
+const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],twitter:['X','#0f1419'],whatsapp:['WhatsApp','#1FA855'],email:['Email','#6E6A62'],appstore:['App Store','#0A84FF'],other:['Other','#8a887e']};
 const PICON={
   facebook:'<svg viewBox="0 0 24 24" width="60%" height="60%" fill="#fff"><path d="M13.5 21v-7h2.3l.4-2.9h-2.7V9.3c0-.8.3-1.4 1.5-1.4H16.4V5.3c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H8.1V14h2.4v7h3z"/></svg>',
   instagram:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17.2" cy="6.8" r="1.15" fill="#fff" stroke="none"/></svg>',
@@ -2244,19 +2278,12 @@ function contentView(){
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
       <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();await loadDirectLinks();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
       <span style="flex:1"></span>
-      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)&&!(_directPlatforms||[]).includes(p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
+      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)&&!(_directPlatforms||[]).includes(p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
     </div>
   </div>`:''}
   <div id="wa-tpl-panel">${waTplPanelHtml()}</div>
   <div id="th-insights"></div>
-  ${(_socAccounts&&_socAccounts.length)?`<div class="card" style="padding:14px;margin-bottom:14px" id="perf-card">
-    <div style="display:flex;align-items:center;gap:8px">
-      <b style="font-size:11px;letter-spacing:.05em;color:var(--muted)">LAST 30 DAYS</b>
-      <span style="flex:1"></span>
-      <button class="btn ghost sm" onclick="boardStats(true)" title="Refresh from the platforms">↻</button>
-    </div>
-    <div id="perf-body" style="margin-top:8px">${(()=>{setTimeout(()=>boardStats(false),120);return '<div class="empty">Loading performance…</div>';})()}</div>
-  </div>`:''}
+  
   <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">${_cols.join('')||'<div class="empty" style="flex:1;text-align:center;padding:40px">All columns hidden — use the Tasks / Calendar / Inbox buttons above to bring them back.</div>'}</div>`;
 }
 async function switchContentBoard(id){
@@ -3224,6 +3251,114 @@ async function anInsight(force){
   if(r&&r.ok){ if(!_an)_an={}; _an.digest={body:r.insight,period:r.period}; const h=document.getElementById('an-body'); if(h)h.innerHTML=anBody(); if(force&&r.credits_left!=null)toast('Insight updated · '+r.credits_left+' credits left'); }
   else anFail(r);
 }
+
+/* ===== BEGIN Boards Analytics redesign (injected) ===== */
+let _anPlat=null;
+const AN_SRC=['tiktok','instagram','facebook','youtube','threads','social'];
+const AN_SRCMAP={tiktok:'tiktok',instagram:'instagram',facebook:'facebook',youtube:'youtube',threads:'threads',social:'linkedin'};
+async function anLoadPlatforms(){
+  _anPlat={platforms:[],totals:{},kpiSeries:{},kpiDelta:{},accounts:0};
+  try{
+    const d60=new Date(Date.now()-60*864e5).toISOString().slice(0,10);
+    const {data,error}=await sb.from('bbe_metrics').select('source,metric,value,captured_for').eq('board_id',S.board).in('source',AN_SRC).gte('captured_for',d60).order('captured_for');
+    if(error||!data||!data.length)return;
+    const bySrc={};
+    for(const r of data){const s=r.source,m=r.metric;(bySrc[s]=bySrc[s]||{});(bySrc[s][m]=bySrc[s][m]||[]).push({d:r.captured_for,v:Number(r.value)||0});}
+    const d30=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+    const dayList=[];for(let i=29;i>=0;i--)dayList.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+    const latest=a=>a&&a.length?a[a.length-1].v:0;
+    const agoVal=a=>{if(!a)return null;let v=null;for(const p of a){if(p.d<=d30)v=p.v;}return v;};
+    const series30=a=>{if(!a||!a.length)return dayList.map(d=>({d,v:0}));const map={};a.forEach(p=>map[p.d]=p.v);let last=0;for(const p of a){if(p.d<dayList[0])last=p.v;}return dayList.map(d=>{if(map[d]!=null)last=map[d];return {d,v:last};});};
+    const METR=['reach','impressions','likes','comments','shares','views','posts'];
+    const plats=[],totals={};METR.forEach(m=>totals[m]=0);let accounts=0;
+    for(const src of AN_SRC){
+      const g=bySrc[src];if(!g)continue;
+      const t={};METR.forEach(m=>t[m]=latest(g[m]));
+      if(!METR.some(m=>t[m]>0))continue;
+      const key=AN_SRCMAP[src]||'other',meta=(typeof PLAT!=='undefined'&&PLAT[key])?PLAT[key]:['Other','#8a887e'];
+      const primary=t.reach>0?'reach':'views';
+      const denom=t.reach||t.views||0,er=denom>0?((t.likes+t.comments+t.shares)/denom*100):null;
+      const curP=primary==='reach'?t.reach:t.views,agoP=agoVal(g[primary]);
+      const delta=(agoP&&agoP>0)?Math.round((curP-agoP)/agoP*100):null;
+      plats.push({key,name:meta[0],color:meta[1],mono:key.slice(0,2).toUpperCase(),totals:t,primary,series:series30(g[primary]),er,delta});
+      METR.forEach(m=>totals[m]+=t[m]);accounts++;
+    }
+    const kpiSeries={},kpiDelta={};
+    const sumSeriesFor=metric=>{const per=AN_SRC.map(s=>bySrc[s]&&bySrc[s][metric]?series30(bySrc[s][metric]):null).filter(Boolean);return dayList.map((d,i)=>({d,v:per.reduce((a,arr)=>a+(arr[i]?arr[i].v:0),0)}));};
+    const sumAgo=metric=>{let tot=0,any=false;for(const s of AN_SRC){const a=agoVal(bySrc[s]&&bySrc[s][metric]);if(a!=null){tot+=a;any=true;}}return any?tot:null;};
+    ['reach','impressions','views','posts'].forEach(m=>{kpiSeries[m]=sumSeriesFor(m);const ago=sumAgo(m);kpiDelta[m]=(ago&&ago>0)?Math.round((totals[m]-ago)/ago*100):null;});
+    const lS=sumSeriesFor('likes'),cS=sumSeriesFor('comments'),sS=sumSeriesFor('shares');
+    kpiSeries.engagements=dayList.map((d,i)=>({d,v:lS[i].v+cS[i].v+sS[i].v}));
+    const engCur=totals.likes+totals.comments+totals.shares,la=sumAgo('likes'),ca=sumAgo('comments'),sa=sumAgo('shares');
+    const engAgo=(la==null&&ca==null&&sa==null)?null:((la||0)+(ca||0)+(sa||0));
+    kpiDelta.engagements=(engAgo&&engAgo>0)?Math.round((engCur-engAgo)/engAgo*100):null;
+    _anPlat={from:d30,accounts,totals,kpiSeries,kpiDelta,platforms:plats};
+  }catch(e){/* keep empty _anPlat */}
+}
+function anSparkSvg(series,color,h){h=h||34;const vals=(series||[]).map(p=>Number(p.v)||0);if(vals.length<2)return '<div style="font-size:11px;color:var(--muted);margin-top:6px">Trend builds up over the next few days.</div>';const w=200,mn=Math.min(...vals),mx=Math.max(...vals),rng=(mx-mn)||1;const pts=vals.map((v,i)=>[i/(vals.length-1)*w,h-3-((v-mn)/rng)*(h-6)]);const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');return '<svg width="100%" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" style="height:'+h+'px;margin-top:6px;display:block"><path d="'+d+' L '+w+' '+h+' L 0 '+h+' Z" fill="'+color+'" opacity="0.08"/><path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>';}
+let _anLineData=null;
+function anLineSvg(plats){
+  const W=980,H=250,pad={l:38,r:14,t:12,b:24},iw=W-pad.l-pad.r,ih=H-pad.t-pad.b;
+  const withData=plats.filter(p=>(p.series||[]).some(x=>x.v>0)),use=withData.length?withData:plats;
+  const maxY=Math.max(1,...use.flatMap(p=>(p.series||[]).map(x=>x.v)))*1.12;
+  const n=Math.max(...use.map(p=>(p.series||[]).length),2),X=i=>pad.l+i/(n-1)*iw,Y=v=>pad.t+ih-(v/maxY)*ih;
+  let g='';
+  for(let k=0;k<=4;k++){const gy=pad.t+ih-(k/4)*ih;g+='<line x1="'+pad.l+'" y1="'+gy+'" x2="'+(W-pad.r)+'" y2="'+gy+'" stroke="var(--line)" stroke-width="1"/><text x="'+(pad.l-7)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="var(--muted)">'+anNum(maxY*k/4)+'</text>';}
+  [0,Math.floor((n-1)/2),n-1].forEach(i=>{g+='<text x="'+X(i)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10" fill="var(--muted)">Day '+(i+1)+'</text>';});
+  use.forEach(p=>{const s=p.series||[];if(!s.length)return;const d=s.map((x,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(x.v).toFixed(1)).join(' ');g+='<path d="'+d+'" fill="none" stroke="'+p.color+'" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round"/>';const li=s.length-1;g+='<circle cx="'+X(li)+'" cy="'+Y(s[li].v)+'" r="3.2" fill="'+p.color+'" stroke="#fff" stroke-width="1.6"/>';});
+  _anLineData={use:use.map(p=>({name:p.name,color:p.color,vals:(p.series||[]).map(x=>x.v)})),W,pad,iw,n};
+  return '<svg id="an-line" width="100%" viewBox="0 0 '+W+' '+H+'" style="height:auto;display:block">'+g+'<line id="an-cross" x1="0" x2="0" y1="'+pad.t+'" y2="'+(pad.t+ih)+'" stroke="var(--ink)" stroke-width="1" opacity="0"/><rect id="an-hit" x="'+pad.l+'" y="'+pad.t+'" width="'+iw+'" height="'+ih+'" fill="transparent"/></svg>';
+}
+function anWireLineHover(){
+  const el=document.getElementById('an-line');if(!el||!_anLineData)return;const D=_anLineData,tip=document.getElementById('an-tip'),cross=document.getElementById('an-cross');if(!tip)return;
+  const X=i=>D.pad.l+i/(D.n-1)*D.iw;
+  el.addEventListener('mousemove',ev=>{const r=el.getBoundingClientRect();const sx=(ev.clientX-r.left)/r.width*D.W;let i=Math.round((sx-D.pad.l)/D.iw*(D.n-1));i=Math.max(0,Math.min(D.n-1,i));cross.setAttribute('x1',X(i));cross.setAttribute('x2',X(i));cross.setAttribute('opacity','.3');tip.style.opacity=1;tip.style.left=(ev.clientX+14)+'px';tip.style.top=(ev.clientY-10)+'px';tip.innerHTML='<div class="tt">Day '+(i+1)+'</div>'+D.use.map(p=>'<div class="tr"><span><span class="an-dot" style="background:'+p.color+';margin-right:6px"></span>'+esc(p.name)+'</span><b>'+anNum(p.vals[i]||0)+'</b></div>').join('');});
+  el.addEventListener('mouseleave',()=>{cross.setAttribute('opacity','0');tip.style.opacity=0;});
+}
+function anBarsSvg(plats){const rows=plats.map(p=>({p,val:(p.totals.likes||0)+(p.totals.comments||0)+(p.totals.shares||0)})).sort((a,b)=>b.val-a.val);const max=Math.max(1,...rows.map(r=>r.val)),W=430,rh=34,pad=96;let g='';rows.forEach((r,i)=>{const y=i*rh+8,bw=(r.val/max)*(W-pad-40);g+='<text x="0" y="'+(y+14)+'" font-size="12.5" font-weight="700" fill="var(--ink)">'+esc(r.p.name)+'</text><rect x="'+pad+'" y="'+(y+3)+'" width="'+(W-pad-40)+'" height="14" rx="5" fill="var(--line)"/><rect x="'+pad+'" y="'+(y+3)+'" width="'+Math.max(4,bw)+'" height="14" rx="5" fill="'+r.p.color+'"><title>'+esc(r.p.name)+': '+r.val+'</title></rect><text x="'+(pad+Math.max(4,bw)+7)+'" y="'+(y+14)+'" font-size="12" font-weight="800" fill="var(--muted)">'+r.val+'</text>';});return '<svg width="100%" viewBox="0 0 '+W+' '+(rows.length*rh+8)+'" style="height:auto;margin-top:4px">'+g+'</svg>';}
+function anDonutSvg(plats){const T=plats.map(p=>({p,val:p.totals.reach||p.totals.views||0})).filter(t=>t.val>0).sort((a,b)=>b.val-a.val);const tot=T.reduce((a,b)=>a+b.val,0)||1;const cx=88,cy=100,r=66,ri=42;let a0=-Math.PI/2,g='';T.forEach(t=>{const f=t.val/tot,a1=a0+f*Math.PI*2,la=f>.5?1:0;const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1),xi0=cx+ri*Math.cos(a1),yi0=cy+ri*Math.sin(a1),xi1=cx+ri*Math.cos(a0),yi1=cy+ri*Math.sin(a0);g+='<path d="M '+x0+' '+y0+' A '+r+' '+r+' 0 '+la+' 1 '+x1+' '+y1+' L '+xi0+' '+yi0+' A '+ri+' '+ri+' 0 '+la+' 0 '+xi1+' '+yi1+' Z" fill="'+t.p.color+'" stroke="#fff" stroke-width="2"><title>'+esc(t.p.name)+': '+Math.round(f*100)+'%</title></path>';a0=a1;});g+='<text x="'+cx+'" y="'+(cy-3)+'" text-anchor="middle" font-size="19" font-weight="800" fill="var(--ink)">'+anNum(tot)+'</text><text x="'+cx+'" y="'+(cy+13)+'" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--muted)">TOTAL REACH</text>';const leg=T.map(t=>'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0"><span class="an-lg"><span class="an-dot" style="background:'+t.p.color+'"></span>'+esc(t.p.name)+'</span><b style="font-size:12.5px">'+Math.round(t.val/tot*100)+'%</b></div>').join('');return '<div style="display:flex;gap:6px;align-items:center;margin-top:2px"><svg width="176" height="200" viewBox="0 0 176 200" style="flex:0 0 176px">'+g+'</svg><div style="flex:1">'+leg+'</div></div>';}
+function anKpiRowHtml(){const P=_anPlat,defs=[['Reach','reach'],['Impressions','impressions'],['Engagements','engagements'],['Views','views'],['Posts','posts']],tot=P.totals||{},eng=(tot.likes||0)+(tot.comments||0)+(tot.shares||0),val=k=>k==='engagements'?eng:(tot[k]||0);return '<div class="an-kpis">'+defs.map(([lab,k])=>{const d=(P.kpiDelta||{})[k],dd=(d==null)?'':'<span class="an-d '+(d>=0?'up':'dn')+'">'+(d>=0?'▲':'▼')+' '+Math.abs(d)+'%</span>',col=(d>=0)?'var(--ok)':'var(--danger)';return '<div class="card an-kpi"><div class="lab">'+lab+'</div><div class="rw"><div class="num">'+anNum(val(k))+'</div>'+dd+'</div>'+anSparkSvg((P.kpiSeries||{})[k],col,30)+'</div>';}).join('')+'</div>';}
+function anPlatCard(p){const t=p.totals,primary=p.primary==='views'?t.views:(t.reach||t.views||0);return '<div class="card an-plat"><div class="ph"><span class="an-badge" style="background:'+p.color+'">'+(p.mono||p.name.slice(0,2).toUpperCase())+'</span><span class="pn">'+esc(p.name)+'</span></div><div class="cap">'+(p.primary==='views'?'Views':'Reach')+' · 30d</div><div class="big">'+anNum(primary)+'</div>'+anSparkSvg(p.series,p.color,32)+'<div class="an-mrow"><div><span class="mk">Posts</span><br><span class="mv">'+anNum(t.posts)+'</span></div><div><span class="mk">Likes</span><br><span class="mv">'+anNum(t.likes)+'</span></div><div><span class="mk">Eng.</span><br><span class="mv">'+(p.er!=null?p.er.toFixed(1)+'%':'—')+'</span></div><div><span class="mk">Δ</span><br><span class="mv" style="color:'+((p.delta>=0)?'var(--ok)':'var(--danger)')+'">'+(p.delta==null?'—':((p.delta>=0?'+':'')+p.delta+'%'))+'</span></div></div></div>';}
+function anRecos(){
+  const P=_anPlat||{},plats=(P.platforms||[]).filter(p=>p.delta!=null||p.er!=null),recs=[];
+  const grow=plats.filter(p=>p.delta!=null).sort((a,b)=>b.delta-a.delta)[0];
+  if(grow&&grow.delta>0)recs.push(['▲ Lean in','Double down on '+esc(grow.name)+' — your fastest-growing channel (+'+grow.delta+'%). Give it more posts this week.']);
+  const dec=plats.filter(p=>p.delta!=null).sort((a,b)=>a.delta-b.delta)[0];
+  if(dec&&dec.delta<0)recs.push(['◆ Fix',esc(dec.name)+' is slipping ('+dec.delta+'%). Test new formats, or repost your best content there.']);
+  else{const le=plats.filter(p=>p.er!=null).sort((a,b)=>a.er-b.er)[0];if(le)recs.push(['◆ Fix',esc(le.name)+' has the lowest engagement ('+le.er.toFixed(1)+'%). Try a stronger hook or a clearer call-to-action.']);}
+  const top=(((_an.analytics||{}).top)||[])[0];
+  if(top)recs.push(['✎ Plan','Your top post was on '+esc(((typeof PLAT!=='undefined'&&PLAT[top.platform])||[top.platform||''])[0])+': “'+esc((top.content||'').slice(0,55))+'”. Build next month’s plan around what worked.']);
+  else{const be=plats.filter(p=>p.er!=null).sort((a,b)=>b.er-a.er)[0];if(be)recs.push(['✎ Plan',esc(be.name)+' has your best engagement — make more content in that style.']);}
+  if(!recs.length)return '';
+  return '<div class="an-recs">'+recs.slice(0,3).map(x=>'<div class="an-rec"><div class="rk">'+x[0]+'</div><div class="rv">'+x[1]+'</div></div>').join('')+'</div>';
+}
+function anAiCard(){
+  const r=_an,has=r.digest&&r.digest.body;
+  const btn=canManage()?('<button class="btn ghost sm" onclick="anInsight('+(has?'true':'false')+')" title="'+(has?'Regenerate — uses 1 credit':'Let AI read your numbers')+'">'+(has?'↻ Regenerate (1 credit)':'✦ Generate summary')+'</button>'):'';
+  const body=has?('<div style="font-size:13.5px;line-height:1.55">'+esc(r.digest.body)+'</div>'):('<div style="font-size:13px;color:var(--muted)">Let AI read your numbers and tell you the one thing that matters — then see your recommended next moves below.</div>');
+  return '<div class="card" style="padding:14px 16px;margin-bottom:12px;border-left:4px solid var(--accent);background:var(--accent-soft)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b style="font-size:10.5px;font-weight:800;letter-spacing:.05em;color:var(--accent)">✦ AI SUMMARY'+(r.goal_label?' · '+esc(r.goal_label):'')+'</b><span style="flex:1"></span>'+btn+'</div>'+body+anRecos()+'</div>';
+}
+function anKpiBandHtml(){const r=_an,kpis=r.kpis||[],cards=kpis.map(k=>{const pct=Math.round((k.pct||0)*100),onT=k.projected>=k.target,bc=onT?'var(--ok)':(pct>60?'var(--warn)':'var(--danger)');return '<div class="card" style="padding:12px 14px;flex:1;min-width:190px"><div style="display:flex;align-items:center;gap:6px"><b style="font-size:13px">'+esc((typeof AN_MNAME!=='undefined'&&AN_MNAME[k.metric])||k.metric)+'</b>'+(k.origin==='ai'?'<span class="pill" style="background:var(--accent);font-size:9px">AI</span>':'')+'<span style="flex:1"></span>'+(canManage()?'<button style="color:var(--muted);background:none;border:none;cursor:pointer" title="Remove KPI" onclick="anKpiRemove(\''+k.id+'\')">✕</button>':'')+'</div><div style="font-size:20px;font-weight:800;margin:4px 0 2px">'+anNum(k.current)+' <span style="font-size:12px;font-weight:600;color:var(--muted)">/ '+anNum(k.target)+'</span></div><div style="height:7px;background:rgba(0,0,0,.07);border-radius:4px;overflow:hidden;margin:5px 0"><i style="display:block;height:100%;width:'+Math.min(100,pct)+'%;background:'+bc+';border-radius:4px"></i></div><div style="font-size:11px;color:var(--muted)">Projected <b style="color:'+(onT?'var(--ok)':'var(--danger)')+'">'+anNum(k.projected)+'</b>'+(k.period_end?' by '+new Date(k.period_end).toLocaleDateString('en-ZA',{day:'numeric',month:'short'}):'')+' · '+(onT?'on track ✓':(k.gap>0?('short by '+anNum(k.gap)):'—'))+'</div></div>';}).join('');return '<div class="an-sec" style="display:flex;align-items:center;gap:8px">KPIs &amp; Pace<span style="flex:1"></span>'+(canManage()?'<button class="btn ghost sm" onclick="anKpiAdd()">+ Set a KPI</button>':'')+'</div>'+(kpis.length?'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">'+cards+'</div>':'<div class="empty" style="padding:14px;text-align:center;font-size:12.5px">No KPI yet. '+(canManage()?'Set a target and I\'ll track your pace and predict whether you reach it.':'')+'</div>');}
+function anTopHtml(){const top=((_an.analytics||{}).top)||[];if(!top.length)return '';return '<div class="an-sec">Top posts</div><div class="card" style="padding:6px 14px">'+top.map(p=>'<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><span class="pill" style="background:'+(((typeof PLAT!=='undefined'&&PLAT[p.platform])||['',''])[1]||'#888')+';flex:none">'+(((typeof PLAT!=='undefined'&&PLAT[p.platform])||[p.platform||''])[0])+'</span><span style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.content||'(no caption)')+'</span><span style="font-size:11.5px;color:var(--muted);flex:none;font-weight:700">♥ '+anNum(p.likes)+' · 💬 '+anNum(p.comments)+'</span></div>').join('')+'</div>';}
+function anBody(){
+  const r=_an;if(!r||r.error)return '<div class="empty" style="padding:40px;text-align:center">'+esc((r&&r.error)||'Could not load analytics.')+'</div>';
+  const P=_anPlat||{platforms:[]},plats=(P.platforms||[]).filter(p=>p.totals&&(p.totals.posts>0||p.totals.reach>0||p.totals.views>0||p.totals.likes>0));
+  const ai=anAiCard();
+  if(!plats.length){return ai+'<div class="empty" style="padding:30px 20px;text-align:center"><div style="font-size:14px;font-weight:700;margin-bottom:6px">No numbers yet</div><div style="font-size:12.5px;color:var(--muted);max-width:440px;margin:0 auto;line-height:1.55">Connect a social account on the <b>Content</b> tab and publish through Boards — per-platform reach, engagement and top posts appear here.</div></div>'+anKpiBandHtml();}
+  const trend='<div class="card" style="padding:14px 16px;margin-bottom:12px"><div class="an-cardhd">Reach — last 30 days, by platform<span style="flex:1"></span>'+plats.map(p=>'<span class="an-lg"><span class="an-dot" style="background:'+p.color+'"></span>'+esc(p.name)+'</span>').join('')+'</div>'+anLineSvg(plats)+'</div>';
+  const two='<div class="an-two"><div class="card" style="padding:14px 16px"><div class="an-cardhd">Engagement by platform</div>'+anBarsSvg(plats)+'</div><div class="card" style="padding:14px 16px"><div class="an-cardhd">Share of reach</div>'+anDonutSvg(plats)+'</div></div>';
+  const cards='<div class="an-sec">Per-platform breakdown</div><div class="an-plats">'+plats.map(anPlatCard).join('')+'</div>';
+  setTimeout(anWireLineHover,30);
+  return ai+anKpiRowHtml()+trend+two+cards+anKpiBandHtml()+anTopHtml();
+}
+async function anLoad(force){
+  const r=await anApi({action:'overview'});_an=r;
+  try{await anLoadPlatforms();}catch(_e){}
+  const h=document.getElementById('an-body');if(h)h.innerHTML=anBody();
+}
+/* ===== END Boards Analytics redesign (injected) ===== */
+
+
 function inboxView(){
   setTimeout(async()=>{await loadInbox();const el=document.getElementById('inbox-list');if(el)el.outerHTML=inboxListHtml();},60);
   return `<div class="view-title"><h2>${ic('mail',18)} Inbox</h2>
@@ -3822,5 +3957,6 @@ async function doResetPw(){
   closeModal();await boot();toast('🔑 Password updated');}catch(e){fail(e);}
 }
 </script>
+<div class="an-tip" id="an-tip"></div>
 </body>
 </html>
