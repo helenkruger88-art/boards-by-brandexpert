@@ -2453,7 +2453,7 @@ async function socialApi(body){
     body:JSON.stringify({workspace_id:WS.id,...body})});
   return await res.json();
 }
-let _cbUsed=0,_cbAllowed=1;
+let _cbUsed=0,_cbAllowed=1,_socRenderedFor=null;
 async function loadSocials(){
   if(!S.board){_socAccounts=[];return;}
   try{const j=await socialApi({action:'accounts',board_id:S.board});
@@ -2461,7 +2461,10 @@ async function loadSocials(){
   if(j.content_boards_used!==undefined){_cbUsed=j.content_boards_used;_cbAllowed=j.content_boards_allowed;}
   const el=$('soc-list'); if(el)el.innerHTML=socListHtml();
   loadInboxConnects();
-  if(S.view==='content'&&_socAccounts.length&&!document.getElementById('perf-card'))render();}catch(_){_socAccounts=[];}
+  // Re-render once per board when social accounts first load (so the "posts to" strip reflects them).
+  // Guard on the board id — NOT on a #perf-card element (that strip was removed in the analytics
+  // redesign, so the old check was always true and looped render() → loadSocials() → render() forever.)
+  if(S.view==='content'&&_socRenderedFor!==S.board){_socRenderedFor=S.board;render();}}catch(_){_socAccounts=[];}
 }
 function socListHtml(){
   if(_socAccounts===null)return '<div class="empty">Checking connections…</div>';
