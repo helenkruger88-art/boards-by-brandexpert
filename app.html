@@ -3958,5 +3958,589 @@ async function doResetPw(){
 }
 </script>
 <div class="an-tip" id="an-tip"></div>
+<style id="dash-css">
+/* ===== Customizable Home Dashboard ===== */
+.dash-wrap{position:relative}
+.dash-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:4px 2px 14px}
+.dash-h{font-size:20px;display:flex;align-items:center;gap:8px;margin:0}
+.dash-sub{color:var(--muted);font-size:13px;font-weight:500;margin-top:3px}
+.dash-tools{display:flex;align-items:center;gap:8px}
+.dash-modehint{display:none;font-size:12px;font-weight:600;color:var(--accent);background:rgba(199,91,18,.10);padding:5px 10px;border-radius:20px}
+body.dash-editing .dash-modehint{display:inline-flex}
+
+.grid-stack{margin:0 -6px}
+.grid-stack-item-content{inset:6px !important;width:auto !important;height:auto !important;overflow:visible;border-radius:14px}
+.dw{background:var(--card);border:1px solid var(--line);border-radius:14px;height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 2px rgba(30,25,20,.04),0 6px 16px rgba(30,25,20,.05)}
+.dw-head{display:flex;align-items:center;gap:8px;padding:10px 12px 7px;flex:0 0 auto}
+.dw-title{font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--ink);display:flex;align-items:center;gap:7px;min-width:0}
+.dw-tl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dw-ic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(199,91,18,.10);flex:0 0 auto}
+.dw-tools{margin-left:auto;display:none;gap:2px;flex:0 0 auto}
+body.dash-editing .dw-tools{display:flex}
+.dw-tools button{border:none;background:transparent;color:var(--muted);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
+.dw-tools button:hover{background:var(--bg);color:var(--ink)}
+.dw-body{padding:2px 12px 12px;flex:1;overflow:auto}
+.dw-body::-webkit-scrollbar{width:7px}
+.dw-body::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+.dw-mute{color:var(--muted);font-size:12px}
+body.dash-editing .grid-stack-item{cursor:grab}
+body.dash-editing .dw{outline:1.5px dashed transparent}
+body.dash-editing .grid-stack-item:hover .dw{outline-color:rgba(199,91,18,.45)}
+body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{display:none !important}
+
+/* goal */
+.dw-goal{display:flex;gap:13px;align-items:center;height:100%}
+.dw-ring{position:relative;flex:0 0 auto}
+.dw-rv{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.dw-rv b{font-size:15px;letter-spacing:-.3px}
+.dw-rv small{font-size:8.5px;color:var(--muted);font-weight:600}
+.dw-gmeta{min-width:0}
+.dw-glab{font-size:14px;font-weight:700;letter-spacing:-.2px;margin-bottom:3px}
+.dw-gnum{font-size:13px;font-weight:600}
+.dw-gnum s{color:var(--muted);text-decoration:none;font-weight:500}
+.dw-gbar{height:7px;border-radius:6px;background:var(--bg);overflow:hidden;margin-top:8px}
+.dw-gbar>i{display:block;height:100%;border-radius:6px;background:var(--accent)}
+.dw-gsub{font-size:11px;color:var(--muted);margin-top:7px;display:flex;gap:5px;flex-wrap:wrap}
+.dw-pill{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em}
+.dw-pill.link{background:rgba(47,158,95,.14);color:var(--ok)}
+.dw-pill.manual{background:var(--bg);color:var(--muted)}
+.dw-pill.due{background:rgba(217,149,18,.16);color:var(--warn,#b9770c)}
+
+/* analytics */
+.dw-cap{font-size:11.5px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+.dw-big{font-size:26px;font-weight:800;letter-spacing:-1px;line-height:1.05}
+.dw-delta{font-size:11.5px;font-weight:700}
+.dw-delta.up{color:var(--ok)} .dw-delta.down{color:var(--danger)}
+.dw-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.dw-bars{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.dw-brow{display:flex;align-items:center;gap:8px;font-size:11.5px}
+.dw-bn{width:78px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.dw-bar{flex:1;height:8px;background:var(--bg);border-radius:6px;overflow:hidden}
+.dw-bar>i{display:block;height:100%;border-radius:6px}
+.dw-bv{width:42px;text-align:right;font-weight:700;flex:0 0 auto}
+
+/* calendar / agenda */
+.dw-srcbadge{font-size:10.5px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.dw-ag{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.dw-ag:last-child{border-bottom:none}
+.dw-when{flex:0 0 42px;text-align:center}
+.dw-when b{display:block;font-size:16px;letter-spacing:-.5px}
+.dw-when small{font-size:9.5px;color:var(--muted);text-transform:uppercase;font-weight:700}
+.dw-what{min-width:0}
+.dw-what .t{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dw-what .m{font-size:11px;color:var(--muted);margin-top:2px}
+.dw-connect{text-align:center;padding:10px 6px}
+.dw-connect p{margin:6px 0 10px}
+
+/* notes */
+.dw-note{width:100%;height:100%;min-height:70px;border:none;resize:none;font-family:inherit;font-size:13px;line-height:1.6;color:var(--ink);background:transparent}
+.dw-note:focus{outline:none}
+
+/* boards + links */
+.dw-boards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
+.dw-bc{border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:11px;padding:10px 11px;cursor:pointer;background:var(--card)}
+.dw-bc:hover{background:var(--bg)}
+.dw-bt{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dw-bprog{height:6px;border-radius:5px;background:var(--bg);overflow:hidden;margin:9px 0 5px}
+.dw-bprog>i{display:block;height:100%;border-radius:5px;background:var(--accent)}
+.dw-bmeta{font-size:10.5px;color:var(--muted)}
+.dw-bnew{border-top-color:var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:600;font-size:12.5px}
+.dw-links{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dw-links a{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink);font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dw-links a:hover{background:var(--bg)}
+.dw-lsq{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
+
+/* empty */
+.dash-empty{text-align:center;padding:56px 20px;color:var(--muted)}
+.dash-empty b{display:block;font-size:16px;color:var(--ink);margin-bottom:6px}
+
+/* modals */
+.dw-scrim{position:fixed;inset:0;background:rgba(28,24,20,.42);display:none;align-items:center;justify-content:center;z-index:2000;padding:20px}
+.dw-scrim.on{display:flex}
+.dw-modal{background:var(--card);border-radius:18px;width:100%;max-width:640px;max-height:86vh;overflow:auto;box-shadow:0 30px 80px rgba(20,15,10,.3)}
+.dw-modal.sm{max-width:460px}
+.dw-mh{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card)}
+.dw-mh h3{margin:0;font-size:16px}
+.dw-x{margin-left:auto;border:none;background:transparent;font-size:19px;color:var(--muted);cursor:pointer;width:32px;height:32px;border-radius:8px}
+.dw-x:hover{background:var(--bg)}
+.dw-mb{padding:18px 20px}
+.dw-mf{display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--card)}
+.dw-cat{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.dw-catcard{border:1px solid var(--line);border-radius:13px;padding:13px;cursor:pointer;display:flex;gap:11px;align-items:flex-start;transition:.12s}
+.dw-catcard:hover{border-color:var(--accent);background:var(--bg);transform:translateY(-1px)}
+.dw-ci{width:34px;height:34px;border-radius:9px;background:rgba(199,91,18,.10);display:flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
+.dw-ct b{font-size:13.5px;display:block}
+.dw-ct span{font-size:11.5px;color:var(--muted);line-height:1.4;display:block;margin-top:2px}
+.dw-fld{margin-bottom:14px}
+.dw-fld label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
+.dw-fld input,.dw-fld select,.dw-fld textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-family:inherit;font-size:13px;background:var(--card);color:var(--ink)}
+.dw-fld input:focus,.dw-fld select:focus{outline:none;border-color:var(--accent)}
+.dw-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dw-seg{display:flex;gap:6px;background:var(--bg);padding:4px;border-radius:10px}
+.dw-seg button{flex:1;border:none;background:transparent;padding:8px;border-radius:7px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.dw-seg button.on{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.dw-hint{font-size:11.5px;color:var(--muted);background:var(--bg);border-radius:9px;padding:9px 11px;line-height:1.5}
+
+</style>
+<script id="dash-js">
+/* ============================================================
+   CUSTOMIZABLE HOME DASHBOARD  (appended module, overrides boardsView)
+   Personal widget grid per member. Layout persisted to bbe_dashboard.
+   ============================================================ */
+(function(){
+  if(window.__dashLoaded)return; window.__dashLoaded=true;
+
+  /* ---------- small helpers (defensive re: app globals) ---------- */
+  const E = s => (window.esc? window.esc(s) : String(s==null?'':s));
+  const money = n => (window.Rand? window.Rand(Number(n)||0) : ('R'+(Number(n)||0).toLocaleString('en-ZA')));
+  const num = n => { n=Number(n)||0; return n>=1000? (n/1000).toFixed(n>=10000?0:1)+'k' : (''+n); };
+  const numF = n => (Number(n)||0).toLocaleString('en-ZA');
+  const saD = () => (window.saDate? window.saDate() : new Date().toISOString().slice(0,10));
+  const elFrom = h => { const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
+  function dtoast(m){ if(window.toast) window.toast(m); }
+
+  /* ---------- widget catalog ---------- */
+  const CAT = {
+    goal:     {icon:'🎯', name:'Goal',                desc:'A target — a plain number, or auto-linked to revenue, followers, posts… with an optional deadline.', w:4,h:3},
+    todos:    {icon:'✓',  name:'To-dos',              desc:'Your Today list — check things off right here.', w:4,h:4},
+    notes:    {icon:'📝', name:'Notes',               desc:'A personal scratch pad that stays on your home.', w:4,h:3},
+    calendar: {icon:'📅', name:'Calendar / Meetings', desc:'Upcoming content & deadlines, or connect your Google/Outlook calendar.', w:4,h:4},
+    analytics:{icon:'📈', name:'Analytics snapshot',  desc:'A live reach KPI from your metrics — all platforms or one.', w:5,h:5},
+    inbox:    {icon:'💬', name:'Inbox activity',       desc:'Latest comments & messages across connected accounts.', w:4,h:3},
+    posts:    {icon:'🗓️', name:'Upcoming posts',       desc:'What’s scheduled to go out next.', w:4,h:3},
+    boards:   {icon:'📋', name:'Boards',              desc:'Your boards with live progress.', w:8,h:4},
+    links:    {icon:'🔗', name:'Quick links',         desc:'Jump straight to a board.', w:4,h:2}
+  };
+  const GOAL_SRC = {
+    revenue:    {label:'Revenue (this month)', get:d=>d.revenue,        fmt:money},
+    followers:  {label:'Total followers',      get:d=>d.followers,      fmt:numF},
+    reach:      {label:'Total reach (30d)',    get:d=>d.reach,          fmt:numF},
+    posts:      {label:'Posts published (this month)', get:d=>d.postsPublished, fmt:numF},
+    engagement: {label:'Engagement rate',      get:d=>d.engRate,        fmt:n=>(Number(n)||0).toFixed(1)+'%'}
+  };
+  const DEFAULT_LAYOUT = [
+    {type:'goal', cfg:{label:'Revenue this month', mode:'auto', source:'revenue', target:60000, deadline:''}, x:0,y:0,w:4,h:3},
+    {type:'goal', cfg:{label:'Grow followers', mode:'auto', source:'followers', target:10000, deadline:''}, x:4,y:0,w:4,h:3},
+    {type:'todos', cfg:{}, x:8,y:0,w:4,h:5},
+    {type:'analytics', cfg:{platform:'all'}, x:0,y:3,w:5,h:5},
+    {type:'calendar', cfg:{source:'internal'}, x:5,y:3,w:3,h:5},
+    {type:'posts', cfg:{}, x:8,y:5,w:4,h:4},
+    {type:'inbox', cfg:{}, x:0,y:8,w:5,h:3},
+    {type:'boards', cfg:{}, x:5,y:8,w:7,h:4}
+  ];
+
+  /* ---------- state ---------- */
+  let layout = null;      // array of {id,type,cfg,x,y,w,h}
+  let grid = null;
+  let editing = false;
+  let seq = 1;
+  let dataReady = false;
+  let saveT = null;
+  const D = { revenue:0, followers:0, reach:0, postsPublished:0, engRate:0,
+              spark:[], plats:[], delta:null };
+
+  /* ============ DATA ============ */
+  async function loadData(){
+    dataReady=false;
+    try{
+      // reuse the app's own home loader to populate _home {tasks,inbox,posts,docs,today}
+      if(window.loadHome) await window.loadHome();
+    }catch(_e){}
+    const boardIds=(window.BOARDS||[]).map(b=>b.id);
+    try{
+      const monthStart=saD().slice(0,8)+'01';
+      const [inv, posted, metrics] = await Promise.all([
+        boardIds.length? sb.from('bbe_invoices').select('amount,kind,paid,created_at,board_id').in('board_id',boardIds).eq('kind','in').eq('paid',true).gte('created_at',monthStart) : Promise.resolve({data:[]}),
+        boardIds.length? sb.from('bbe_posts').select('id,status,post_date').eq('workspace_id',WS.id).eq('status','posted').gte('post_date',monthStart) : Promise.resolve({data:[]}),
+        boardIds.length? sb.from('bbe_metrics').select('board_id,source,metric,value,captured_for').in('board_id',boardIds).gte('captured_for',new Date(Date.now()-60*864e5).toISOString().slice(0,10)).order('captured_for') : Promise.resolve({data:[]})
+      ]);
+      D.revenue=(inv.data||[]).reduce((t,x)=>t+(Number(x.amount)||0),0);
+      D.postsPublished=(posted.data||[]).length;
+      aggMetrics(metrics.data||[]);
+    }catch(e){ console.error('dash data',e); }
+    dataReady=true;
+    refreshAllBodies();
+  }
+  function aggMetrics(rows){
+    const SRCMAP={tiktok:'tiktok',instagram:'instagram',facebook:'facebook',youtube:'youtube',threads:'threads',social:'linkedin',linkedin:'linkedin',pinterest:'pinterest',twitter:'twitter'};
+    const days=[]; for(let i=29;i>=0;i--) days.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+    // key = board|source|metric -> sorted points
+    const series={};
+    for(const r of rows){ const k=r.board_id+'|'+r.source+'|'+r.metric; (series[k]=series[k]||[]).push({d:r.captured_for,v:Number(r.value)||0}); }
+    const latest=a=>a&&a.length? a[a.length-1].v : 0;
+    const at=(a,day)=>{ if(!a)return 0; let v=0; for(const p of a){ if(p.d<=day)v=p.v; } return v; };
+    const bySource={}; let followers=0, likes=0, comments=0, shares=0, reachTot=0;
+    const reachSeries=days.map(()=>0);
+    Object.keys(series).forEach(k=>{
+      const [board,src,metric]=k.split('|'); const key=SRCMAP[src]||src; const a=series[k];
+      if(metric==='reach'){ const lv=latest(a); reachTot+=lv; bySource[key]=(bySource[key]||0)+lv; days.forEach((d,i)=>{ reachSeries[i]+=at(a,d); }); }
+      else if(metric==='views'){ /* count views as reach fallback only if no reach for that source later — keep simple: add to plat bar if source has no reach */ }
+      else if(metric==='followers_count') followers+=latest(a);
+      else if(metric==='likes') likes+=latest(a);
+      else if(metric==='comments') comments+=latest(a);
+      else if(metric==='shares') shares+=latest(a);
+    });
+    // views fallback: for sources with no reach, use views for the plat bar + total
+    const viewsBy={};
+    Object.keys(series).forEach(k=>{ const [board,src,metric]=k.split('|'); const key=SRCMAP[src]||src; if(metric==='views'){ viewsBy[key]=(viewsBy[key]||0)+latest(series[k]); } });
+    Object.keys(viewsBy).forEach(key=>{ if(!bySource[key]){ bySource[key]=viewsBy[key]; reachTot+=viewsBy[key]; } });
+    D.followers=followers;
+    D.reach=reachTot;
+    D.engRate= reachTot>0 ? ((likes+comments+shares)/reachTot*100) : 0;
+    D.spark=reachSeries;
+    const first=reachSeries.find(v=>v>0)||0, last=reachSeries[reachSeries.length-1]||0;
+    D.delta= first>0 ? Math.round((last-first)/first*100) : null;
+    D.plats=Object.entries(bySource).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  }
+
+  /* ============ WIDGET BODIES ============ */
+  function ring(pct,inner){
+    const r=26,c=2*Math.PI*r,off=c*(1-Math.max(0,Math.min(pct,1)));
+    return `<div class="dw-ring"><svg width="66" height="66" viewBox="0 0 66 66">
+      <circle cx="33" cy="33" r="${r}" fill="none" stroke="var(--line)" stroke-width="7"/>
+      <circle cx="33" cy="33" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
+        stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 33 33)"/>
+    </svg><div class="dw-rv">${inner}</div></div>`;
+  }
+  function spark(arr,h){ h=h||42; arr=(arr||[]).map(Number);
+    if(arr.length<2||Math.max(...arr)<=0) return `<div class="dw-mute" style="margin-top:8px">Trend builds up over the next few days.</div>`;
+    const w=220,mn=Math.min(...arr),mx=Math.max(...arr),rng=(mx-mn)||1;
+    const pts=arr.map((v,i)=>[i/(arr.length-1)*w, h-5-((v-mn)/rng)*(h-10)]);
+    const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+    return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;margin-top:8px">
+      <path d="${d} L${w} ${h} L0 ${h} Z" fill="var(--accent)" opacity="0.08"/>
+      <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function goalBody(cfg){
+    let cur, target=Number(cfg.target)||0, fmt=numF;
+    if(cfg.mode==='auto'){ const s=GOAL_SRC[cfg.source]||GOAL_SRC.reach; cur=dataReady? s.get(D):0; fmt=s.fmt; }
+    else { cur=Number(cfg.current)||0; const u=cfg.unit||''; fmt=n=> u==='R'? money(n) : (numF(n)+(u&&u!=='R'?' '+u:'')); }
+    const pct= target>0? cur/target : 0;
+    const srcPill= cfg.mode==='auto'
+      ? `<span class="dw-pill link">● Linked · ${E((GOAL_SRC[cfg.source]||{}).label||'')}</span>`
+      : `<span class="dw-pill manual">Manual</span>`;
+    let due='';
+    if(cfg.deadline){ const days=Math.ceil((new Date(cfg.deadline+'T00:00:00')-new Date(saD()+'T00:00:00'))/864e5); if(!isNaN(days)) due=`<span class="dw-pill due">⏳ ${days<0?'past due':days+'d left'}</span>`; }
+    const loading = (cfg.mode==='auto'&&!dataReady)?' style="opacity:.5"':'';
+    return `<div class="dw-goal"${loading}>
+      ${ring(pct, `<b>${Math.round(pct*100)}%</b><small>of goal</small>`)}
+      <div class="dw-gmeta">
+        <div class="dw-glab">${E(cfg.label||'My goal')}</div>
+        <div class="dw-gnum">${fmt(cur)} <s>/ ${fmt(target)}</s></div>
+        <div class="dw-gbar"><i style="width:${Math.min(100,pct*100)}%"></i></div>
+        <div class="dw-gsub">${srcPill}${due}</div>
+      </div></div>`;
+  }
+  function analyticsBody(cfg){
+    if(!dataReady) return `<div class="dw-mute" style="padding:10px 0">Loading metrics…</div>`;
+    const plat=cfg.platform||'all';
+    if(plat==='all'){
+      if(!D.reach) return `<div class="dw-mute" style="padding:10px 0">No metrics yet. Connect an account on the Content tab and analytics start flowing here.</div>`;
+      const mx=D.plats.length?D.plats[0][1]:1;
+      const bars=D.plats.map(([k,v])=>{ const p=(window.PLAT&&PLAT[k])||['?','#8a887e']; return `<div class="dw-brow"><span class="dw-bn"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])}</span><span class="dw-bar"><i style="width:${v/mx*100}%;background:${p[1]}"></i></span><span class="dw-bv">${num(v)}</span></div>`; }).join('');
+      const dd = D.delta==null?'':`<span class="dw-delta ${D.delta>=0?'up':'down'}">${D.delta>=0?'▲':'▼'} ${Math.abs(D.delta)}%</span>`;
+      return `<div class="dw-cap">Total reach · all platforms · 30d</div><div class="dw-big">${numF(D.reach)}</div>${dd?'<div style="margin-top:2px">'+dd+'</div>':''}${spark(D.spark)}<div class="dw-bars">${bars}</div>`;
+    } else {
+      const v=(D.plats.find(x=>x[0]===plat)||[,0])[1];
+      const p=(window.PLAT&&PLAT[plat])||['?','#8a887e'];
+      return `<div class="dw-cap"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])} reach · 30d</div><div class="dw-big">${numF(v)}</div>${spark(D.spark)}`;
+    }
+  }
+  function calBody(cfg){
+    if(cfg.source==='external'){
+      return `<div class="dw-srcbadge">🔗 External calendar</div>
+        <div class="dw-connect">
+          <p class="dw-mute">Connect your Google or Outlook calendar to see real meetings here.</p>
+          <button class="btn" onclick="dashConnectCal()">Connect calendar</button>
+          <div class="dw-mute" style="margin-top:8px;font-size:11px">Coming in the next update — your content schedule works today.</div>
+        </div>`;
+    }
+    const home=window._home||{};
+    const posts=(home.posts||[]).map(p=>({date:p.post_date,label:(p.caption||'').split('\n')[0]||'(no caption)',sub:(PLAT[p.platform]||PLAT.other)[0]+' · scheduled',bid:p.board_id}));
+    const tasks=(home.tasks||[]).map(n=>({date:n.due_date,label:n.title||'Task due',sub:'Deadline',bid:n.board_id}));
+    const items=posts.concat(tasks).filter(x=>x.date).sort((a,b)=>a.date<b.date?-1:1).slice(0,8);
+    if(!items.length) return `<div class="dw-srcbadge">📅 Content schedule</div><div class="dw-mute" style="padding:10px 0">Nothing scheduled yet.</div>`;
+    const rows=items.map(x=>{ const dt=new Date(x.date+'T00:00:00'); const dd=isNaN(dt)?'—':dt.getDate(); const mo=isNaN(dt)?'':dt.toLocaleDateString('en-ZA',{month:'short'});
+      return `<div class="dw-ag" onclick="${x.bid?`openBoardView('${x.bid}','content')`:''}"><div class="dw-when"><b>${dd}</b><small>${mo}</small></div><div class="dw-what"><div class="t">${E(x.label)}</div><div class="m">${E(x.sub)}</div></div></div>`;
+    }).join('');
+    return `<div class="dw-srcbadge">📅 Content schedule</div>${rows}`;
+  }
+  function notesBody(w){
+    return `<textarea class="dw-note" placeholder="Jot something…" oninput="dashNoteInput('${w.id}',this.value)">${E(w.cfg.text||'')}</textarea>`;
+  }
+  function boardsBody(){
+    const B=window.BOARDS||[];
+    if(!B.length) return `<div class="dw-mute" style="padding:10px 0">No boards yet. <a href="#" onclick="newBoardModal();return false">Create one</a>.</div>`;
+    setTimeout(()=>{ if(window.loadBoardStats) try{window.loadBoardStats();}catch(_e){} },30);
+    return `<div class="dw-boards">${B.map(b=>`<div class="dw-bc" style="border-top-color:${b.color||'var(--accent)'}" onclick="openBoard('${b.id}')">
+      <div class="dw-bt">${b.private_to?'🔒 ':''}${E(b.name)}</div>
+      <div class="dw-bprog"><i id="bp-${b.id}" style="width:0%"></i></div>
+      <div class="dw-bmeta" id="bt-${b.id}">…</div></div>`).join('')}
+      <div class="dw-bc dw-bnew" onclick="newBoardModal()">＋ New board</div></div>`;
+  }
+  function linksBody(){
+    const B=window.BOARDS||[];
+    return `<div class="dw-links">${B.map(b=>`<a href="#" onclick="openBoard('${b.id}');return false"><span class="dw-lsq" style="background:${b.color||'var(--accent)'}"></span>${E(b.name)}</a>`).join('')||'<span class="dw-mute">No boards yet.</span>'}</div>`;
+  }
+  function bodyFor(w){
+    try{
+      switch(w.type){
+        case 'goal': return goalBody(w.cfg);
+        case 'todos': return window.homeTasksBody? window.homeTasksBody() : '<div class="dw-mute">—</div>';
+        case 'notes': return notesBody(w);
+        case 'analytics': return analyticsBody(w.cfg);
+        case 'calendar': return calBody(w.cfg);
+        case 'inbox': return window.homeInbox? window.homeInbox((window._home||{}).inbox||[]) : '';
+        case 'posts': return window.homePosts? window.homePosts((window._home||{}).posts||[]) : '';
+        case 'boards': return boardsBody();
+        case 'links': return linksBody();
+      }
+    }catch(e){ console.error('widget body',w.type,e); return `<div class="dw-mute">Couldn’t load.</div>`; }
+    return '';
+  }
+  function titleFor(w){
+    if(w.type==='goal') return w.cfg.label||'Goal';
+    if(w.type==='analytics') return (w.cfg.platform&&w.cfg.platform!=='all'&&window.PLAT&&PLAT[w.cfg.platform])? PLAT[w.cfg.platform][0]+' analytics':'Analytics';
+    if(w.type==='calendar') return w.cfg.source==='external'?'Meetings':'Calendar';
+    return CAT[w.type].name;
+  }
+
+  /* ============ GRID ============ */
+  function widgetHtml(w){
+    const c=CAT[w.type];
+    return `<div class="grid-stack-item" gs-x="${w.x}" gs-y="${w.y}" gs-w="${w.w}" gs-h="${w.h}" gs-id="${w.id}">
+      <div class="grid-stack-item-content"><div class="dw" data-id="${w.id}">
+        <div class="dw-head">
+          <span class="dw-title"><span class="dw-ic">${c.icon}</span><span class="dw-tl">${E(titleFor(w))}</span></span>
+          <span class="dw-tools">
+            <button data-dact="config" data-id="${w.id}" title="Configure">⚙</button>
+            <button data-dact="remove" data-id="${w.id}" title="Remove">✕</button>
+          </span>
+        </div>
+        <div class="dw-body" id="dwb-${w.id}">${bodyFor(w)}</div>
+      </div></div></div>`;
+  }
+  function mountWidget(w){
+    const node=elFrom(widgetHtml(w));
+    document.getElementById('dashGrid').appendChild(node);
+    grid.makeWidget(node);
+  }
+  function refreshBody(w){ const b=document.getElementById('dwb-'+w.id); if(b) b.innerHTML=bodyFor(w); const t=document.querySelector(`.dw[data-id="${w.id}"] .dw-tl`); if(t)t.textContent=titleFor(w); }
+  function refreshAllBodies(){ (layout||[]).forEach(refreshBody); }
+
+  function nextPos(){ let maxB=0; (layout||[]).forEach(w=>{ maxB=Math.max(maxB,(w.y||0)+(w.h||1)); }); return maxB; }
+  function addWidget(type){
+    const c=CAT[type];
+    const w={id:'w'+(seq++), type, cfg:defaultCfg(type), w:c.w, h:c.h, x:0, y:nextPos()};
+    layout.push(w); mountWidget(w); refreshEmpty(); save();
+    return w;
+  }
+  function removeWidget(id){
+    const i=(layout||[]).findIndex(w=>w.id===id); if(i<0)return;
+    const node=document.querySelector(`.dw[data-id="${id}"]`); if(node){ const item=node.closest('.grid-stack-item'); grid.removeWidget(item); }
+    layout.splice(i,1); refreshEmpty(); save();
+  }
+  function defaultCfg(type){
+    if(type==='goal') return {label:'New goal', mode:'auto', source:'reach', target:10000, deadline:''};
+    if(type==='analytics') return {platform:'all'};
+    if(type==='calendar') return {source:'internal'};
+    if(type==='notes') return {text:''};
+    return {};
+  }
+  function refreshEmpty(){ const e=document.getElementById('dashEmpty'); if(e) e.style.display=(layout&&layout.length)?'none':'block'; }
+
+  /* ---- persistence ---- */
+  function syncPositions(){
+    if(!grid) return;
+    try{ const saved=grid.save(false); const byId={}; saved.forEach(n=>{ if(n.id!=null) byId[n.id]=n; });
+      (layout||[]).forEach(w=>{ const n=byId[w.id]; if(n){ w.x=n.x; w.y=n.y; w.w=n.w; w.h=n.h; } });
+    }catch(_e){}
+  }
+  function save(){
+    syncPositions();
+    clearTimeout(saveT);
+    saveT=setTimeout(async()=>{
+      try{ await sb.from('bbe_dashboard').upsert({workspace_id:WS.id,user_id:SESSION.user.id,layout:layout,updated_at:new Date().toISOString()},{onConflict:'workspace_id,user_id'}); }
+      catch(e){ console.error('dash save',e); }
+    },600);
+  }
+  async function loadLayout(){
+    try{
+      const {data,error}=await sb.from('bbe_dashboard').select('layout').eq('workspace_id',WS.id).eq('user_id',SESSION.user.id).maybeSingle();
+      if(error) throw error;
+      if(data&&Array.isArray(data.layout)&&data.layout.length){ layout=data.layout; }
+      else { layout=JSON.parse(JSON.stringify(DEFAULT_LAYOUT)).map((w,i)=>Object.assign({id:'w'+(seq++)},w)); save(); }
+    }catch(e){ console.error('dash load',e); layout=JSON.parse(JSON.stringify(DEFAULT_LAYOUT)).map(w=>Object.assign({id:'w'+(seq++)},w)); }
+    // ensure ids + seq
+    layout.forEach(w=>{ if(!w.id) w.id='w'+(seq++); const n=parseInt((w.id||'').replace('w',''),10); if(!isNaN(n)&&n>=seq) seq=n+1; });
+  }
+
+  /* ============ EDIT MODE ============ */
+  window.dashToggleEdit=function(){
+    editing=!editing;
+    document.body.classList.toggle('dash-editing',editing);
+    if(grid){ grid.enableMove(editing); grid.enableResize(editing); }
+    const b=document.getElementById('dashEditBtn'); if(b){ b.innerHTML=editing?'✓ Done':'✎ Edit layout'; b.classList.toggle('accent',editing); }
+    if(!editing){ save(); dtoast('Layout saved'); }
+  };
+  window.dashOpenCatalog=function(){
+    const list=document.getElementById('dashCatList');
+    if(list) list.innerHTML=Object.entries(CAT).map(([k,c])=>`<div class="dw-catcard" onclick="dashAdd('${k}')"><div class="dw-ci">${c.icon}</div><div class="dw-ct"><b>${c.name}</b><span>${c.desc}</span></div></div>`).join('');
+    showModal('dashCatModal');
+  };
+  window.dashAdd=function(type){
+    const w=addWidget(type); hideModal('dashCatModal');
+    if(!editing) window.dashToggleEdit();
+    dtoast(CAT[type].name+' added');
+    if(['goal','analytics','calendar'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
+  };
+  window.dashNoteInput=function(id,val){ const w=(layout||[]).find(x=>x.id===id); if(w){ w.cfg.text=val; save(); } };
+  window.dashConnectCal=function(){ dtoast('Calendar connect is coming in the next update.'); };
+
+  /* ============ CONFIG MODAL ============ */
+  let editingId=null;
+  window.dashConfig=function(id){
+    const w=(layout||[]).find(x=>x.id===id); if(!w)return; editingId=id;
+    document.getElementById('dashCfgTitle').textContent='Configure · '+CAT[w.type].name;
+    document.getElementById('dashCfgBody').innerHTML=cfgForm(w);
+    wireCfg(w);
+    showModal('dashCfgModal');
+  };
+  function cfgForm(w){
+    if(w.type==='goal'){ const g=w.cfg;
+      return `<div class="dw-fld"><label>Goal name</label><input type="text" id="g_label" value="${E(g.label||'')}" placeholder="e.g. 10k Instagram followers"></div>
+      <div class="dw-fld"><label>How is this goal measured?</label><div class="dw-seg" id="g_mode">
+        <button data-v="manual" class="${g.mode==='manual'?'on':''}">Just a number</button>
+        <button data-v="auto" class="${g.mode!=='manual'?'on':''}">Link to live data</button></div></div>
+      <div id="g_manual" style="display:${g.mode==='manual'?'block':'none'}">
+        <div class="dw-row2"><div class="dw-fld"><label>Current</label><input type="number" id="g_current" value="${Number(g.current)||0}"></div>
+        <div class="dw-fld"><label>Target</label><input type="number" id="g_target" value="${Number(g.target)||0}"></div></div>
+        <div class="dw-fld"><label>Unit (optional)</label><input type="text" id="g_unit" value="${E(g.unit||'')}" placeholder="R, %, followers…"></div></div>
+      <div id="g_auto" style="display:${g.mode!=='manual'?'block':'none'}">
+        <div class="dw-fld"><label>Link to</label><select id="g_source">
+          ${Object.entries(GOAL_SRC).map(([k,v])=>`<option value="${k}" ${g.source===k?'selected':''}>${v.label}${dataReady?' (now: '+v.fmt(v.get(D))+')':''}</option>`).join('')}
+        </select></div>
+        <div class="dw-fld"><label>Target</label><input type="number" id="g_target2" value="${Number(g.target)||0}"></div>
+        <div class="dw-hint">The number fills itself from your account and moves as the data changes — you never update it by hand.</div></div>
+      <div class="dw-fld"><label>Deadline (optional)</label><input type="date" id="g_deadline" value="${E(g.deadline||'')}">
+        <div class="dw-hint" style="margin-top:8px">Add a deadline for a countdown with pace tracking. Leave blank for open-ended.</div></div>`;
+    }
+    if(w.type==='analytics'){
+      const opts=[['all','All platforms (total reach)']].concat(Object.keys((window.PLAT||{})).map(k=>[k,PLAT[k][0]+' only']));
+      return `<div class="dw-fld"><label>Show</label><select id="a_platform">${opts.map(([k,l])=>`<option value="${k}" ${(w.cfg.platform||'all')===k?'selected':''}>${E(l)}</option>`).join('')}</select><div class="dw-hint" style="margin-top:10px">Pulls from the same metrics as your Analytics page, across all your boards.</div></div>`;
+    }
+    if(w.type==='calendar'){
+      return `<div class="dw-fld"><label>Calendar source</label><div class="dw-seg" id="c_src">
+        <button data-v="internal" class="${w.cfg.source!=='external'?'on':''}">Content schedule</button>
+        <button data-v="external" class="${w.cfg.source==='external'?'on':''}">My calendar</button></div></div>
+        <div class="dw-hint" id="c_hint">${w.cfg.source==='external'?'Connect a Google/Outlook calendar to show real meetings (coming soon).':'Shows your scheduled posts and deadlines. No setup needed.'}</div>`;
+    }
+    return `<div class="dw-hint">This widget has no extra settings — it just works.</div>`;
+  }
+  function wireCfg(w){
+    if(w.type==='goal'){ document.querySelectorAll('#g_mode button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#g_mode button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); const v=b.dataset.v; document.getElementById('g_manual').style.display=v==='manual'?'block':'none'; document.getElementById('g_auto').style.display=v==='auto'?'block':'none'; }); }
+    if(w.type==='calendar'){ document.querySelectorAll('#c_src button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#c_src button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.getElementById('c_hint').textContent=b.dataset.v==='external'?'Connect a Google/Outlook calendar to show real meetings (coming soon).':'Shows your scheduled posts and deadlines. No setup needed.'; }); }
+  }
+  window.dashCfgSave=function(){
+    const w=(layout||[]).find(x=>x.id===editingId); if(!w)return;
+    if(w.type==='goal'){
+      w.cfg.label=document.getElementById('g_label').value;
+      w.cfg.mode=document.querySelector('#g_mode button.on').dataset.v;
+      if(w.cfg.mode==='manual'){ w.cfg.current=Number(document.getElementById('g_current').value)||0; w.cfg.target=Number(document.getElementById('g_target').value)||0; w.cfg.unit=document.getElementById('g_unit').value; }
+      else { w.cfg.source=document.getElementById('g_source').value; w.cfg.target=Number(document.getElementById('g_target2').value)||0; }
+      w.cfg.deadline=document.getElementById('g_deadline').value||'';
+    }
+    if(w.type==='analytics') w.cfg.platform=document.getElementById('a_platform').value;
+    if(w.type==='calendar') w.cfg.source=document.querySelector('#c_src button.on').dataset.v;
+    refreshBody(w); hideModal('dashCfgModal'); save(); dtoast('Widget updated');
+  };
+
+  /* ---- modal utils ---- */
+  function showModal(id){ const m=document.getElementById(id); if(m) m.classList.add('on'); }
+  function hideModal(id){ const m=document.getElementById(id); if(m) m.classList.remove('on'); }
+  window.dashHideModal=hideModal;
+
+  /* ============ GRIDSTACK LIB LOADER ============ */
+  function ensureLib(cb){
+    if(window.GridStack) return cb();
+    if(!document.getElementById('gs-css')){ const l=document.createElement('link'); l.id='gs-css'; l.rel='stylesheet'; l.href='https://cdnjs.cloudflare.com/ajax/libs/gridstack.js/10.3.1/gridstack.min.css'; document.head.appendChild(l); }
+    let s=document.getElementById('gs-js');
+    if(s){ s.addEventListener('load',cb); return; }
+    s=document.createElement('script'); s.id='gs-js'; s.src='https://cdnjs.cloudflare.com/ajax/libs/gridstack.js/10.3.1/gridstack-all.min.js';
+    s.onload=cb; s.onerror=()=>{ const g=document.getElementById('dashGrid'); if(g) g.innerHTML='<div class="dw-mute" style="padding:24px">Couldn’t load the dashboard engine. Check your connection and refresh.</div>'; };
+    document.head.appendChild(s);
+  }
+
+  /* ============ INIT (called each time home view renders) ============ */
+  window.dashInit=function(){
+    const host=document.getElementById('dashGrid'); if(!host) return;
+    ensureLib(async()=>{
+      if(layout===null){ await loadLayout(); }
+      // (re)build grid fresh
+      host.innerHTML='';
+      if(grid){ try{ grid.destroy(false); }catch(_e){} grid=null; }
+      grid=GridStack.init({column:12, cellHeight:78, margin:6, float:true, handle:'.dw-head', disableDrag:!editing, disableResize:!editing, animate:true}, host);
+      grid.on('change',()=>save());
+      (layout||[]).forEach(mountWidget);
+      refreshEmpty();
+      // sync body edit state
+      document.body.classList.toggle('dash-editing',editing);
+      const b=document.getElementById('dashEditBtn'); if(b){ b.innerHTML=editing?'✓ Done':'✎ Edit layout'; b.classList.toggle('accent',editing); }
+      // load data once (then refresh bodies)
+      if(!dataReady) loadData(); else refreshAllBodies();
+    });
+  };
+
+  /* ============ delegated clicks for widget tools ============ */
+  document.addEventListener('click',function(e){
+    const b=e.target.closest('[data-dact]'); if(!b) return;
+    const act=b.dataset.dact, id=b.dataset.id;
+    if(act==='config') window.dashConfig(id);
+    else if(act==='remove') removeWidget(id);
+  });
+
+  /* ============ OVERRIDE boardsView -> dashboard shell ============ */
+  window.boardsView=function(){
+    const first = window.esc? esc((MEM&&MEM.name?MEM.name.split(' ')[0]:(WS&&WS.name))||'there') : 'there';
+    const h=new Date(Date.now()+2*3600*1000).getUTCHours();
+    const greet=h<12?'Good morning':h<18?'Good afternoon':'Good evening';
+    setTimeout(window.dashInit,40);
+    return `<div class="dash-wrap">
+      <div class="dash-top">
+        <div><h2 class="dash-h">${window.ic?ic('sun',18):''} ${greet}, ${first}</h2>
+          <div class="dash-sub">${WS?E(WS.name):''} · your personal home</div></div>
+        <div class="dash-tools">
+          <span class="dash-modehint">✎ Drag, resize, remove — then Done</span>
+          <button class="btn" onclick="dashOpenCatalog()">＋ Add widget</button>
+          <button class="btn" id="dashEditBtn" onclick="dashToggleEdit()">✎ Edit layout</button>
+        </div>
+      </div>
+      <div class="grid-stack" id="dashGrid"></div>
+      <div class="dash-empty" id="dashEmpty" style="display:none">
+        <b>Your home is empty</b><div class="dw-mute">Add widgets to build a home that works the way you do.</div>
+        <button class="btn accent" style="margin-top:12px" onclick="dashOpenCatalog()">＋ Add your first widget</button>
+      </div>
+
+      <div class="dw-scrim" id="dashCatModal">
+        <div class="dw-modal">
+          <div class="dw-mh"><h3>Add a widget</h3><button class="dw-x" onclick="dashHideModal('dashCatModal')">✕</button></div>
+          <div class="dw-mb"><div class="dw-cat" id="dashCatList"></div></div>
+        </div>
+      </div>
+      <div class="dw-scrim" id="dashCfgModal">
+        <div class="dw-modal sm">
+          <div class="dw-mh"><h3 id="dashCfgTitle">Configure</h3><button class="dw-x" onclick="dashHideModal('dashCfgModal')">✕</button></div>
+          <div class="dw-mb" id="dashCfgBody"></div>
+          <div class="dw-mf"><button class="btn" onclick="dashHideModal('dashCfgModal')">Cancel</button><button class="btn accent" onclick="dashCfgSave()">Save widget</button></div>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  // close modals on scrim click
+  document.addEventListener('click',function(e){ if(e.target.classList&&e.target.classList.contains('dw-scrim')) e.target.classList.remove('on'); });
+})();
+
+</script>
 </body>
 </html>
