@@ -1008,7 +1008,7 @@ async function saveBoardSetup(){
 /* ============ PLAN CANVAS ============ */
 const PLAN_COLORS=['#0F6E56','#185FA5','#C4356B','#BA7517','#534AB7','#C75B12'];
 let _planConnect=false,_planConnectFrom=null,_planColor=null,_pd=null,_planChannels=null,_planFrameColor=null,_pf=null;
-const PLAN_CHANNELS=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter'];
+const PLAN_CHANNELS=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'];
 function planView(){
   const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
   const nodes=cur.planNodes||[],edges=cur.planEdges||[],frames=cur.planFrames||[];
@@ -2096,7 +2096,7 @@ async function saveAccent(){
   await sb.from('bbe_workspaces').update({theme}).eq('id',WS.id);WS.theme=theme;applyTheme();render();toast('Accent applied');}catch(e){fail(e);}
 }
 /* ============ CONTENT (social calendar) ============ */
-const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],twitter:['X','#0f1419'],whatsapp:['WhatsApp','#1FA855'],email:['Email','#6E6A62'],appstore:['App Store','#0A84FF'],other:['Other','#8a887e']};
+const PLAT={instagram:['Instagram','#C4356B'],facebook:['Facebook','#185FA5'],youtube:['YouTube','#C6453D'],tiktok:['TikTok','#23241f'],threads:['Threads','#444441'],linkedin:['LinkedIn','#0F6E8E'],twitter:['X','#0f1419'],pinterest:['Pinterest','#E60023'],whatsapp:['WhatsApp','#1FA855'],email:['Email','#6E6A62'],appstore:['App Store','#0A84FF'],other:['Other','#8a887e']};
 const PICON={
   facebook:'<svg viewBox="0 0 24 24" width="60%" height="60%" fill="#fff"><path d="M13.5 21v-7h2.3l.4-2.9h-2.7V9.3c0-.8.3-1.4 1.5-1.4H16.4V5.3c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H8.1V14h2.4v7h3z"/></svg>',
   instagram:'<svg viewBox="0 0 24 24" width="64%" height="64%" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17.2" cy="6.8" r="1.15" fill="#fff" stroke="none"/></svg>',
@@ -2278,7 +2278,7 @@ function contentView(){
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
       <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();await loadDirectLinks();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
       <span style="flex:1"></span>
-      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)&&!(_directPlatforms||[]).includes(p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
+      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)&&!(_directPlatforms||[]).includes(p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
     </div>
   </div>`:''}
   <div id="wa-tpl-panel">${waTplPanelHtml()}</div>
