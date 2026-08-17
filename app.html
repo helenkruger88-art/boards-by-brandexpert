@@ -3973,11 +3973,13 @@ body.dash-editing .dash-modehint{display:inline-flex}
 
 .grid-stack{margin:0 -6px}
 .grid-stack-item-content{inset:6px !important;width:auto !important;height:auto !important;overflow:visible;border-radius:14px}
-.dw{background:var(--card);border:1px solid var(--line);border-radius:14px;height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 2px rgba(30,25,20,.04),0 6px 16px rgba(30,25,20,.05)}
+.dw{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 2px rgba(30,25,20,.04),0 6px 16px rgba(30,25,20,.05)}
+/* coloured top accent — only on tiles that set a colour */
+.dw[style*="--wc"]::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--wc);z-index:1}
 .dw-head{display:flex;align-items:center;gap:8px;padding:10px 12px 7px;flex:0 0 auto}
 .dw-title{font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--ink);display:flex;align-items:center;gap:7px;min-width:0}
 .dw-tl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dw-ic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(199,91,18,.10);flex:0 0 auto}
+.dw-ic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;background:color-mix(in srgb, var(--wc, var(--accent)) 14%, transparent);flex:0 0 auto}
 .dw-tools{margin-left:auto;display:none;gap:2px;flex:0 0 auto}
 body.dash-editing .dw-tools{display:flex}
 .dw-tools button{border:none;background:transparent;color:var(--muted);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
@@ -4002,7 +4004,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
 .dw-gnum{font-size:13px;font-weight:600}
 .dw-gnum s{color:var(--muted);text-decoration:none;font-weight:500}
 .dw-gbar{height:7px;border-radius:6px;background:var(--bg);overflow:hidden;margin-top:8px}
-.dw-gbar>i{display:block;height:100%;border-radius:6px;background:var(--accent)}
+.dw-gbar>i{display:block;height:100%;border-radius:6px;background:var(--wc, var(--accent))}
 .dw-gsub{font-size:11px;color:var(--muted);margin-top:7px;display:flex;gap:5px;flex-wrap:wrap}
 .dw-pill{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em}
 .dw-pill.link{background:rgba(47,158,95,.14);color:var(--ok)}
@@ -4083,6 +4085,10 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
 .dw-seg button{flex:1;border:none;background:transparent;padding:8px;border-radius:7px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
 .dw-seg button.on{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .dw-hint{font-size:11.5px;color:var(--muted);background:var(--bg);border-radius:9px;padding:9px 11px;line-height:1.5}
+.dw-divider{height:1px;background:var(--line);margin:4px 0 16px}
+.dw-sws{display:flex;gap:8px;flex-wrap:wrap}
+.dw-sw{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;padding:0;background:var(--card)}
+.dw-sw.on{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--ink)}
 
 </style>
 <script id="dash-js">
@@ -4118,20 +4124,23 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     links:    {icon:'🔗', name:'Quick links',         desc:'Jump straight to a board.', w:4,h:2}
   };
   const GOAL_SRC = {
-    revenue:    {label:'Revenue (this month)', get:d=>d.revenue,        fmt:money},
-    followers:  {label:'Total followers',      get:d=>d.followers,      fmt:numF},
-    reach:      {label:'Total reach (30d)',    get:d=>d.reach,          fmt:numF},
-    posts:      {label:'Posts published (this month)', get:d=>d.postsPublished, fmt:numF},
-    engagement: {label:'Engagement rate',      get:d=>d.engRate,        fmt:n=>(Number(n)||0).toFixed(1)+'%'}
+    revenue:    {label:'Revenue (this month)',        metric:'revenue',    fmt:money},
+    followers:  {label:'Total followers',             metric:'followers',  fmt:numF},
+    reach:      {label:'Total reach (30d)',           metric:'reach',      fmt:numF},
+    posts:      {label:'Posts published (this month)',metric:'posts',      fmt:numF},
+    engagement: {label:'Engagement rate',             metric:'engagement', fmt:n=>(Number(n)||0).toFixed(1)+'%'}
   };
+  // '' = default (uses the app accent). Others are tile accent colours.
+  const PALETTE = ['', '#C75B12','#2f9e5f','#0A66C2','#7A5AF8','#E4405F','#d99512','#0f766e','#334155'];
+  const CHANNELS = [['all','All channels'],['facebook','Facebook'],['instagram','Instagram'],['whatsapp','WhatsApp'],['email','Email'],['linkedin','LinkedIn']];
   const DEFAULT_LAYOUT = [
-    {type:'goal', cfg:{label:'Revenue this month', mode:'auto', source:'revenue', target:60000, deadline:''}, x:0,y:0,w:4,h:3},
-    {type:'goal', cfg:{label:'Grow followers', mode:'auto', source:'followers', target:10000, deadline:''}, x:4,y:0,w:4,h:3},
+    {type:'goal', cfg:{label:'Revenue this month', mode:'auto', source:'revenue', board:'all', target:60000, deadline:''}, x:0,y:0,w:4,h:3},
+    {type:'goal', cfg:{label:'Grow followers', mode:'auto', source:'followers', board:'all', target:10000, deadline:''}, x:4,y:0,w:4,h:3},
     {type:'todos', cfg:{}, x:8,y:0,w:4,h:5},
-    {type:'analytics', cfg:{platform:'all'}, x:0,y:3,w:5,h:5},
+    {type:'analytics', cfg:{platform:'all', board:'all'}, x:0,y:3,w:5,h:5},
     {type:'calendar', cfg:{source:'internal'}, x:5,y:3,w:3,h:5},
     {type:'posts', cfg:{}, x:8,y:5,w:4,h:4},
-    {type:'inbox', cfg:{}, x:0,y:8,w:5,h:3},
+    {type:'inbox', cfg:{board:'all', channel:'all'}, x:0,y:8,w:5,h:3},
     {type:'boards', cfg:{}, x:5,y:8,w:7,h:4}
   ];
 
@@ -4142,8 +4151,18 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   let seq = 1;
   let dataReady = false;
   let saveT = null;
-  const D = { revenue:0, followers:0, reach:0, postsPublished:0, engRate:0,
-              spark:[], plats:[], delta:null };
+  const EMPTY_M = { reach:0, followers:0, engRate:0, plats:[], spark:[], delta:null };
+  const D = { all:Object.assign({},EMPTY_M), by:{}, revAll:0, revBy:{}, postAll:0, postBy:{}, inbox:[] };
+  function mSrc(board){ return (board&&board!=='all') ? (D.by[board]||EMPTY_M) : D.all; }
+  function mVal(metric, board){
+    if(metric==='revenue') return (board&&board!=='all') ? (D.revBy[board]||0) : D.revAll;
+    if(metric==='posts')   return (board&&board!=='all') ? (D.postBy[board]||0) : D.postAll;
+    const s=mSrc(board);
+    if(metric==='followers') return s.followers||0;
+    if(metric==='reach') return s.reach||0;
+    if(metric==='engagement') return s.engRate||0;
+    return 0;
+  }
 
   /* ============ DATA ============ */
   async function loadData(){
@@ -4155,22 +4174,33 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const boardIds=BRDS().map(b=>b.id);
     try{
       const monthStart=saD().slice(0,8)+'01';
-      const [inv, posted, metrics] = await Promise.all([
-        boardIds.length? sb.from('bbe_invoices').select('amount,kind,paid,created_at,board_id').in('board_id',boardIds).eq('kind','in').eq('paid',true).gte('created_at',monthStart) : Promise.resolve({data:[]}),
-        boardIds.length? sb.from('bbe_posts').select('id,status,post_date').eq('workspace_id',WS.id).eq('status','posted').gte('post_date',monthStart) : Promise.resolve({data:[]}),
-        boardIds.length? sb.from('bbe_metrics').select('board_id,source,metric,value,captured_for').in('board_id',boardIds).gte('captured_for',new Date(Date.now()-60*864e5).toISOString().slice(0,10)).order('captured_for') : Promise.resolve({data:[]})
+      const P0=Promise.resolve({data:[]});
+      const [inv, posted, metrics, inbox] = await Promise.all([
+        boardIds.length? sb.from('bbe_invoices').select('amount,kind,paid,created_at,board_id').in('board_id',boardIds).eq('kind','in').eq('paid',true).gte('created_at',monthStart) : P0,
+        boardIds.length? sb.from('bbe_posts').select('id,status,post_date,board_id').eq('workspace_id',WS.id).eq('status','posted').gte('post_date',monthStart) : P0,
+        boardIds.length? sb.from('bbe_metrics').select('board_id,source,metric,value,captured_for').in('board_id',boardIds).gte('captured_for',new Date(Date.now()-60*864e5).toISOString().slice(0,10)).order('captured_for') : P0,
+        boardIds.length? sb.from('bbe_interactions').select('*').in('board_id',boardIds).order('received_at',{ascending:false}).limit(60) : P0
       ]);
-      D.revenue=(inv.data||[]).reduce((t,x)=>t+(Number(x.amount)||0),0);
-      D.postsPublished=(posted.data||[]).length;
-      aggMetrics(metrics.data||[]);
+      // revenue per board + total
+      D.revAll=0; D.revBy={};
+      (inv.data||[]).forEach(x=>{ const a=Number(x.amount)||0; D.revAll+=a; D.revBy[x.board_id]=(D.revBy[x.board_id]||0)+a; });
+      // posts published per board + total
+      D.postAll=0; D.postBy={};
+      (posted.data||[]).forEach(x=>{ D.postAll++; D.postBy[x.board_id]=(D.postBy[x.board_id]||0)+1; });
+      // metrics: combined + per board
+      const rows=metrics.data||[];
+      D.all=computeMetrics(rows);
+      D.by={};
+      boardIds.forEach(bid=>{ const sub=rows.filter(r=>r.board_id===bid); if(sub.length) D.by[bid]=computeMetrics(sub); });
+      // inbox (broad set for per-board / per-channel filtering)
+      D.inbox=inbox.data||[];
     }catch(e){ console.error('dash data',e); }
     dataReady=true;
     refreshAllBodies();
   }
-  function aggMetrics(rows){
+  function computeMetrics(rows){
     const SRCMAP={tiktok:'tiktok',instagram:'instagram',facebook:'facebook',youtube:'youtube',threads:'threads',social:'linkedin',linkedin:'linkedin',pinterest:'pinterest',twitter:'twitter'};
     const days=[]; for(let i=29;i>=0;i--) days.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
-    // key = board|source|metric -> sorted points
     const series={};
     for(const r of rows){ const k=r.board_id+'|'+r.source+'|'+r.metric; (series[k]=series[k]||[]).push({d:r.captured_for,v:Number(r.value)||0}); }
     const latest=a=>a&&a.length? a[a.length-1].v : 0;
@@ -4180,23 +4210,23 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     Object.keys(series).forEach(k=>{
       const [board,src,metric]=k.split('|'); const key=SRCMAP[src]||src; const a=series[k];
       if(metric==='reach'){ const lv=latest(a); reachTot+=lv; bySource[key]=(bySource[key]||0)+lv; days.forEach((d,i)=>{ reachSeries[i]+=at(a,d); }); }
-      else if(metric==='views'){ /* count views as reach fallback only if no reach for that source later — keep simple: add to plat bar if source has no reach */ }
       else if(metric==='followers_count') followers+=latest(a);
       else if(metric==='likes') likes+=latest(a);
       else if(metric==='comments') comments+=latest(a);
       else if(metric==='shares') shares+=latest(a);
     });
-    // views fallback: for sources with no reach, use views for the plat bar + total
+    // views fallback: sources with no reach contribute views to the platform bar + total
     const viewsBy={};
     Object.keys(series).forEach(k=>{ const [board,src,metric]=k.split('|'); const key=SRCMAP[src]||src; if(metric==='views'){ viewsBy[key]=(viewsBy[key]||0)+latest(series[k]); } });
     Object.keys(viewsBy).forEach(key=>{ if(!bySource[key]){ bySource[key]=viewsBy[key]; reachTot+=viewsBy[key]; } });
-    D.followers=followers;
-    D.reach=reachTot;
-    D.engRate= reachTot>0 ? ((likes+comments+shares)/reachTot*100) : 0;
-    D.spark=reachSeries;
     const first=reachSeries.find(v=>v>0)||0, last=reachSeries[reachSeries.length-1]||0;
-    D.delta= first>0 ? Math.round((last-first)/first*100) : null;
-    D.plats=Object.entries(bySource).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+    return {
+      reach:reachTot, followers,
+      engRate: reachTot>0 ? ((likes+comments+shares)/reachTot*100) : 0,
+      spark:reachSeries,
+      delta: first>0 ? Math.round((last-first)/first*100) : null,
+      plats:Object.entries(bySource).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])
+    };
   }
 
   /* ============ WIDGET BODIES ============ */
@@ -4204,7 +4234,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const r=26,c=2*Math.PI*r,off=c*(1-Math.max(0,Math.min(pct,1)));
     return `<div class="dw-ring"><svg width="66" height="66" viewBox="0 0 66 66">
       <circle cx="33" cy="33" r="${r}" fill="none" stroke="var(--line)" stroke-width="7"/>
-      <circle cx="33" cy="33" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
+      <circle cx="33" cy="33" r="${r}" fill="none" stroke="var(--wc, var(--accent))" stroke-width="7" stroke-linecap="round"
         stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 33 33)"/>
     </svg><div class="dw-rv">${inner}</div></div>`;
   }
@@ -4214,16 +4244,19 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const pts=arr.map((v,i)=>[i/(arr.length-1)*w, h-5-((v-mn)/rng)*(h-10)]);
     const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
     return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;margin-top:8px">
-      <path d="${d} L${w} ${h} L0 ${h} Z" fill="var(--accent)" opacity="0.08"/>
-      <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      <path d="${d} L${w} ${h} L0 ${h} Z" fill="var(--wc, var(--accent))" opacity="0.08"/>
+      <path d="${d}" fill="none" stroke="var(--wc, var(--accent))" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   }
+  function boardName(id){ const b=BRDS().find(x=>x.id===id); return b?b.name:'board'; }
   function goalBody(cfg){
     let cur, target=Number(cfg.target)||0, fmt=numF;
-    if(cfg.mode==='auto'){ const s=GOAL_SRC[cfg.source]||GOAL_SRC.reach; cur=dataReady? s.get(D):0; fmt=s.fmt; }
+    const board=cfg.board||'all';
+    if(cfg.mode==='auto'){ const s=GOAL_SRC[cfg.source]||GOAL_SRC.reach; cur=dataReady? mVal(s.metric, board):0; fmt=s.fmt; }
     else { cur=Number(cfg.current)||0; const u=cfg.unit||''; fmt=n=> u==='R'? money(n) : (numF(n)+(u&&u!=='R'?' '+u:'')); }
     const pct= target>0? cur/target : 0;
+    const scope= cfg.mode==='auto' ? (board==='all'?'All boards':E(boardName(board))) : '';
     const srcPill= cfg.mode==='auto'
-      ? `<span class="dw-pill link">● Linked · ${E((GOAL_SRC[cfg.source]||{}).label||'')}</span>`
+      ? `<span class="dw-pill link">● ${E((GOAL_SRC[cfg.source]||{}).label||'')}${scope?' · '+scope:''}</span>`
       : `<span class="dw-pill manual">Manual</span>`;
     let due='';
     if(cfg.deadline){ const days=Math.ceil((new Date(cfg.deadline+'T00:00:00')-new Date(saD()+'T00:00:00'))/864e5); if(!isNaN(days)) due=`<span class="dw-pill due">⏳ ${days<0?'past due':days+'d left'}</span>`; }
@@ -4240,16 +4273,19 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   function analyticsBody(cfg){
     if(!dataReady) return `<div class="dw-mute" style="padding:10px 0">Loading metrics…</div>`;
     const plat=cfg.platform||'all';
+    const board=cfg.board||'all';
+    const m=mSrc(board);
+    const scope = board==='all' ? 'all boards' : E(boardName(board));
     if(plat==='all'){
-      if(!D.reach) return `<div class="dw-mute" style="padding:10px 0">No metrics yet. Connect an account on the Content tab and analytics start flowing here.</div>`;
-      const mx=D.plats.length?D.plats[0][1]:1;
-      const bars=D.plats.map(([k,v])=>{ const p=PLATS()[k]||['?','#8a887e']; return `<div class="dw-brow"><span class="dw-bn"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])}</span><span class="dw-bar"><i style="width:${v/mx*100}%;background:${p[1]}"></i></span><span class="dw-bv">${num(v)}</span></div>`; }).join('');
-      const dd = D.delta==null?'':`<span class="dw-delta ${D.delta>=0?'up':'down'}">${D.delta>=0?'▲':'▼'} ${Math.abs(D.delta)}%</span>`;
-      return `<div class="dw-cap">Total reach · all platforms · 30d</div><div class="dw-big">${numF(D.reach)}</div>${dd?'<div style="margin-top:2px">'+dd+'</div>':''}${spark(D.spark)}<div class="dw-bars">${bars}</div>`;
+      if(!m.reach) return `<div class="dw-mute" style="padding:10px 0">No metrics yet for ${scope}. Connect an account on the Content tab and analytics start flowing here.</div>`;
+      const mx=m.plats.length?m.plats[0][1]:1;
+      const bars=m.plats.map(([k,v])=>{ const p=PLATS()[k]||['?','#8a887e']; return `<div class="dw-brow"><span class="dw-bn"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])}</span><span class="dw-bar"><i style="width:${v/mx*100}%;background:${p[1]}"></i></span><span class="dw-bv">${num(v)}</span></div>`; }).join('');
+      const dd = m.delta==null?'':`<span class="dw-delta ${m.delta>=0?'up':'down'}">${m.delta>=0?'▲':'▼'} ${Math.abs(m.delta)}%</span>`;
+      return `<div class="dw-cap">Total reach · ${scope} · 30d</div><div class="dw-big">${numF(m.reach)}</div>${dd?'<div style="margin-top:2px">'+dd+'</div>':''}${spark(m.spark)}<div class="dw-bars">${bars}</div>`;
     } else {
-      const v=(D.plats.find(x=>x[0]===plat)||[,0])[1];
+      const v=(m.plats.find(x=>x[0]===plat)||[,0])[1];
       const p=PLATS()[plat]||['?','#8a887e'];
-      return `<div class="dw-cap"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])} reach · 30d</div><div class="dw-big">${numF(v)}</div>${spark(D.spark)}`;
+      return `<div class="dw-cap"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])} reach · ${scope} · 30d</div><div class="dw-big">${numF(v)}</div>${spark(m.spark)}`;
     }
   }
   function calBody(cfg){
@@ -4298,6 +4334,20 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const B=BRDS();
     return `<div class="dw-links">${B.map(b=>`<a href="#" onclick="openBoard('${b.id}');return false"><span class="dw-lsq" style="background:${b.color||'var(--accent)'}"></span>${E(b.name)}</a>`).join('')||'<span class="dw-mute">No boards yet.</span>'}</div>`;
   }
+  function inboxBody(cfg){
+    cfg=cfg||{};
+    const board=cfg.board||'all', channel=cfg.channel||'all';
+    // prefer the broad set we fetched; fall back to the app's home inbox before data loads
+    let rows = (D.inbox&&D.inbox.length) ? D.inbox : ((HOME().inbox)||[]);
+    if(board!=='all') rows=rows.filter(r=>r.board_id===board);
+    if(channel!=='all') rows=rows.filter(r=>r.platform===channel);
+    const scopeBits=[];
+    if(channel!=='all'){ const c=CHANNELS.find(x=>x[0]===channel); scopeBits.push(c?c[1]:channel); }
+    if(board!=='all') scopeBits.push(boardName(board));
+    const head = scopeBits.length? `<div class="dw-srcbadge">💬 ${E(scopeBits.join(' · '))}</div>` : '';
+    const body = (typeof homeInbox!=='undefined') ? homeInbox(rows.slice(0,10)) : '';
+    return head+body;
+  }
   function bodyFor(w){
     try{
       switch(w.type){
@@ -4306,7 +4356,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         case 'notes': return notesBody(w);
         case 'analytics': return analyticsBody(w.cfg);
         case 'calendar': return calBody(w.cfg);
-        case 'inbox': return typeof homeInbox!=='undefined'? homeInbox(HOME().inbox||[]) : '';
+        case 'inbox': return inboxBody(w.cfg);
         case 'posts': return typeof homePosts!=='undefined'? homePosts(HOME().posts||[]) : '';
         case 'boards': return boardsBody();
         case 'links': return linksBody();
@@ -4315,6 +4365,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     return '';
   }
   function titleFor(w){
+    if(w.cfg && w.cfg.title) return w.cfg.title;
     if(w.type==='goal') return w.cfg.label||'Goal';
     if(w.type==='analytics') return (w.cfg.platform&&w.cfg.platform!=='all'&&PLATS()[w.cfg.platform])? PLATS()[w.cfg.platform][0]+' analytics':'Analytics';
     if(w.type==='calendar') return w.cfg.source==='external'?'Meetings':'Calendar';
@@ -4325,7 +4376,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   function widgetHtml(w){
     const c=CAT[w.type];
     return `<div class="grid-stack-item" gs-x="${w.x}" gs-y="${w.y}" gs-w="${w.w}" gs-h="${w.h}" gs-id="${w.id}">
-      <div class="grid-stack-item-content"><div class="dw" data-id="${w.id}">
+      <div class="grid-stack-item-content"><div class="dw" data-id="${w.id}"${w.cfg&&w.cfg.color?` style="--wc:${w.cfg.color}"`:''}>
         <div class="dw-head">
           <span class="dw-title"><span class="dw-ic">${c.icon}</span><span class="dw-tl">${E(titleFor(w))}</span></span>
           <span class="dw-tools">
@@ -4357,9 +4408,10 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     layout.splice(i,1); refreshEmpty(); save();
   }
   function defaultCfg(type){
-    if(type==='goal') return {label:'New goal', mode:'auto', source:'reach', target:10000, deadline:''};
-    if(type==='analytics') return {platform:'all'};
+    if(type==='goal') return {label:'New goal', mode:'auto', source:'reach', board:'all', target:10000, deadline:''};
+    if(type==='analytics') return {platform:'all', board:'all'};
     if(type==='calendar') return {source:'internal'};
+    if(type==='inbox') return {board:'all', channel:'all'};
     if(type==='notes') return {text:''};
     return {};
   }
@@ -4408,7 +4460,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const w=addWidget(type); hideModal('dashCatModal');
     if(!editing) window.dashToggleEdit();
     dtoast(CAT[type].name+' added');
-    if(['goal','analytics','calendar'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
+    if(['goal','analytics','calendar','inbox'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
   };
   window.dashNoteInput=function(id,val){ const w=(layout||[]).find(x=>x.id===id); if(w){ w.cfg.text=val; save(); } };
 
@@ -4464,9 +4516,18 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     wireCfg(w);
     showModal('dashCfgModal');
   };
+  function boardOpts(sel){ sel=sel||'all'; return ['<option value="all" '+(sel==='all'?'selected':'')+'>All boards (combined)</option>'].concat(BRDS().map(b=>`<option value="${b.id}" ${sel===b.id?'selected':''}>${E(b.name)}</option>`)).join(''); }
+  function appearanceForm(w){
+    const cur=(w.cfg&&w.cfg.color)||'';
+    const sw=PALETTE.map(c=>`<button type="button" class="dw-sw ${cur===c?'on':''}" data-color="${c}" style="${c?('background:'+c):''}" title="${c||'Default'}">${c?'':'∅'}</button>`).join('');
+    return `<div class="dw-fld"><label>Header</label><input type="text" id="w_title" value="${E((w.cfg&&w.cfg.title)||'')}" placeholder="${E(CAT[w.type].name)}"></div>
+      <div class="dw-fld"><label>Tile colour</label><div class="dw-sws" id="w_color">${sw}</div></div>
+      <div class="dw-divider"></div>`;
+  }
   function cfgForm(w){
+    let s=appearanceForm(w);
     if(w.type==='goal'){ const g=w.cfg;
-      return `<div class="dw-fld"><label>Goal name</label><input type="text" id="g_label" value="${E(g.label||'')}" placeholder="e.g. 10k Instagram followers"></div>
+      s+=`<div class="dw-fld"><label>Goal name</label><input type="text" id="g_label" value="${E(g.label||'')}" placeholder="e.g. 10k Instagram followers"></div>
       <div class="dw-fld"><label>How is this goal measured?</label><div class="dw-seg" id="g_mode">
         <button data-v="manual" class="${g.mode==='manual'?'on':''}">Just a number</button>
         <button data-v="auto" class="${g.mode!=='manual'?'on':''}">Link to live data</button></div></div>
@@ -4476,40 +4537,56 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         <div class="dw-fld"><label>Unit (optional)</label><input type="text" id="g_unit" value="${E(g.unit||'')}" placeholder="R, %, followers…"></div></div>
       <div id="g_auto" style="display:${g.mode!=='manual'?'block':'none'}">
         <div class="dw-fld"><label>Link to</label><select id="g_source">
-          ${Object.entries(GOAL_SRC).map(([k,v])=>`<option value="${k}" ${g.source===k?'selected':''}>${v.label}${dataReady?' (now: '+v.fmt(v.get(D))+')':''}</option>`).join('')}
+          ${Object.entries(GOAL_SRC).map(([k,v])=>`<option value="${k}" ${g.source===k?'selected':''}>${v.label}</option>`).join('')}
         </select></div>
+        <div class="dw-fld"><label>For which board?</label><select id="g_board">${boardOpts(g.board)}</select></div>
         <div class="dw-fld"><label>Target</label><input type="number" id="g_target2" value="${Number(g.target)||0}"></div>
-        <div class="dw-hint">The number fills itself from your account and moves as the data changes — you never update it by hand.</div></div>
+        <div class="dw-hint">The number fills itself from that board's data (or all boards combined) and moves as it changes.</div></div>
       <div class="dw-fld"><label>Deadline (optional)</label><input type="date" id="g_deadline" value="${E(g.deadline||'')}">
         <div class="dw-hint" style="margin-top:8px">Add a deadline for a countdown with pace tracking. Leave blank for open-ended.</div></div>`;
-    }
-    if(w.type==='analytics'){
+    } else if(w.type==='analytics'){
       const opts=[['all','All platforms (total reach)']].concat(Object.keys(PLATS()).filter(k=>['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].includes(k)).map(k=>[k,PLATS()[k][0]+' only']));
-      return `<div class="dw-fld"><label>Show</label><select id="a_platform">${opts.map(([k,l])=>`<option value="${k}" ${(w.cfg.platform||'all')===k?'selected':''}>${E(l)}</option>`).join('')}</select><div class="dw-hint" style="margin-top:10px">Pulls from the same metrics as your Analytics page, across all your boards.</div></div>`;
-    }
-    if(w.type==='calendar'){
-      return `<div class="dw-fld"><label>Calendar source</label><div class="dw-seg" id="c_src">
+      s+=`<div class="dw-fld"><label>Board</label><select id="a_board">${boardOpts(w.cfg.board)}</select></div>
+        <div class="dw-fld"><label>Platform</label><select id="a_platform">${opts.map(([k,l])=>`<option value="${k}" ${(w.cfg.platform||'all')===k?'selected':''}>${E(l)}</option>`).join('')}</select></div>
+        <div class="dw-hint">Show one board or all combined, and all platforms or a single one. Same metrics as your Analytics page.</div>`;
+    } else if(w.type==='calendar'){
+      s+=`<div class="dw-fld"><label>Calendar source</label><div class="dw-seg" id="c_src">
         <button data-v="internal" class="${w.cfg.source!=='external'?'on':''}">Content schedule</button>
         <button data-v="external" class="${w.cfg.source==='external'?'on':''}">My calendar</button></div></div>
-        <div class="dw-hint" id="c_hint">${w.cfg.source==='external'?'Connect a Google/Outlook calendar to show real meetings (coming soon).':'Shows your scheduled posts and deadlines. No setup needed.'}</div>`;
+        <div class="dw-hint" id="c_hint">${w.cfg.source==='external'?'Connect a Google/Outlook calendar to show real meetings.':'Shows your scheduled posts and deadlines. No setup needed.'}</div>`;
+    } else if(w.type==='inbox'){
+      s+=`<div class="dw-fld"><label>Board</label><select id="i_board">${boardOpts(w.cfg.board)}</select></div>
+        <div class="dw-fld"><label>Channel</label><select id="i_channel">${CHANNELS.map(([k,l])=>`<option value="${k}" ${(w.cfg.channel||'all')===k?'selected':''}>${E(l)}</option>`).join('')}</select></div>
+        <div class="dw-hint">Combine everything into one inbox, or add a widget per inbox — pick one channel and/or one board each.</div>`;
+    } else {
+      s+=`<div class="dw-hint">No other settings — the header and colour above are all yours.</div>`;
     }
-    return `<div class="dw-hint">This widget has no extra settings — it just works.</div>`;
+    return s;
   }
   function wireCfg(w){
+    document.querySelectorAll('#w_color .dw-sw').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#w_color .dw-sw').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
     if(w.type==='goal'){ document.querySelectorAll('#g_mode button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#g_mode button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); const v=b.dataset.v; document.getElementById('g_manual').style.display=v==='manual'?'block':'none'; document.getElementById('g_auto').style.display=v==='auto'?'block':'none'; }); }
-    if(w.type==='calendar'){ document.querySelectorAll('#c_src button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#c_src button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.getElementById('c_hint').textContent=b.dataset.v==='external'?'Connect a Google/Outlook calendar to show real meetings (coming soon).':'Shows your scheduled posts and deadlines. No setup needed.'; }); }
+    if(w.type==='calendar'){ document.querySelectorAll('#c_src button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#c_src button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.getElementById('c_hint').textContent=b.dataset.v==='external'?'Connect a Google/Outlook calendar to show real meetings.':'Shows your scheduled posts and deadlines. No setup needed.'; }); }
   }
   window.dashCfgSave=function(){
     const w=(layout||[]).find(x=>x.id===editingId); if(!w)return;
+    // appearance — applies to every widget
+    const t=document.getElementById('w_title'); const title=t?t.value.trim():'';
+    if(title) w.cfg.title=title; else delete w.cfg.title;
+    const swOn=document.querySelector('#w_color .dw-sw.on'); const col=swOn?swOn.dataset.color:'';
+    if(col) w.cfg.color=col; else delete w.cfg.color;
     if(w.type==='goal'){
       w.cfg.label=document.getElementById('g_label').value;
       w.cfg.mode=document.querySelector('#g_mode button.on').dataset.v;
       if(w.cfg.mode==='manual'){ w.cfg.current=Number(document.getElementById('g_current').value)||0; w.cfg.target=Number(document.getElementById('g_target').value)||0; w.cfg.unit=document.getElementById('g_unit').value; }
-      else { w.cfg.source=document.getElementById('g_source').value; w.cfg.target=Number(document.getElementById('g_target2').value)||0; }
+      else { w.cfg.source=document.getElementById('g_source').value; w.cfg.board=document.getElementById('g_board').value; w.cfg.target=Number(document.getElementById('g_target2').value)||0; }
       w.cfg.deadline=document.getElementById('g_deadline').value||'';
     }
-    if(w.type==='analytics') w.cfg.platform=document.getElementById('a_platform').value;
+    if(w.type==='analytics'){ w.cfg.platform=document.getElementById('a_platform').value; w.cfg.board=document.getElementById('a_board').value; }
     if(w.type==='calendar') w.cfg.source=document.querySelector('#c_src button.on').dataset.v;
+    if(w.type==='inbox'){ w.cfg.board=document.getElementById('i_board').value; w.cfg.channel=document.getElementById('i_channel').value; }
+    // apply tile colour to the root immediately
+    const root=document.querySelector('.dw[data-id="'+w.id+'"]'); if(root){ if(w.cfg.color) root.style.setProperty('--wc',w.cfg.color); else root.style.removeProperty('--wc'); }
     refreshBody(w); hideModal('dashCfgModal'); save(); dtoast('Widget updated');
   };
 
