@@ -4091,13 +4091,16 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   if(window.__dashLoaded)return; window.__dashLoaded=true;
 
   /* ---------- small helpers (defensive re: app globals) ---------- */
-  const E = s => (window.esc? window.esc(s) : String(s==null?'':s));
-  const money = n => (window.Rand? window.Rand(Number(n)||0) : ('R'+(Number(n)||0).toLocaleString('en-ZA')));
+  const E = s => (typeof esc!=='undefined'? esc(s) : String(s==null?'':s));
+  const money = n => (typeof Rand!=='undefined'? Rand(Number(n)||0) : ('R'+(Number(n)||0).toLocaleString('en-ZA')));
   const num = n => { n=Number(n)||0; return n>=1000? (n/1000).toFixed(n>=10000?0:1)+'k' : (''+n); };
   const numF = n => (Number(n)||0).toLocaleString('en-ZA');
-  const saD = () => (window.saDate? window.saDate() : new Date().toISOString().slice(0,10));
+  const saD = () => (typeof saDate!=='undefined'? saDate() : new Date().toISOString().slice(0,10));
+  const BRDS = () => (typeof BOARDS!=='undefined'&&Array.isArray(BOARDS)? BOARDS : []);
+  const PLATS = () => (typeof PLAT!=='undefined'? PLAT : {});
+  const HOME = () => (typeof _home!=='undefined'&&_home? _home : {});
   const elFrom = h => { const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
-  function dtoast(m){ if(window.toast) window.toast(m); }
+  function dtoast(m){ try{ if(typeof toast!=='undefined') toast(m); }catch(_e){} }
 
   /* ---------- widget catalog ---------- */
   const CAT = {
@@ -4144,9 +4147,9 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     dataReady=false;
     try{
       // reuse the app's own home loader to populate _home {tasks,inbox,posts,docs,today}
-      if(window.loadHome) await window.loadHome();
+      if(typeof loadHome!=='undefined') await loadHome();
     }catch(_e){}
-    const boardIds=(window.BOARDS||[]).map(b=>b.id);
+    const boardIds=BRDS().map(b=>b.id);
     try{
       const monthStart=saD().slice(0,8)+'01';
       const [inv, posted, metrics] = await Promise.all([
@@ -4237,26 +4240,36 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(plat==='all'){
       if(!D.reach) return `<div class="dw-mute" style="padding:10px 0">No metrics yet. Connect an account on the Content tab and analytics start flowing here.</div>`;
       const mx=D.plats.length?D.plats[0][1]:1;
-      const bars=D.plats.map(([k,v])=>{ const p=(window.PLAT&&PLAT[k])||['?','#8a887e']; return `<div class="dw-brow"><span class="dw-bn"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])}</span><span class="dw-bar"><i style="width:${v/mx*100}%;background:${p[1]}"></i></span><span class="dw-bv">${num(v)}</span></div>`; }).join('');
+      const bars=D.plats.map(([k,v])=>{ const p=PLATS()[k]||['?','#8a887e']; return `<div class="dw-brow"><span class="dw-bn"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])}</span><span class="dw-bar"><i style="width:${v/mx*100}%;background:${p[1]}"></i></span><span class="dw-bv">${num(v)}</span></div>`; }).join('');
       const dd = D.delta==null?'':`<span class="dw-delta ${D.delta>=0?'up':'down'}">${D.delta>=0?'▲':'▼'} ${Math.abs(D.delta)}%</span>`;
       return `<div class="dw-cap">Total reach · all platforms · 30d</div><div class="dw-big">${numF(D.reach)}</div>${dd?'<div style="margin-top:2px">'+dd+'</div>':''}${spark(D.spark)}<div class="dw-bars">${bars}</div>`;
     } else {
       const v=(D.plats.find(x=>x[0]===plat)||[,0])[1];
-      const p=(window.PLAT&&PLAT[plat])||['?','#8a887e'];
+      const p=PLATS()[plat]||['?','#8a887e'];
       return `<div class="dw-cap"><span class="dw-dot" style="background:${p[1]}"></span>${E(p[0])} reach · 30d</div><div class="dw-big">${numF(v)}</div>${spark(D.spark)}`;
     }
   }
   function calBody(cfg){
     if(cfg.source==='external'){
-      return `<div class="dw-srcbadge">🔗 External calendar</div>
-        <div class="dw-connect">
-          <p class="dw-mute">Connect your Google or Outlook calendar to see real meetings here.</p>
-          <button class="btn" onclick="dashConnectCal()">Connect calendar</button>
-          <div class="dw-mute" style="margin-top:8px;font-size:11px">Coming in the next update — your content schedule works today.</div>
-        </div>`;
+      if(_dashCal.state==='loading'){ if(!_dashCal.started) dashCalLoad(); return `<div class="dw-srcbadge">🔗 My calendar</div><div class="dw-mute" style="padding:10px 0">Loading your calendar…</div>`; }
+      if(_dashCal.state==='disconnected'){
+        return `<div class="dw-srcbadge">🔗 My calendar</div>
+          <div class="dw-connect">
+            <p class="dw-mute">Connect your Google calendar to see your real meetings here.</p>
+            <button class="btn accent" onclick="dashCalConnect()">Connect Google Calendar</button>
+          </div>`;
+      }
+      // connected
+      const evs=_dashCal.events||[];
+      const head=`<div class="dw-srcbadge" title="${E(_dashCal.email||'')}">🔗 ${E(_dashCal.email||'Google Calendar')} <a href="#" onclick="dashCalDisconnect();return false" style="color:var(--muted);margin-left:6px">disconnect</a></div>`;
+      if(!evs.length) return head+`<div class="dw-mute" style="padding:10px 0">No meetings in the next 3 weeks.</div>`;
+      const rows=evs.map(x=>{ const dstr=x.date; const dt=dstr?new Date((x.dateTime||dstr)):null; const dd=dt&&!isNaN(dt)?dt.getDate():'—'; const mo=dt&&!isNaN(dt)?dt.toLocaleDateString('en-ZA',{month:'short'}):''; const tm=x.allDay?'All day':(dt&&!isNaN(dt)?dt.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'}):''); const sub=[tm,x.where].filter(Boolean).join(' · ');
+        return `<div class="dw-ag" onclick="${x.link?`window.open('${x.link}','_blank')`:''}"><div class="dw-when"><b>${dd}</b><small>${mo}</small></div><div class="dw-what"><div class="t">${E(x.title)}</div><div class="m">${E(sub)}</div></div></div>`;
+      }).join('');
+      return head+rows;
     }
-    const home=window._home||{};
-    const posts=(home.posts||[]).map(p=>({date:p.post_date,label:(p.caption||'').split('\n')[0]||'(no caption)',sub:(PLAT[p.platform]||PLAT.other)[0]+' · scheduled',bid:p.board_id}));
+    const home=HOME();
+    const posts=(home.posts||[]).map(p=>({date:p.post_date,label:(p.caption||'').split('\n')[0]||'(no caption)',sub:(PLATS()[p.platform]||PLATS().other||['',''])[0]+' · scheduled',bid:p.board_id}));
     const tasks=(home.tasks||[]).map(n=>({date:n.due_date,label:n.title||'Task due',sub:'Deadline',bid:n.board_id}));
     const items=posts.concat(tasks).filter(x=>x.date).sort((a,b)=>a.date<b.date?-1:1).slice(0,8);
     if(!items.length) return `<div class="dw-srcbadge">📅 Content schedule</div><div class="dw-mute" style="padding:10px 0">Nothing scheduled yet.</div>`;
@@ -4269,9 +4282,9 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     return `<textarea class="dw-note" placeholder="Jot something…" oninput="dashNoteInput('${w.id}',this.value)">${E(w.cfg.text||'')}</textarea>`;
   }
   function boardsBody(){
-    const B=window.BOARDS||[];
+    const B=BRDS();
     if(!B.length) return `<div class="dw-mute" style="padding:10px 0">No boards yet. <a href="#" onclick="newBoardModal();return false">Create one</a>.</div>`;
-    setTimeout(()=>{ if(window.loadBoardStats) try{window.loadBoardStats();}catch(_e){} },30);
+    setTimeout(()=>{ try{ if(typeof loadBoardStats!=='undefined') loadBoardStats(); }catch(_e){} },30);
     return `<div class="dw-boards">${B.map(b=>`<div class="dw-bc" style="border-top-color:${b.color||'var(--accent)'}" onclick="openBoard('${b.id}')">
       <div class="dw-bt">${b.private_to?'🔒 ':''}${E(b.name)}</div>
       <div class="dw-bprog"><i id="bp-${b.id}" style="width:0%"></i></div>
@@ -4279,19 +4292,19 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
       <div class="dw-bc dw-bnew" onclick="newBoardModal()">＋ New board</div></div>`;
   }
   function linksBody(){
-    const B=window.BOARDS||[];
+    const B=BRDS();
     return `<div class="dw-links">${B.map(b=>`<a href="#" onclick="openBoard('${b.id}');return false"><span class="dw-lsq" style="background:${b.color||'var(--accent)'}"></span>${E(b.name)}</a>`).join('')||'<span class="dw-mute">No boards yet.</span>'}</div>`;
   }
   function bodyFor(w){
     try{
       switch(w.type){
         case 'goal': return goalBody(w.cfg);
-        case 'todos': return window.homeTasksBody? window.homeTasksBody() : '<div class="dw-mute">—</div>';
+        case 'todos': return typeof homeTasksBody!=='undefined'? homeTasksBody() : '<div class="dw-mute">—</div>';
         case 'notes': return notesBody(w);
         case 'analytics': return analyticsBody(w.cfg);
         case 'calendar': return calBody(w.cfg);
-        case 'inbox': return window.homeInbox? window.homeInbox((window._home||{}).inbox||[]) : '';
-        case 'posts': return window.homePosts? window.homePosts((window._home||{}).posts||[]) : '';
+        case 'inbox': return typeof homeInbox!=='undefined'? homeInbox(HOME().inbox||[]) : '';
+        case 'posts': return typeof homePosts!=='undefined'? homePosts(HOME().posts||[]) : '';
         case 'boards': return boardsBody();
         case 'links': return linksBody();
       }
@@ -4300,7 +4313,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   }
   function titleFor(w){
     if(w.type==='goal') return w.cfg.label||'Goal';
-    if(w.type==='analytics') return (w.cfg.platform&&w.cfg.platform!=='all'&&window.PLAT&&PLAT[w.cfg.platform])? PLAT[w.cfg.platform][0]+' analytics':'Analytics';
+    if(w.type==='analytics') return (w.cfg.platform&&w.cfg.platform!=='all'&&PLATS()[w.cfg.platform])? PLATS()[w.cfg.platform][0]+' analytics':'Analytics';
     if(w.type==='calendar') return w.cfg.source==='external'?'Meetings':'Calendar';
     return CAT[w.type].name;
   }
@@ -4395,7 +4408,49 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(['goal','analytics','calendar'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
   };
   window.dashNoteInput=function(id,val){ const w=(layout||[]).find(x=>x.id===id); if(w){ w.cfg.text=val; save(); } };
-  window.dashConnectCal=function(){ dtoast('Calendar connect is coming in the next update.'); };
+
+  /* ---- external calendar (Google) ---- */
+  const _dashCal={ state:'loading', started:false, events:[], email:null };
+  function calFnUrl(){ return (typeof SUPABASE_URL!=='undefined'?SUPABASE_URL:'')+'/functions/v1/bbe-calendar'; }
+  async function calPost(action, extra){
+    const { data:{ session } }=await sb.auth.getSession();
+    const jwt=session?.access_token||'';
+    const anon=(typeof SUPABASE_KEY!=='undefined')?SUPABASE_KEY:'';
+    const r=await fetch(calFnUrl(), { method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':anon, 'Authorization':'Bearer '+jwt }, body:JSON.stringify(Object.assign({action, workspace_id:WS.id}, extra||{})) });
+    return await r.json();
+  }
+  function refreshCalWidgets(){ (layout||[]).filter(w=>w.type==='calendar'&&w.cfg.source==='external').forEach(refreshBody); }
+  async function dashCalLoad(){
+    if(_dashCal.started) return; _dashCal.started=true; _dashCal.state='loading';
+    try{
+      const j=await calPost('list');
+      if(j&&j.connected){ _dashCal.state='connected'; _dashCal.events=j.events||[]; _dashCal.email=j.email||null; }
+      else { _dashCal.state='disconnected'; _dashCal.events=[]; }
+    }catch(_e){ _dashCal.state='disconnected'; }
+    refreshCalWidgets();
+  }
+  window.dashCalConnect=async function(){
+    dtoast('Opening Google…');
+    try{ const j=await calPost('connect'); if(j&&j.url){ location.href=j.url; } else { dtoast(j&&j.error?j.error:'Could not start calendar connect.'); } }
+    catch(_e){ dtoast('Could not start calendar connect.'); }
+  };
+  window.dashCalDisconnect=async function(){
+    try{ await calPost('disconnect'); }catch(_e){}
+    _dashCal.state='disconnected'; _dashCal.events=[]; _dashCal.email=null; refreshCalWidgets(); dtoast('Calendar disconnected');
+  };
+  // handle return from Google OAuth (?calconnected=1|err)
+  try{
+    const q=new URLSearchParams(location.search);
+    if(q.has('calconnected')){
+      const ok=q.get('calconnected')==='1';
+      setTimeout(()=>dtoast(ok?'✅ Calendar connected':'Calendar connect failed — please try again'),600);
+      // reset so the widget re-fetches fresh state
+      _dashCal.started=false; _dashCal.state='loading';
+      q.delete('calconnected');
+      const clean=location.pathname+(q.toString()?('?'+q.toString()):'')+location.hash;
+      history.replaceState(null,'',clean);
+    }
+  }catch(_e){}
 
   /* ============ CONFIG MODAL ============ */
   let editingId=null;
@@ -4426,7 +4481,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         <div class="dw-hint" style="margin-top:8px">Add a deadline for a countdown with pace tracking. Leave blank for open-ended.</div></div>`;
     }
     if(w.type==='analytics'){
-      const opts=[['all','All platforms (total reach)']].concat(Object.keys((window.PLAT||{})).map(k=>[k,PLAT[k][0]+' only']));
+      const opts=[['all','All platforms (total reach)']].concat(Object.keys(PLATS()).filter(k=>['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].includes(k)).map(k=>[k,PLATS()[k][0]+' only']));
       return `<div class="dw-fld"><label>Show</label><select id="a_platform">${opts.map(([k,l])=>`<option value="${k}" ${(w.cfg.platform||'all')===k?'selected':''}>${E(l)}</option>`).join('')}</select><div class="dw-hint" style="margin-top:10px">Pulls from the same metrics as your Analytics page, across all your boards.</div></div>`;
     }
     if(w.type==='calendar'){
@@ -4501,13 +4556,13 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
 
   /* ============ OVERRIDE boardsView -> dashboard shell ============ */
   window.boardsView=function(){
-    const first = window.esc? esc((MEM&&MEM.name?MEM.name.split(' ')[0]:(WS&&WS.name))||'there') : 'there';
+    const first = typeof esc!=='undefined'? esc((MEM&&MEM.name?MEM.name.split(' ')[0]:(WS&&WS.name))||'there') : 'there';
     const h=new Date(Date.now()+2*3600*1000).getUTCHours();
     const greet=h<12?'Good morning':h<18?'Good afternoon':'Good evening';
     setTimeout(window.dashInit,40);
     return `<div class="dash-wrap">
       <div class="dash-top">
-        <div><h2 class="dash-h">${window.ic?ic('sun',18):''} ${greet}, ${first}</h2>
+        <div><h2 class="dash-h">${typeof ic!=='undefined'?ic('sun',18):''} ${greet}, ${first}</h2>
           <div class="dash-sub">${WS?E(WS.name):''} · your personal home</div></div>
         <div class="dash-tools">
           <span class="dash-modehint">✎ Drag, resize, remove — then Done</span>
