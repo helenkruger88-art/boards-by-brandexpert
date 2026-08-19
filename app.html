@@ -4132,7 +4132,19 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     email:    {icon:'✉️', name:'Email (Mailchimp)',    desc:'Audience size, list count, open & click rates, and your last campaign.', w:4,h:4},
     sales:    {icon:'🛍️', name:'Sales (Shopify)',      desc:'30-day orders, revenue and average order value from your store.', w:4,h:3},
     reviews:  {icon:'⭐', name:'Reviews (Google)',     desc:'Google Business Profile star rating, review count & recent reviews (uses the board’s Google connection).', w:4,h:5},
-    ads:      {icon:'📣', name:'Ads (Meta)',           desc:'Facebook/Instagram ad spend, ROAS, purchases & clicks over 30 days.', w:4,h:3}
+    ads:      {icon:'📣', name:'Ads (Meta)',           desc:'Facebook/Instagram ad spend, ROAS, purchases & clicks over 30 days.', w:4,h:3},
+    weather:  {icon:'⛅', name:'Weather',              desc:'Today’s weather and a 4-day outlook for any city — live, no setup.', w:3,h:3},
+    clock:    {icon:'🕐', name:'World clocks',         desc:'Live clocks for the time zones you and your clients work across.', w:4,h:3},
+    focus:    {icon:'✨', name:'Daily focus',          desc:'Your one thing for the day, plus a rotating spark of inspiration.', w:4,h:2},
+    countdown:{icon:'⏳', name:'Countdown',            desc:'Days to go until a launch, campaign go-live or any deadline.', w:3,h:2},
+    top3:     {icon:'✅', name:'Weekly top 3',         desc:'The three things that matter this week — tick them off right here.', w:4,h:3},
+    activity: {icon:'📡', name:'Recent activity',      desc:'A live stream of what just happened on a board — comments, messages, scheduled posts.', w:4,h:4},
+    news:     {icon:'📰', name:'News feed',            desc:'Headlines from any RSS feed — an industry blog, a client, or a Google News topic.', w:4,h:4},
+    besttime: {icon:'🕰️', name:'Best time to post',    desc:'When your audience actually engages, learned from your own inbox activity.', w:5,h:4},
+    toppost:  {icon:'🏆', name:'Top post',             desc:'Your best-performing published post over the last 30 days.', w:4,h:3},
+    mentions: {icon:'👂', name:'Mentions',             desc:'What people are saying — mentions & conversations across your connected accounts.', w:4,h:4},
+    trends:   {icon:'#️⃣', name:'Hashtags',             desc:'Your most-used hashtags plus a watchlist of tags to keep an eye on.', w:4,h:4},
+    sitehealth:{icon:'🩺', name:'Site health',         desc:'Uptime, response time and SSL-certificate expiry for a website.', w:4,h:3}
   };
   const GOAL_SRC = {
     revenue:    {label:'Revenue (this month)',        metric:'revenue',    fmt:money},
@@ -4144,6 +4156,31 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   // '' = default (uses the app accent). Others are tile accent colours.
   const PALETTE = ['', '#C75B12','#2f9e5f','#0A66C2','#7A5AF8','#E4405F','#d99512','#0f766e','#334155'];
   const CHANNELS = [['all','All channels'],['facebook','Facebook'],['instagram','Instagram'],['whatsapp','WhatsApp'],['email','Email'],['linkedin','LinkedIn']];
+  // WMO weather codes -> [label, emoji]
+  const WMO = {0:['Clear sky','☀️'],1:['Mainly clear','🌤️'],2:['Partly cloudy','⛅'],3:['Overcast','☁️'],45:['Fog','🌫️'],48:['Rime fog','🌫️'],51:['Light drizzle','🌦️'],53:['Drizzle','🌦️'],55:['Heavy drizzle','🌦️'],56:['Freezing drizzle','🌧️'],57:['Freezing drizzle','🌧️'],61:['Light rain','🌦️'],63:['Rain','🌧️'],65:['Heavy rain','🌧️'],66:['Freezing rain','🌧️'],67:['Freezing rain','🌧️'],71:['Light snow','🌨️'],73:['Snow','🌨️'],75:['Heavy snow','❄️'],77:['Snow grains','🌨️'],80:['Rain showers','🌦️'],81:['Rain showers','🌧️'],82:['Violent showers','⛈️'],85:['Snow showers','🌨️'],86:['Snow showers','🌨️'],95:['Thunderstorm','⛈️'],96:['Thunderstorm + hail','⛈️'],99:['Thunderstorm + hail','⛈️']};
+  const COMMON_TZ = [['Cape Town','Africa/Johannesburg'],['London','Europe/London'],['New York','America/New_York'],['Los Angeles','America/Los_Angeles'],['Chicago','America/Chicago'],['Toronto','America/Toronto'],['São Paulo','America/Sao_Paulo'],['Dubai','Asia/Dubai'],['Mumbai','Asia/Kolkata'],['Singapore','Asia/Singapore'],['Hong Kong','Asia/Hong_Kong'],['Tokyo','Asia/Tokyo'],['Sydney','Australia/Sydney'],['Paris','Europe/Paris'],['Berlin','Europe/Berlin'],['Nairobi','Africa/Nairobi'],['Lagos','Africa/Lagos'],['Auckland','Pacific/Auckland']];
+  const QUOTES = [
+    ['Content builds relationships. Relationships build trust. Trust drives revenue.','Andrew Davis'],
+    ['Marketing is no longer about the stuff you make, but the stories you tell.','Seth Godin'],
+    ['Done is better than perfect.','Sheryl Sandberg'],
+    ['The best marketing doesn’t feel like marketing.','Tom Fishburne'],
+    ['People don’t buy what you do; they buy why you do it.','Simon Sinek'],
+    ['Make it simple. Make it memorable. Make it inviting to look at.','Leo Burnett'],
+    ['Either write something worth reading or do something worth writing about.','Benjamin Franklin'],
+    ['You can’t use up creativity. The more you use, the more you have.','Maya Angelou'],
+    ['Focus on the value you deliver, not the noise you make.','—'],
+    ['Consistency is more important than intensity.','—'],
+    ['Your brand is what people say about you when you’re not in the room.','Jeff Bezos'],
+    ['Start where you are. Use what you have. Do what you can.','Arthur Ashe'],
+    ['A goal without a deadline is just a dream.','—'],
+    ['Ship it, then improve it.','—'],
+    ['The riches are in the niches.','—'],
+    ['Quality means doing it right when no one is looking.','Henry Ford'],
+    ['Great things are done by a series of small things brought together.','Vincent van Gogh'],
+    ['Don’t find customers for your products, find products for your customers.','Seth Godin'],
+    ['Attention is the new currency — earn it, don’t buy it.','—'],
+    ['Small daily improvements are the key to staggering long-term results.','—']
+  ];
   const DEFAULT_LAYOUT = [
     {type:'goal', cfg:{label:'Revenue this month', mode:'auto', source:'revenue', board:'all', target:60000, deadline:''}, x:0,y:0,w:4,h:3},
     {type:'goal', cfg:{label:'Grow followers', mode:'auto', source:'followers', board:'all', target:10000, deadline:''}, x:4,y:0,w:4,h:3},
@@ -4377,6 +4414,18 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         case 'sales': return salesBody(w.cfg);
         case 'reviews': return reviewsBody(w.cfg);
         case 'ads': return adsBody(w.cfg);
+        case 'weather': return weatherBody(w.cfg);
+        case 'clock': return clockBody(w.cfg);
+        case 'focus': return focusBody(w);
+        case 'countdown': return countdownBody(w.cfg);
+        case 'top3': return top3Body(w);
+        case 'activity': return activityBody(w.cfg);
+        case 'news': return newsBody(w.cfg);
+        case 'besttime': return bestTimeBody(w.cfg);
+        case 'toppost': return topPostBody(w.cfg);
+        case 'mentions': return mentionsBody(w.cfg);
+        case 'trends': return trendsBody(w.cfg);
+        case 'sitehealth': return siteHealthBody(w.cfg);
       }
     }catch(e){ console.error('widget body',w.type,e); return `<div class="dw-mute">Couldn’t load.</div>`; }
     return '';
@@ -4392,6 +4441,18 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(w.type==='sales') return 'Sales';
     if(w.type==='reviews') return 'Reviews';
     if(w.type==='ads') return 'Ads';
+    if(w.type==='weather') return w.cfg.city||'Weather';
+    if(w.type==='clock') return 'World clocks';
+    if(w.type==='focus') return 'Daily focus';
+    if(w.type==='countdown') return w.cfg.label||'Countdown';
+    if(w.type==='top3') return 'Weekly top 3';
+    if(w.type==='activity') return 'Recent activity';
+    if(w.type==='news') return w.cfg.title||'News';
+    if(w.type==='besttime') return 'Best time to post';
+    if(w.type==='toppost') return 'Top post';
+    if(w.type==='mentions') return 'Mentions';
+    if(w.type==='trends') return 'Hashtags';
+    if(w.type==='sitehealth') return 'Site health';
     return CAT[w.type].name;
   }
 
@@ -4437,6 +4498,18 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(type==='inbox') return {board:'all', channel:'all'};
     if(type==='notes') return {text:''};
     if(['website','search','email','sales','reviews','ads'].includes(type)) return {board:(BRDS()[0]||{}).id||''};
+    if(type==='weather') return {city:'Cape Town', lat:-33.9249, lon:18.4241, unit:'c'};
+    if(type==='clock') return {zones:[['Cape Town','Africa/Johannesburg'],['London','Europe/London'],['New York','America/New_York']]};
+    if(type==='focus') return {text:'', showQuote:true};
+    if(type==='countdown') return {label:'Launch day', date:''};
+    if(type==='top3') return {items:[{t:'',done:false},{t:'',done:false},{t:'',done:false}]};
+    if(type==='activity') return {board:'all'};
+    if(type==='news') return {url:'', title:''};
+    if(type==='besttime') return {board:'all'};
+    if(type==='toppost') return {board:'all'};
+    if(type==='mentions') return {board:'all', keyword:''};
+    if(type==='trends') return {board:'all', watch:[]};
+    if(type==='sitehealth') return {url:''};
     return {};
   }
   function refreshEmpty(){ const e=document.getElementById('dashEmpty'); if(e) e.style.display=(layout&&layout.length)?'none':'block'; }
@@ -4484,7 +4557,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const w=addWidget(type); hideModal('dashCatModal');
     if(!editing) window.dashToggleEdit();
     dtoast(CAT[type].name+' added');
-    if(['goal','analytics','calendar','inbox','website','search','email','sales','reviews','ads'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
+    if(['goal','analytics','calendar','inbox','website','search','email','sales','reviews','ads','weather','clock','countdown','activity','news','besttime','toppost','mentions','trends','sitehealth'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
   };
   window.dashNoteInput=function(id,val){ const w=(layout||[]).find(x=>x.id===id); if(w){ w.cfg.text=val; save(); } };
 
@@ -4714,6 +4787,250 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(q.has('adsconnected')){ const ok=q.get('adsconnected')==='1'; setTimeout(()=>dtoast(ok?'✅ Meta Ads connected — pick your ad account':'Meta Ads connect failed'),600); Object.keys(_dashAds).forEach(k=>delete _dashAds[k]); q.delete('adsconnected'); history.replaceState(null,'',location.pathname+(q.toString()?('?'+q.toString()):'')+location.hash); }
   }catch(_e){}
 
+  /* ============ ADD-ON WIDGETS (ambient + data-driven + rss/site) ============ */
+  function relTime(dt){
+    if(!(dt instanceof Date)||isNaN(dt)) return '';
+    const s=Math.floor((Date.now()-dt.getTime())/1000);
+    if(s<0){ const f=-s; if(f<3600)return 'in '+Math.max(1,Math.ceil(f/60))+'m'; if(f<86400)return 'in '+Math.ceil(f/3600)+'h'; return 'in '+Math.ceil(f/86400)+'d'; }
+    if(s<60)return 'now'; if(s<3600)return Math.floor(s/60)+'m'; if(s<86400)return Math.floor(s/3600)+'h'; if(s<604800)return Math.floor(s/86400)+'d'; return Math.floor(s/604800)+'w';
+  }
+  function dayIdx(n){ const d=new Date(); const day=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5); return ((day%n)+n)%n; }
+
+  /* ---- Weather (Open-Meteo, free, no key) ---- */
+  const _dashWx={};
+  async function wxGeocode(city){
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
+    const j=await r.json(); const g=(j.results||[])[0]; if(!g) return null;
+    const extra=[g.admin1,g.country].filter(Boolean).join(', ');
+    return {lat:g.latitude, lon:g.longitude, name:g.name+(extra?' · '+extra:'')};
+  }
+  async function wxLoad(key,lat,lon,unit){
+    _dashWx[key]={state:'loading'};
+    try{
+      const u=(unit==='f')?'fahrenheit':'celsius';
+      const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=4&temperature_unit=${u}`);
+      const j=await r.json(); _dashWx[key]={state:'ready',d:j,unit};
+    }catch(_e){ _dashWx[key]={state:'error'}; }
+    (layout||[]).filter(w=>w.type==='weather').forEach(refreshBody);
+  }
+  function wxKey(cfg){ return cfg.lat+','+cfg.lon+','+(cfg.unit||'c'); }
+  function weatherBody(cfg){
+    if(cfg.lat==null) return `<div class="dw-mute" style="padding:10px 0">Set a city in ⚙ settings.</div>`;
+    const key=wxKey(cfg); const w=_dashWx[key];
+    if(!w){ wxLoad(key,cfg.lat,cfg.lon,cfg.unit||'c'); return `<div class="dw-srcbadge">⛅ ${E(cfg.city||'Weather')}</div><div class="dw-mute" style="padding:10px 0">Loading weather…</div>`; }
+    if(w.state==='loading') return `<div class="dw-srcbadge">⛅ ${E(cfg.city||'Weather')}</div><div class="dw-mute" style="padding:10px 0">Loading weather…</div>`;
+    if(w.state==='error') return `<div class="dw-srcbadge">⛅ Weather</div><div class="dw-mute" style="padding:10px 0">Couldn’t load weather — check the city in ⚙ settings.</div>`;
+    const d=w.d||{}, c=d.current||{}, dy=d.daily||{}, deg=(w.unit==='f'?'°F':'°C');
+    const wc=WMO[c.weather_code]||['—','🌡️'];
+    const days=(dy.time||[]).map((t,i)=>{ const dt=new Date(t+'T00:00:00'); const dn=isNaN(dt)?'':dt.toLocaleDateString('en-ZA',{weekday:'short'}); const em=(WMO[(dy.weather_code||[])[i]]||['','·'])[1];
+      return `<div style="text-align:center;flex:1"><div style="font-size:10px;color:var(--muted);font-weight:700">${i===0?'Today':E(dn)}</div><div style="font-size:17px;margin:2px 0">${em}</div><div style="font-size:11px;font-weight:700">${Math.round((dy.temperature_2m_max||[])[i])}°</div><div style="font-size:10px;color:var(--muted)">${Math.round((dy.temperature_2m_min||[])[i])}°</div></div>`; }).join('');
+    return `<div class="dw-srcbadge">⛅ ${E(cfg.city||'Weather')}</div>
+      <div style="display:flex;align-items:center;gap:12px;margin:2px 0 4px">
+        <div style="font-size:40px;line-height:1">${wc[1]}</div>
+        <div style="min-width:0"><div class="dw-big" style="font-size:30px">${Math.round(c.temperature_2m)}${deg}</div>
+        <div class="dw-cap" style="white-space:normal">${E(wc[0])} · feels ${Math.round(c.apparent_temperature)}° · 💧${c.relative_humidity_2m}% · 💨${Math.round(c.wind_speed_10m)}km/h</div></div>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:6px">${days}</div>`;
+  }
+
+  /* ---- World clocks (ticking) ---- */
+  function clockBody(cfg){
+    const zones=(cfg&&cfg.zones)||[];
+    if(!zones.length) return `<div class="dw-mute" style="padding:10px 0">Add time zones in ⚙ settings.</div>`;
+    const now=new Date();
+    return zones.map(z=>{ const label=z[0], tz=z[1]; let tm='—',dd='';
+      try{ tm=now.toLocaleTimeString('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit'}); dd=now.toLocaleDateString('en-ZA',{timeZone:tz,weekday:'short',day:'numeric',month:'short'}); }catch(_e){ dd='invalid zone'; }
+      const hr=parseInt(tm,10); const em=(!isNaN(hr)&&hr>=6&&hr<18)?'☀️':'🌙';
+      return `<div class="dw-ag" style="cursor:default"><div class="dw-what"><div class="t">${em} ${E(label)}</div><div class="m">${E(dd)}</div></div><div style="margin-left:auto;font-size:20px;font-weight:800;letter-spacing:-.5px;font-variant-numeric:tabular-nums;flex:0 0 auto">${E(tm)}</div></div>`;
+    }).join('');
+  }
+
+  /* ---- Daily focus + rotating quote ---- */
+  function focusBody(w){
+    const cfg=w.cfg||{}; const q=QUOTES[dayIdx(QUOTES.length)];
+    const quote=(cfg.showQuote!==false)?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.5"><span style="font-style:italic">“${E(q[0])}”</span><div style="margin-top:3px;font-size:11px">— ${E(q[1])}</div></div>`:'';
+    return `<div style="font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.03em;margin-bottom:3px">TODAY’S FOCUS</div>
+      <textarea class="dw-note" style="min-height:32px" placeholder="What’s the one thing today?" oninput="dashFocusInput('${w.id}',this.value)">${E(cfg.text||'')}</textarea>${quote}`;
+  }
+  window.dashFocusInput=function(id,val){ const w=(layout||[]).find(x=>x.id===id); if(w){ w.cfg.text=val; save(); } };
+
+  /* ---- Countdown ---- */
+  function countdownBody(cfg){
+    if(!cfg||!cfg.date) return `<div class="dw-mute" style="padding:10px 0">Set a target date in ⚙ settings.</div>`;
+    const target=new Date(cfg.date+'T00:00:00'), now=new Date(saD()+'T00:00:00');
+    const days=Math.round((target-now)/864e5);
+    const big= days>0?days:(days===0?'🎉':Math.abs(days));
+    const lab= days>0?(days===1?'day to go':'days to go'):(days===0?'today!':(days===-1?'day ago':'days ago'));
+    const dd=isNaN(target)?'':target.toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    return `<div style="text-align:center;padding:4px 0">
+      <div class="dw-big" style="font-size:40px;color:var(--wc,var(--accent));line-height:1">${big}</div>
+      <div class="dw-cap" style="font-size:13px">${lab}</div>
+      <div style="margin-top:7px;font-size:12.5px;font-weight:600">${E(cfg.label||'')}</div>
+      <div class="dw-mute" style="font-size:11px;margin-top:1px">${E(dd)}</div></div>`;
+  }
+
+  /* ---- Weekly top 3 ---- */
+  function top3Body(w){
+    const items=(w.cfg&&w.cfg.items&&w.cfg.items.length)?w.cfg.items:[{t:'',done:false},{t:'',done:false},{t:'',done:false}];
+    return items.slice(0,3).map((it,i)=>`<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--line)">
+      <input type="checkbox" ${it.done?'checked':''} onchange="dashTop3('${w.id}',${i},'done',this.checked)" style="width:16px;height:16px;accent-color:var(--wc,var(--accent));flex:0 0 auto;cursor:pointer">
+      <input type="text" value="${E(it.t||'')}" placeholder="Priority ${i+1}…" oninput="dashTop3('${w.id}',${i},'t',this.value)" style="border:none;background:transparent;font-family:inherit;font-size:13px;flex:1;min-width:0;color:var(--ink);${it.done?'text-decoration:line-through;opacity:.55':''}"></div>`).join('');
+  }
+  window.dashTop3=function(id,i,k,v){ const w=(layout||[]).find(x=>x.id===id); if(!w)return; if(!w.cfg.items)w.cfg.items=[{t:'',done:false},{t:'',done:false},{t:'',done:false}]; if(!w.cfg.items[i])w.cfg.items[i]={t:'',done:false}; w.cfg.items[i][k]=v; if(k==='done')refreshBody(w); save(); };
+
+  /* ---- Recent activity (from loaded interactions + scheduled posts) ---- */
+  function activityBody(cfg){
+    const board=(cfg&&cfg.board)||'all';
+    if(!dataReady) return `<div class="dw-mute" style="padding:10px 0">Loading activity…</div>`;
+    const evs=[];
+    let inter=(D.inbox||[]).slice(); if(board!=='all') inter=inter.filter(r=>r.board_id===board);
+    inter.slice(0,20).forEach(r=>{ const plat=(PLATS()[r.platform]||['',''])[0]||r.platform||''; const kind=(r.kind==='dm'||r.kind==='message')?'messaged':'commented';
+      evs.push({when:r.received_at, icon:'💬', txt:`<b>${E(r.author_name||'Someone')}</b> ${kind}${plat?' on '+E(plat):''}`, sub:E((r.text||'').slice(0,80)), bid:r.board_id, view:'binbox'}); });
+    let posts=(HOME().posts||[]).slice(); if(board!=='all') posts=posts.filter(p=>p.board_id===board);
+    posts.slice(0,6).forEach(p=>{ const plat=(PLATS()[p.platform]||['',''])[0]||''; evs.push({when:(p.post_date||'')+'T'+(p.post_time||'09:00'), icon:'🗓️', txt:`Post scheduled${plat?' · '+E(plat):''}`, sub:E((p.caption||'').split('\n')[0].slice(0,80)), bid:p.board_id, view:'content'}); });
+    evs.sort((a,b)=> (a.when<b.when?1:-1));
+    const head=board!=='all'?`<div class="dw-srcbadge">📡 ${E(boardName(board))}</div>`:'';
+    if(!evs.length) return head+`<div class="dw-mute" style="padding:10px 0">No activity yet. Connect an account or schedule a post and it shows up here.</div>`;
+    const rows=evs.slice(0,10).map(e=>{ const rel=relTime(new Date(e.when));
+      return `<div class="dw-ag" ${e.bid?`onclick="openBoardView('${e.bid}','${e.view}')"`:''} style="cursor:${e.bid?'pointer':'default'}"><div style="font-size:15px;flex:0 0 auto">${e.icon}</div><div class="dw-what"><div class="t" style="white-space:normal">${e.txt}</div>${e.sub?`<div class="m">${e.sub}</div>`:''}</div><div class="dw-mute" style="font-size:10px;flex:0 0 auto;margin-left:auto">${rel}</div></div>`; }).join('');
+    return head+rows;
+  }
+
+  /* ---- Best time to post (from inbox-activity patterns) ---- */
+  function bestTimeBody(cfg){
+    const board=(cfg&&cfg.board)||'all';
+    if(!dataReady) return `<div class="dw-mute" style="padding:10px 0">Loading…</div>`;
+    let rows=(D.inbox||[]).slice(); if(board!=='all') rows=rows.filter(r=>r.board_id===board);
+    const times=rows.map(r=>r.received_at).filter(Boolean);
+    const head=`<div class="dw-srcbadge">🕰️ Audience activity${board!=='all'?' · '+E(boardName(board)):''}</div>`;
+    if(times.length<5) return head+`<div class="dw-mute" style="padding:10px 0">Not enough inbox activity yet to spot a pattern. As comments and messages come in, your busiest windows show up here.</div>`;
+    const hours=new Array(24).fill(0), dow=new Array(7).fill(0);
+    times.forEach(t=>{ const dt=new Date(t); if(isNaN(dt))return; hours[dt.getHours()]++; dow[dt.getDay()]++; });
+    const mxH=Math.max(...hours)||1, peakH=hours.indexOf(mxH);
+    const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], mxD=Math.max(...dow)||1, peakD=dow.indexOf(mxD);
+    const fmtH=h=>{ const ap=h<12?'am':'pm'; let hh=h%12; if(hh===0)hh=12; return hh+ap; };
+    const bars=hours.map((v,h)=>`<div title="${fmtH(h)} · ${v}" style="flex:1;height:${(6+(v/mxH)*32).toFixed(0)}px;background:${v===mxH?'var(--wc,var(--accent))':'color-mix(in srgb, var(--wc, var(--accent)) 32%, transparent)'};border-radius:2px"></div>`).join('');
+    return `${head}<div class="dw-cap">Best time to post</div>
+      <div class="dw-big" style="font-size:22px">${fmtH(peakH)}–${fmtH((peakH+1)%24)}</div>
+      <div class="dw-cap">busiest day: <b style="color:var(--ink)">${DOW[peakD]}</b> · from ${times.length} interactions</div>
+      <div style="display:flex;align-items:flex-end;gap:2px;height:40px;margin-top:10px">${bars}</div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:3px"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span></div>`;
+  }
+
+  /* ---- Top post (from bbe_posts.stats) ---- */
+  const _dashTop={};
+  function postScore(st){ st=st||{}; const n=k=>Number(k)||0; return n(st.likes||st.like_count||st.reactions||st.favorites)+n(st.comments||st.comment_count)+n(st.shares||st.share_count||st.retweets)+n(st.reach||st.impressions||st.views||st.plays)*0.1; }
+  async function topLoad(board){
+    const c=_dashTop[board]; if(c&&c.started)return; _dashTop[board]={state:'loading',started:true};
+    try{ let q=sb.from('bbe_posts').select('id,caption,platform,post_date,post_url,stats,board_id').eq('workspace_id',WS.id).eq('status','posted').not('stats','is',null).gte('post_date',new Date(Date.now()-30*864e5).toISOString().slice(0,10)).order('post_date',{ascending:false}).limit(60);
+      if(board&&board!=='all') q=q.eq('board_id',board);
+      const {data}=await q; _dashTop[board]={state:'ready',started:true,rows:data||[]};
+    }catch(_e){ _dashTop[board]={state:'error',started:true}; }
+    (layout||[]).filter(w=>w.type==='toppost'&&((w.cfg.board||'all')===board)).forEach(refreshBody);
+  }
+  function topPostBody(cfg){
+    const board=(cfg&&cfg.board)||'all'; const w=_dashTop[board];
+    const head=`<div class="dw-srcbadge">🏆 Top post · last 30d${board!=='all'?' · '+E(boardName(board)):''}</div>`;
+    if(!w||w.state==='loading'){ if(!w)topLoad(board); return `<div class="dw-srcbadge">🏆 Top post</div><div class="dw-mute" style="padding:10px 0">Finding your best post…</div>`; }
+    if(w.state==='error') return `<div class="dw-srcbadge">🏆 Top post</div><div class="dw-mute" style="padding:10px 0">Couldn’t load posts.</div>`;
+    const rows=(w.rows||[]).slice().sort((a,b)=>postScore(b.stats)-postScore(a.stats));
+    const top=rows[0];
+    if(!top||postScore(top.stats)<=0) return head+`<div class="dw-mute" style="padding:10px 0">No post stats yet. Once your published posts collect likes & comments, the winner shows here.</div>`;
+    const st=top.stats||{}, plat=PLATS()[top.platform]||['',''];
+    const cap=(top.caption||'').split('\n')[0].slice(0,120);
+    const metric=(k,v)=> v?`<span style="margin-right:12px"><b>${num(v)}</b> <span class="dw-mute">${k}</span></span>`:'';
+    return `${head}
+      <div class="dw-cap"><span class="dw-dot" style="background:${plat[1]||'var(--accent)'}"></span>${E(plat[0]||top.platform||'')} · ${E(top.post_date||'')}</div>
+      <div style="font-size:13px;font-weight:600;margin:6px 0;line-height:1.45">${E(cap)||'(no caption)'}</div>
+      <div style="font-size:12px;margin-top:4px">${metric('likes',st.likes||st.like_count||st.reactions||st.favorites)}${metric('comments',st.comments||st.comment_count)}${metric('shares',st.shares||st.share_count||st.retweets)}${metric('reach',st.reach||st.impressions||st.views||st.plays)}</div>
+      ${top.post_url?`<a href="${encodeURI(top.post_url)}" target="_blank" rel="noopener" style="font-size:11.5px;color:var(--accent);font-weight:600;text-decoration:none">View post ↗</a>`:''}`;
+  }
+
+  /* ---- Mentions (from interactions + keyword) ---- */
+  function mentionsBody(cfg){
+    const board=(cfg&&cfg.board)||'all', kw=((cfg&&cfg.keyword)||'').toLowerCase().trim();
+    if(!dataReady) return `<div class="dw-mute" style="padding:10px 0">Loading…</div>`;
+    let rows=(D.inbox||[]).slice(); if(board!=='all') rows=rows.filter(r=>r.board_id===board);
+    if(kw) rows=rows.filter(r=>(((r.text||'')+' '+(r.author_name||'')).toLowerCase().includes(kw)));
+    const head=`<div class="dw-srcbadge">👂 Mentions${kw?' · “'+E(kw)+'”':''}${board!=='all'?' · '+E(boardName(board)):''}</div>`;
+    rows=rows.slice(0,12);
+    if(!rows.length) return head+`<div class="dw-mute" style="padding:10px 0">${kw?'No mentions matching that keyword yet.':'No mentions yet. Comments and messages from your connected accounts show up here — add a keyword in ⚙ to track a specific term.'}</div>`;
+    const list=rows.map(r=>{ const plat=PLATS()[r.platform]||['','#8a887e']; const rel=relTime(new Date(r.received_at));
+      return `<div class="dw-ag" ${r.permalink?`onclick="window.open('${encodeURI(r.permalink)}','_blank')"`:''} style="cursor:${r.permalink?'pointer':'default'}"><div class="dw-what"><div class="t"><span class="dw-dot" style="background:${plat[1]||'#8a887e'}"></span> ${E(r.author_name||'Someone')}</div><div class="m" style="white-space:normal">${E((r.text||'').slice(0,90))}</div></div><div class="dw-mute" style="font-size:10px;margin-left:auto;flex:0 0 auto">${rel}</div></div>`; }).join('');
+    return head+list;
+  }
+
+  /* ---- Hashtags (from own post captions + watchlist) ---- */
+  const _dashTags={};
+  async function tagsLoad(board){
+    const c=_dashTags[board]; if(c&&c.started)return; _dashTags[board]={state:'loading',started:true};
+    try{ let q=sb.from('bbe_posts').select('caption,board_id').eq('workspace_id',WS.id).gte('post_date',new Date(Date.now()-60*864e5).toISOString().slice(0,10)).limit(300);
+      if(board&&board!=='all') q=q.eq('board_id',board);
+      const {data}=await q; _dashTags[board]={state:'ready',started:true,rows:data||[]};
+    }catch(_e){ _dashTags[board]={state:'error',started:true}; }
+    (layout||[]).filter(w=>w.type==='trends'&&((w.cfg.board||'all')===board)).forEach(refreshBody);
+  }
+  function trendsBody(cfg){
+    const board=(cfg&&cfg.board)||'all', watch=(cfg&&cfg.watch)||[];
+    const w=_dashTags[board];
+    const head=`<div class="dw-srcbadge">#️⃣ Hashtags${board!=='all'?' · '+E(boardName(board)):''}</div>`;
+    if(!w||w.state==='loading'){ if(!w)tagsLoad(board); return `<div class="dw-srcbadge">#️⃣ Hashtags</div><div class="dw-mute" style="padding:10px 0">Reading your posts…</div>`; }
+    const counts={};
+    (w.rows||[]).forEach(p=>{ const m=(p.caption||'').match(/#[\p{L}0-9_]+/gu)||[]; m.forEach(t=>{ t=t.toLowerCase(); counts[t]=(counts[t]||0)+1; }); });
+    const top=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    let body='';
+    if(top.length){ const mx=top[0][1]; body+=`<div class="dw-cap">Your most-used tags · 60d</div><div class="dw-bars" style="margin-top:6px">`+top.map(([t,c])=>`<div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${E(t)}">${E(t)}</span><span class="dw-bar" style="max-width:90px"><i style="width:${c/mx*100}%;background:var(--wc,var(--accent))"></i></span><span class="dw-bv">${c}</span></div>`).join('')+`</div>`; }
+    else body+=`<div class="dw-mute" style="padding:8px 0">No hashtags in your recent posts yet.</div>`;
+    if(watch.length){ body+=`<div class="dw-cap" style="margin-top:12px">Watchlist</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">`+watch.map(t=>{ const c=counts[String(t).toLowerCase()]||0; return `<span class="dw-pill ${c?'link':'manual'}" style="text-transform:none;font-size:11px" title="${c?('used '+c+'× recently'):'not used recently'}">${E(t)}${c?' · '+c:''}</span>`; }).join('')+`</div>`; }
+    return head+body;
+  }
+
+  /* ---- News feed (bbe-rss proxy) ---- */
+  const _dashNews={};
+  async function newsLoad(url){
+    _dashNews[url]={state:'loading'};
+    try{ const j=await fnPost('bbe-rss','fetch',null,{url}); _dashNews[url]=(j&&j.items)?{state:'ready',d:j}:{state:'error',err:j&&j.error}; }
+    catch(_e){ _dashNews[url]={state:'error'}; }
+    (layout||[]).filter(w=>w.type==='news'&&((w.cfg.url||'').trim()===url)).forEach(refreshBody);
+  }
+  function newsBody(cfg){
+    const url=((cfg&&cfg.url)||'').trim();
+    if(!url) return `<div class="dw-connect" style="padding:14px 6px"><p class="dw-mute">Add any RSS feed URL in ⚙ settings — an industry blog, a client’s site, or a Google News topic feed.</p></div>`;
+    const w=_dashNews[url];
+    if(!w||w.state==='loading'){ if(!w)newsLoad(url); return `<div class="dw-srcbadge">📰 News</div><div class="dw-mute" style="padding:10px 0">Loading headlines…</div>`; }
+    if(w.state==='error') return `<div class="dw-srcbadge">📰 News</div><div class="dw-mute" style="padding:10px 0">${E(w.err||'Couldn’t load that feed — check the URL is a valid RSS/Atom feed.')}</div>`;
+    const d=w.d||{}, items=(d.items||[]).slice(0,8);
+    if(!items.length) return `<div class="dw-srcbadge">📰 ${E(cfg.title||d.title||'News')}</div><div class="dw-mute" style="padding:10px 0">No items in this feed.</div>`;
+    const rows=items.map(it=>{ const rel=it.date?relTime(new Date(it.date)):''; return `<div class="dw-ag" ${it.link?`onclick="window.open('${encodeURI(it.link)}','_blank')"`:''} style="cursor:${it.link?'pointer':'default'}"><div class="dw-what"><div class="t" style="white-space:normal">${E(it.title||'—')}</div>${rel?`<div class="m">${rel}</div>`:''}</div></div>`; }).join('');
+    return `<div class="dw-srcbadge">📰 ${E(cfg.title||d.title||'News')}</div>${rows}`;
+  }
+
+  /* ---- Site health (bbe-sitehealth) ---- */
+  const _dashSite={};
+  async function siteLoad(url){
+    _dashSite[url]={state:'loading'};
+    try{ const j=await fnPost('bbe-sitehealth','check',null,{url}); _dashSite[url]=(j&&!j.error)?{state:'ready',d:j}:{state:'error',err:j&&j.error}; }
+    catch(_e){ _dashSite[url]={state:'error'}; }
+    (layout||[]).filter(w=>w.type==='sitehealth'&&((w.cfg.url||'').trim()===url)).forEach(refreshBody);
+  }
+  function siteHealthBody(cfg){
+    const url=((cfg&&cfg.url)||'').trim();
+    if(!url) return `<div class="dw-connect" style="padding:14px 6px"><p class="dw-mute">Add a website URL in ⚙ settings to monitor its uptime, response time and SSL certificate.</p></div>`;
+    const w=_dashSite[url];
+    if(!w||w.state==='loading'){ if(!w)siteLoad(url); return `<div class="dw-srcbadge">🩺 Site health</div><div class="dw-mute" style="padding:10px 0">Checking ${E(url)}…</div>`; }
+    if(w.state==='error') return `<div class="dw-srcbadge">🩺 Site health</div><div class="dw-mute" style="padding:10px 0">${E(w.err||'Couldn’t check that site.')}</div>`;
+    const d=w.d||{}, up=d.up, dot=up?'#2f9e5f':'#e5484d';
+    const sd=d.ssl_days_left, sslColor=(sd==null)?'var(--muted)':(sd<14?'#e5484d':sd<30?'#d99512':'#2f9e5f');
+    return `<div class="dw-srcbadge">🩺 ${E(d.host||url)}</div>
+      <div style="display:flex;align-items:center;gap:9px;margin:2px 0 8px"><span class="dw-dot" style="background:${dot};width:11px;height:11px"></span><span class="dw-big" style="font-size:20px">${up?'Online':'Down'}</span>${d.status?`<span class="dw-mute">HTTP ${d.status}</span>`:''}</div>
+      <div class="dw-bars">
+        <div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">Response time</span><span class="dw-bv" style="width:auto">${d.ms!=null?d.ms+' ms':'—'}</span></div>
+        <div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">SSL certificate</span><span class="dw-bv" style="width:auto;color:${sslColor}">${sd==null?'—':(sd<0?'expired':sd+' days left')}</span></div>
+        ${d.ssl_issuer?`<div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">Issuer</span><span class="dw-bv" style="width:auto;font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${E(d.ssl_issuer)}</span></div>`:''}
+      </div>
+      <div class="dw-mute" style="font-size:10px;margin-top:8px">${sd!=null?'SSL from certificate transparency · ':''}checked just now</div>`;
+  }
+
   /* ============ CONFIG MODAL ============ */
   let editingId=null;
   window.dashConfig=function(id){
@@ -4769,6 +5086,49 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     } else if(['website','search','email','sales','reviews','ads'].includes(w.type)){
       s+=`<div class="dw-fld"><label>Which board?</label><select id="wb_board">${boardOptsSpecific(w.cfg.board)}</select></div>
         <div class="dw-hint">Each board connects its own account. Connect it from the tile itself.</div>`;
+    } else if(w.type==='weather'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>City</label><input type="text" id="wx_city" value="${E(cfg.city||'')}" placeholder="e.g. Cape Town"></div>
+        <div class="dw-fld"><label>Units</label><div class="dw-seg" id="wx_unit">
+          <button data-v="c" class="${(cfg.unit||'c')==='c'?'on':''}">°C</button>
+          <button data-v="f" class="${cfg.unit==='f'?'on':''}">°F</button></div></div>
+        <div class="dw-hint">Type any city and Save — I’ll look up its location automatically. Live data from Open-Meteo (free, no account).</div>`;
+    } else if(w.type==='clock'){ const cfg=w.cfg; const zlines=((cfg.zones)||[]).map(z=>z[0]+' | '+z[1]).join('\n');
+      s+=`<div class="dw-fld"><label>Time zones — one per line, as <b>Label | Zone</b></label><textarea id="clk_zones" rows="4" style="font-family:inherit">${E(zlines)}</textarea></div>
+        <div class="dw-fld"><label>Quick add a city</label><select id="clk_add"><option value="">Add a city…</option>${COMMON_TZ.map(z=>`<option value="${z[0]} | ${z[1]}">${E(z[0])}</option>`).join('')}</select></div>
+        <div class="dw-hint">Uses standard IANA zone names (e.g. Europe/London, America/New_York, Asia/Dubai). Add as many rows as you like.</div>`;
+    } else if(w.type==='focus'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>Show a daily quote</label><div class="dw-seg" id="fc_q">
+        <button data-v="1" class="${cfg.showQuote!==false?'on':''}">On</button>
+        <button data-v="0" class="${cfg.showQuote===false?'on':''}">Off</button></div></div>
+        <div class="dw-hint">Type your focus for the day right on the tile — it saves as you go. The quote rotates each day.</div>`;
+    } else if(w.type==='countdown'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>What are you counting down to?</label><input type="text" id="cd_label" value="${E(cfg.label||'')}" placeholder="e.g. Summer campaign launch"></div>
+        <div class="dw-fld"><label>Target date</label><input type="date" id="cd_date" value="${E(cfg.date||'')}"></div>
+        <div class="dw-hint">Shows the days remaining, and counts up once the date has passed.</div>`;
+    } else if(w.type==='activity'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>Board</label><select id="ac_board">${boardOpts(cfg.board)}</select></div>
+        <div class="dw-hint">A live stream of comments, messages and scheduled posts. Pick one board or all combined.</div>`;
+    } else if(w.type==='besttime'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>Board</label><select id="bt_board">${boardOpts(cfg.board)}</select></div>
+        <div class="dw-hint">Learns your busiest windows from when comments &amp; messages actually arrive in your inbox — a real proxy for when your audience is active.</div>`;
+    } else if(w.type==='toppost'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>Board</label><select id="tp_board">${boardOpts(cfg.board)}</select></div>
+        <div class="dw-hint">Ranks your published posts from the last 30 days by likes, comments, shares &amp; reach.</div>`;
+    } else if(w.type==='mentions'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>Board</label><select id="mn_board">${boardOpts(cfg.board)}</select></div>
+        <div class="dw-fld"><label>Track a keyword (optional)</label><input type="text" id="mn_kw" value="${E(cfg.keyword||'')}" placeholder="your brand, a product name…"></div>
+        <div class="dw-hint">Shows conversations from your connected accounts’ comments &amp; messages. Add a keyword to filter to a specific term.</div>`;
+    } else if(w.type==='trends'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>Board</label><select id="tr_board">${boardOpts(cfg.board)}</select></div>
+        <div class="dw-fld"><label>Watch these tags (optional)</label><input type="text" id="tr_watch" value="${E(((cfg.watch)||[]).join(' '))}" placeholder="#yourbrand #campaign #niche"></div>
+        <div class="dw-hint">Surfaces the hashtags you use most across recent posts, and tracks any tags on your watchlist.</div>`;
+    } else if(w.type==='news'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>RSS feed URL</label><input type="text" id="nw_url" value="${E(cfg.url||'')}" placeholder="https://…/feed"></div>
+        <div class="dw-fld"><label>Title (optional)</label><input type="text" id="nw_title" value="${E(cfg.title||'')}" placeholder="Industry news"></div>
+        <div class="dw-hint">Most blogs have a feed at /feed or /rss.xml. For a topic, use a Google News feed: news.google.com/rss/search?q=YOUR+TOPIC</div>`;
+    } else if(w.type==='sitehealth'){ const cfg=w.cfg;
+      s+=`<div class="dw-fld"><label>Website URL</label><input type="text" id="sh_url" value="${E(cfg.url||'')}" placeholder="example.com"></div>
+        <div class="dw-hint">Checks uptime, response time and how many days until the SSL certificate expires.</div>`;
     } else {
       s+=`<div class="dw-hint">No other settings — the header and colour above are all yours.</div>`;
     }
@@ -4778,8 +5138,12 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     document.querySelectorAll('#w_color .dw-sw').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#w_color .dw-sw').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
     if(w.type==='goal'){ document.querySelectorAll('#g_mode button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#g_mode button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); const v=b.dataset.v; document.getElementById('g_manual').style.display=v==='manual'?'block':'none'; document.getElementById('g_auto').style.display=v==='auto'?'block':'none'; }); }
     if(w.type==='calendar'){ document.querySelectorAll('#c_src button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#c_src button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.getElementById('c_hint').textContent=b.dataset.v==='external'?'Connect a Google/Outlook calendar to show real meetings.':'Shows your scheduled posts and deadlines. No setup needed.'; }); }
+    const segWire=id=>{ document.querySelectorAll('#'+id+' button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }); };
+    if(w.type==='weather') segWire('wx_unit');
+    if(w.type==='focus') segWire('fc_q');
+    if(w.type==='clock'){ const sel=document.getElementById('clk_add'), ta=document.getElementById('clk_zones'); if(sel&&ta) sel.onchange=()=>{ if(sel.value){ ta.value=(ta.value.trim()?ta.value.replace(/\s*$/,'')+'\n':'')+sel.value; sel.value=''; } }; }
   }
-  window.dashCfgSave=function(){
+  window.dashCfgSave=async function(){
     const w=(layout||[]).find(x=>x.id===editingId); if(!w)return;
     // appearance — applies to every widget
     const t=document.getElementById('w_title'); const title=t?t.value.trim():'';
@@ -4797,6 +5161,29 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(w.type==='calendar') w.cfg.source=document.querySelector('#c_src button.on').dataset.v;
     if(w.type==='inbox'){ w.cfg.board=document.getElementById('i_board').value; w.cfg.channel=document.getElementById('i_channel').value; }
     if(['website','search','email','sales','reviews','ads'].includes(w.type)){ const wb=document.getElementById('wb_board'); if(wb) w.cfg.board=wb.value; }
+    if(w.type==='weather'){
+      const seg=document.querySelector('#wx_unit button.on'); w.cfg.unit=seg?seg.dataset.v:'c';
+      const city=(document.getElementById('wx_city').value||'').trim();
+      if(city && city!==w.cfg.city){
+        const saveBtn=document.querySelector('#dashCfgModal .btn.accent'); const old=saveBtn?saveBtn.textContent:''; if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Finding city…';}
+        try{ const g=await wxGeocode(city); if(g){ w.cfg.city=g.name; w.cfg.lat=g.lat; w.cfg.lon=g.lon; } else { w.cfg.city=city; } }
+        catch(_e){ w.cfg.city=city; }
+        if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=old;}
+      } else if(city){ w.cfg.city=city; }
+      Object.keys(_dashWx).forEach(k=>delete _dashWx[k]);
+    }
+    if(w.type==='clock'){ const ta=document.getElementById('clk_zones');
+      w.cfg.zones=(ta?ta.value:'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{ const p=l.split('|'); return [ (p[0]||'').trim()||'—', (p[1]||p[0]||'').trim() ]; });
+    }
+    if(w.type==='focus'){ const seg=document.querySelector('#fc_q button.on'); w.cfg.showQuote=seg?seg.dataset.v==='1':true; }
+    if(w.type==='countdown'){ w.cfg.label=(document.getElementById('cd_label').value||'').trim(); w.cfg.date=document.getElementById('cd_date').value||''; }
+    if(w.type==='activity'){ w.cfg.board=document.getElementById('ac_board').value; }
+    if(w.type==='besttime'){ w.cfg.board=document.getElementById('bt_board').value; }
+    if(w.type==='toppost'){ w.cfg.board=document.getElementById('tp_board').value; }
+    if(w.type==='mentions'){ w.cfg.board=document.getElementById('mn_board').value; w.cfg.keyword=(document.getElementById('mn_kw').value||'').trim(); }
+    if(w.type==='trends'){ w.cfg.board=document.getElementById('tr_board').value; w.cfg.watch=(document.getElementById('tr_watch').value||'').split(/[\s,]+/).map(s=>s.trim()).filter(Boolean).map(s=>s[0]==='#'?s:'#'+s); Object.keys(_dashTags).forEach(k=>delete _dashTags[k]); }
+    if(w.type==='news'){ w.cfg.url=(document.getElementById('nw_url').value||'').trim(); w.cfg.title=(document.getElementById('nw_title').value||'').trim(); }
+    if(w.type==='sitehealth'){ w.cfg.url=(document.getElementById('sh_url').value||'').trim(); }
     // apply tile colour to the root immediately
     const root=document.querySelector('.dw[data-id="'+w.id+'"]'); if(root){ if(w.cfg.color) root.style.setProperty('--wc',w.cfg.color); else root.style.removeProperty('--wc'); }
     refreshBody(w); hideModal('dashCfgModal'); save(); dtoast('Widget updated');
@@ -4835,6 +5222,8 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
       const b=document.getElementById('dashEditBtn'); if(b){ b.innerHTML=editing?'✓ Done':'✎ Edit layout'; b.classList.toggle('accent',editing); }
       // load data once (then refresh bodies)
       if(!dataReady) loadData(); else refreshAllBodies();
+      // keep world-clock tiles ticking (once)
+      if(!window._dashClockT){ window._dashClockT=setInterval(()=>{ try{ (layout||[]).filter(w=>w.type==='clock').forEach(refreshBody); }catch(_e){} }, 15000); }
     });
   };
 
