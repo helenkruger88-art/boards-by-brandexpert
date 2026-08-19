@@ -511,7 +511,7 @@ function pwToggle(inp){
 }
 function enhancePasswords(){ try{ document.querySelectorAll('input[type="password"]').forEach(pwToggle); }catch(_e){} }
 function go(v){
-  const bv=['btoday','board','plan','content','binbox','files','money','team','setup'];
+  const bv=['btoday','board','plan','content','analytics','binbox','files','money','team','setup'];
   S.scope=bv.includes(v)?'board':'workspace';
   S.view=v;
   if(v==='content')_contentAll=false;
@@ -843,10 +843,10 @@ async function delBoardCard(ev,id){
   ev.stopPropagation();
   if(!canManage()){toast('Only the owner or an admin can delete a board');return;}
   const b=BOARDS.find(x=>x.id===id);
-  if(!confirm(`Delete the whole board “${b?b.name:''}”? Everything on it goes too — this can't be undone.`))return;
+  if(!confirm(`Delete the whole board “${b?b.name:''}”? Everything on it — tasks, posts, files, budget, links & analytics — goes too. This can't be undone.`))return;
   try{
-    const {error}=await sb.from('bbe_boards').delete().eq('id',id); if(error)throw error;
-    if(S.board===id)S.board=null;
+    const {error}=await sb.rpc('bbe_delete_board',{p_board:id}); if(error)throw error;
+    if(S.board===id){S.board=null; if(WS)localStorage.removeItem('bbe_board_'+WS.id);}
     await loadWs(); render(); toast('Board deleted');
   }catch(e){fail(e);}
 }
@@ -973,6 +973,7 @@ function boardInboxView(){
   setTimeout(()=>{if(typeof loadInboxConnects==='function')loadInboxConnects();},60);
   return `<div class="view-title"><h2>${ic('mail',18)} Inbox <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">emails, WhatsApp, comments &amp; messages for this board</span><span style="flex:1"></span><button class="btn ghost sm" onclick="syncInbox()">↻ Refresh</button></div>
   <div class="card" style="padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Connect</b><span style="flex:1"></span><span id="inbox-connects">${inboxConnectsHtml()}</span></div>
+  <div id="wa-tpl-panel">${waTplPanelHtml()}</div>
   ${boardInboxHtml(b.id)}`;
 }
 function boardSetupView(){
@@ -1626,9 +1627,14 @@ async function saveBoardEdit(id){
   try{await sb.from('bbe_boards').update(patch).eq('id',id);closeModal();await loadWs();render();toast('Board updated');}catch(e){fail(e);}
 }
 async function delBoard(){
-  const b=BOARDS.find(x=>x.id===S.board);
-  if(!confirm(`Delete the whole board “${b.name}”? This can't be undone.`))return;
-  try{await sb.from('bbe_boards').delete().eq('id',b.id);S.board=null;await loadWs();await loadBoard();go('boards');}catch(e){fail(e);}
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return;
+  if(!canManage()){toast('Only the owner or an admin can delete a board');return;}
+  if(!confirm(`Delete the whole board “${b.name}”? Everything on it — tasks, posts, files, budget, links & analytics — goes too. This can't be undone.`))return;
+  try{
+    const {error}=await sb.rpc('bbe_delete_board',{p_board:b.id}); if(error)throw error;
+    S.board=null; if(WS)localStorage.removeItem('bbe_board_'+WS.id);
+    await loadWs(); await loadBoard(); go('boards'); toast('Board deleted');
+  }catch(e){fail(e);}
 }
 /* ============ NOTE MODAL ============ */
 let _subs=[];
@@ -2272,7 +2278,7 @@ function contentView(){
     <button class="btn ${_cShow.cal?'accent':'ghost'} sm" onclick="colToggle('cal')" title="Show or hide the Calendar column">${ic('calendar',12)} Calendar</button>
     <button class="btn ${_cShow.inbox?'accent':'ghost'} sm" onclick="colToggle('inbox')" title="Show or hide the Inbox column">${ic('mail',12)} Inbox</button>
     <button class="btn ghost sm" style="color:var(--accent)" onclick="openImportBrief()" title="Paste a brief — AI turns it into tasks and content drafts">✦ Import brief</button>
-    <button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button></div>
+    <button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button>${canManage()?`<button class="btn ghost sm" style="color:var(--accent)" onclick="wpBlogModal()" title="Write &amp; publish a blog post to a connected WordPress site">${ic('note',12)} Blog post</button>`:''}</div>
   ${paidAI()?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
@@ -2281,7 +2287,6 @@ function contentView(){
       ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)&&!(_directPlatforms||[]).includes(p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
     </div>
   </div>`:''}
-  <div id="wa-tpl-panel">${waTplPanelHtml()}</div>
   <div id="th-insights"></div>
   
   <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">${_cols.join('')||'<div class="empty" style="flex:1;text-align:center;padding:40px">All columns hidden — use the Tasks / Calendar / Inbox buttons above to bring them back.</div>'}</div>`;
@@ -2878,7 +2883,7 @@ function inboxConnectsHtml(){
   const lbl=`<b style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.04em;margin:0 4px 0 10px">INBOX</b>`;
   const iconWrap=icons.length?`${lbl}<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${icons.join('')}</span>`:(dd?lbl:'');
   let acts='';
-  if(inboxLinkFor('facebook'))acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Publish a post straight to the connected Facebook Page" onclick="fbComposeModal()">${ic('pencil',12)} Post to Facebook</button>`;
+  if(inboxLinkFor('facebook')&&S.view==='content')acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Publish a post straight to the connected Facebook Page" onclick="fbComposeModal()">${ic('pencil',12)} Post to Facebook</button>`;
   if(inboxLinkFor('threads'))acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Views, likes & replies for the connected Threads account" onclick="thInsights()">View insights</button>`;
   if(canManage())acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Forward, connect Gmail, or add any mailbox to this board's Inbox" onclick="openEmailConnect()">${ic('mail',12)} Email setup</button>`;
   return iconWrap+dd+acts;
@@ -4121,7 +4126,13 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     inbox:    {icon:'💬', name:'Inbox activity',       desc:'Latest comments & messages across connected accounts.', w:4,h:3},
     posts:    {icon:'🗓️', name:'Upcoming posts',       desc:'What’s scheduled to go out next.', w:4,h:3},
     boards:   {icon:'📋', name:'Boards',              desc:'Your boards with live progress.', w:8,h:4},
-    links:    {icon:'🔗', name:'Quick links',         desc:'Jump straight to a board.', w:4,h:2}
+    links:    {icon:'🔗', name:'Quick links',         desc:'Jump straight to a board.', w:4,h:2},
+    website:  {icon:'🌐', name:'Website (GA4)',       desc:'Live website traffic — visitors, sessions, pageviews & sources from Google Analytics.', w:5,h:5},
+    search:   {icon:'🔎', name:'Search (Google)',     desc:'How the site shows up in Google Search — clicks, impressions, CTR, position & top queries.', w:4,h:5},
+    email:    {icon:'✉️', name:'Email (Mailchimp)',    desc:'Audience size, list count, open & click rates, and your last campaign.', w:4,h:4},
+    sales:    {icon:'🛍️', name:'Sales (Shopify)',      desc:'30-day orders, revenue and average order value from your store.', w:4,h:3},
+    reviews:  {icon:'⭐', name:'Reviews (Google)',     desc:'Google Business Profile star rating, review count & recent reviews (uses the board’s Google connection).', w:4,h:5},
+    ads:      {icon:'📣', name:'Ads (Meta)',           desc:'Facebook/Instagram ad spend, ROAS, purchases & clicks over 30 days.', w:4,h:3}
   };
   const GOAL_SRC = {
     revenue:    {label:'Revenue (this month)',        metric:'revenue',    fmt:money},
@@ -4360,6 +4371,12 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         case 'posts': return typeof homePosts!=='undefined'? homePosts(HOME().posts||[]) : '';
         case 'boards': return boardsBody();
         case 'links': return linksBody();
+        case 'website': return websiteBody(w.cfg);
+        case 'search': return searchBody(w.cfg);
+        case 'email': return emailBody(w.cfg);
+        case 'sales': return salesBody(w.cfg);
+        case 'reviews': return reviewsBody(w.cfg);
+        case 'ads': return adsBody(w.cfg);
       }
     }catch(e){ console.error('widget body',w.type,e); return `<div class="dw-mute">Couldn’t load.</div>`; }
     return '';
@@ -4369,6 +4386,12 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(w.type==='goal') return w.cfg.label||'Goal';
     if(w.type==='analytics') return (w.cfg.platform&&w.cfg.platform!=='all'&&PLATS()[w.cfg.platform])? PLATS()[w.cfg.platform][0]+' analytics':'Analytics';
     if(w.type==='calendar') return w.cfg.source==='external'?'Meetings':'Calendar';
+    if(w.type==='website') return 'Website';
+    if(w.type==='search') return 'Search';
+    if(w.type==='email') return 'Email';
+    if(w.type==='sales') return 'Sales';
+    if(w.type==='reviews') return 'Reviews';
+    if(w.type==='ads') return 'Ads';
     return CAT[w.type].name;
   }
 
@@ -4413,6 +4436,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(type==='calendar') return {source:'internal'};
     if(type==='inbox') return {board:'all', channel:'all'};
     if(type==='notes') return {text:''};
+    if(['website','search','email','sales','reviews','ads'].includes(type)) return {board:(BRDS()[0]||{}).id||''};
     return {};
   }
   function refreshEmpty(){ const e=document.getElementById('dashEmpty'); if(e) e.style.display=(layout&&layout.length)?'none':'block'; }
@@ -4460,7 +4484,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const w=addWidget(type); hideModal('dashCatModal');
     if(!editing) window.dashToggleEdit();
     dtoast(CAT[type].name+' added');
-    if(['goal','analytics','calendar','inbox'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
+    if(['goal','analytics','calendar','inbox','website','search','email','sales','reviews','ads'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
   };
   window.dashNoteInput=function(id,val){ const w=(layout||[]).find(x=>x.id===id); if(w){ w.cfg.text=val; save(); } };
 
@@ -4507,6 +4531,189 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     }
   }catch(_e){}
 
+  /* ---- website + search analytics (Google GA4 + Search Console), per board ---- */
+  const _dashWeb={}; // boardId -> {state,email,ga4,ga4name,ga4sel,scsel,ga4List,siteList,sc,started}
+  function webUrl(){ return (typeof SUPABASE_URL!=='undefined'?SUPABASE_URL:'')+'/functions/v1/bbe-web'; }
+  async function webPost(action, board, extra){
+    const { data:{ session } }=await sb.auth.getSession();
+    const jwt=session?.access_token||''; const anon=(typeof SUPABASE_KEY!=='undefined')?SUPABASE_KEY:'';
+    const r=await fetch(webUrl(), { method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':anon, 'Authorization':'Bearer '+jwt }, body:JSON.stringify(Object.assign({action, workspace_id:WS.id, board_id:board}, extra||{})) });
+    return await r.json();
+  }
+  function webBoardOf(cfg){ return (cfg&&cfg.board)||((BRDS()[0]||{}).id); }
+  function refreshWebWidgets(board){ (layout||[]).filter(w=>(w.type==='website'||w.type==='search')&&webBoardOf(w.cfg)===board).forEach(refreshBody); }
+  async function webLoad(board){
+    const cur=_dashWeb[board]; if(cur&&cur.started) return;
+    _dashWeb[board]={state:'loading',started:true};
+    try{
+      const st=await webPost('status',board);
+      if(!st||!st.connected){ _dashWeb[board]={state:'disconnected',started:true}; refreshWebWidgets(board); return; }
+      const rec={state:'ready',started:true,email:st.email,ga4sel:st.ga4_property_id,ga4name:st.ga4_property_name,scsel:st.sc_site_url,ga4:null,sc:null,ga4List:null,siteList:null};
+      if(!st.ga4_property_id || !st.sc_site_url){ try{ const l=await webPost('list',board); if(l&&l.connected){ rec.ga4List=l.ga4||[]; rec.siteList=l.sites||[]; } }catch(_e){} }
+      if(st.ga4_property_id || st.sc_site_url){ try{ const s=await webPost('stats',board); if(s&&s.connected){ rec.ga4=s.ga4||null; rec.sc=s.sc||null; } }catch(_e){} }
+      _dashWeb[board]=rec;
+    }catch(_e){ _dashWeb[board]={state:'disconnected',started:true}; }
+    refreshWebWidgets(board);
+  }
+  window.dashWebConnect=async function(board){ dtoast('Opening Google…'); try{ const j=await webPost('connect',board); if(j&&j.url) location.href=j.url; else dtoast(j&&j.error?j.error:'Could not start.'); }catch(_e){ dtoast('Could not start.'); } };
+  window.dashWebDisconnect=async function(board){ try{ await webPost('disconnect',board); }catch(_e){} _dashWeb[board]={state:'disconnected',started:true}; refreshWebWidgets(board); dtoast('Disconnected'); };
+  window.dashWebPickGa4=async function(board,pid,name){ if(!pid)return; try{ await webPost('select',board,{ga4_property_id:pid,ga4_property_name:name}); }catch(_e){} delete _dashWeb[board]; webLoad(board); dtoast('Analytics property linked'); };
+  window.dashWebPickSite=async function(board,site){ if(!site)return; try{ await webPost('select',board,{sc_site_url:site}); }catch(_e){} delete _dashWeb[board]; webLoad(board); dtoast('Search Console site linked'); };
+  function webConnectPrompt(board,label){
+    return `<div class="dw-srcbadge">${label} · ${E(boardName(board))}</div>
+      <div class="dw-connect"><p class="dw-mute">Connect Google Analytics &amp; Search Console for this board to see its website numbers.</p>
+      <button class="btn accent" onclick="dashWebConnect('${board}')">Connect Google</button></div>`;
+  }
+  function websiteBody(cfg){
+    const board=webBoardOf(cfg);
+    if(!board) return `<div class="dw-mute" style="padding:10px 0">No boards yet.</div>`;
+    const w=_dashWeb[board];
+    if(!w||w.state==='loading'){ webLoad(board); return `<div class="dw-srcbadge">🌐 Website</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
+    if(w.state==='disconnected') return webConnectPrompt(board,'🌐 Website');
+    if(!w.ga4sel){ // need to pick GA4 property
+      const opts=(w.ga4List||[]).map(p=>`<option value="${E(p.property)}">${E(p.name)}</option>`).join('');
+      if(!opts) return `<div class="dw-srcbadge">🌐 Website</div><div class="dw-mute" style="padding:10px 0">No GA4 property on ${E(w.email||'this account')}. <a href="#" onclick="dashWebDisconnect('${board}');return false">Reconnect</a></div>`;
+      return `<div class="dw-srcbadge">🌐 Pick a GA4 property</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashWebPickGa4('${board}',this.value,this.options[this.selectedIndex].text)"><option value="">Choose property…</option>${opts}</select></div>`;
+    }
+    const g=w.ga4;
+    if(!g) return `<div class="dw-srcbadge">🌐 ${E(w.ga4name||boardName(board))}</div><div class="dw-mute" style="padding:10px 0">No traffic data in the last 30 days.</div>`;
+    const chMax=(g.channels&&g.channels[0]?g.channels[0].sessions:1)||1;
+    const bars=(g.channels||[]).map(c=>`<div class="dw-brow"><span class="dw-bn">${E(c.name||'—')}</span><span class="dw-bar"><i style="width:${c.sessions/chMax*100}%;background:var(--wc,var(--accent))"></i></span><span class="dw-bv">${num(c.sessions)}</span></div>`).join('');
+    return `<div class="dw-srcbadge" title="${E(w.email||'')}">🌐 ${E(w.ga4name||boardName(board))} · 30d</div>
+      <div class="dw-big">${numF(g.users)}</div>
+      <div class="dw-cap">users · ${numF(g.sessions)} sessions · ${numF(g.views)} views${g.engagementRate!=null?' · '+g.engagementRate.toFixed(0)+'% engaged':''}</div>
+      ${spark(g.spark)}<div class="dw-bars">${bars}</div>`;
+  }
+  function searchBody(cfg){
+    const board=webBoardOf(cfg);
+    if(!board) return `<div class="dw-mute" style="padding:10px 0">No boards yet.</div>`;
+    const w=_dashWeb[board];
+    if(!w||w.state==='loading'){ webLoad(board); return `<div class="dw-srcbadge">🔎 Search</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
+    if(w.state==='disconnected') return webConnectPrompt(board,'🔎 Search');
+    if(!w.scsel){ // pick Search Console site
+      const opts=(w.siteList||[]).map(s=>`<option value="${E(s.siteUrl)}">${E(s.siteUrl)}</option>`).join('');
+      if(!opts) return `<div class="dw-srcbadge">🔎 Search</div><div class="dw-mute" style="padding:10px 0">No verified Search Console site on ${E(w.email||'this account')}. <a href="#" onclick="dashWebDisconnect('${board}');return false">Reconnect</a></div>`;
+      return `<div class="dw-srcbadge">🔎 Pick a Search Console site</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashWebPickSite('${board}',this.value)"><option value="">Choose site…</option>${opts}</select></div>`;
+    }
+    const s=w.sc;
+    if(!s) return `<div class="dw-srcbadge">🔎 ${E(w.scsel||boardName(board))}</div><div class="dw-mute" style="padding:10px 0">No search data in the last 30 days.</div>`;
+    const qMax=(s.topQueries&&s.topQueries[0]?s.topQueries[0].clicks:1)||1;
+    const qs=(s.topQueries||[]).map(q=>`<div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${E(q.query||'')}">${E(q.query||'—')}</span><span class="dw-bv">${num(q.clicks)}</span></div>`).join('');
+    return `<div class="dw-srcbadge" title="${E(w.email||'')}">🔎 ${E(w.scsel||boardName(board))} · 30d</div>
+      <div class="dw-big">${numF(s.clicks)}</div>
+      <div class="dw-cap">clicks · ${numF(s.impressions)} impressions · ${s.ctr.toFixed(1)}% CTR${s.position!=null?' · pos '+s.position.toFixed(1):''}</div>
+      ${spark(s.spark)}
+      ${qs?'<div class="dw-cap" style="margin-top:10px">Top queries</div><div class="dw-bars">'+qs+'</div>':''}`;
+  }
+  // handle return from Google OAuth for web analytics (?webconnected=1|err)
+  try{
+    const q=new URLSearchParams(location.search);
+    if(q.has('webconnected')){
+      const ok=q.get('webconnected')==='1';
+      setTimeout(()=>dtoast(ok?'✅ Website analytics connected — pick your property':'Website connect failed — please try again'),600);
+      Object.keys(_dashWeb).forEach(k=>delete _dashWeb[k]);
+      q.delete('webconnected');
+      history.replaceState(null,'',location.pathname+(q.toString()?('?'+q.toString()):'')+location.hash);
+    }
+  }catch(_e){}
+
+  /* ---- extra footprint widgets: Email(Mailchimp), Sales(Shopify), Reviews(GBP), Ads(Meta) ---- */
+  const _dashMc={}, _dashShop={}, _dashAds={}, _dashRev={};
+  function fmtCur(v,cur){ v=Number(v)||0; return (cur?cur+' ':'')+v.toLocaleString('en-ZA',{maximumFractionDigits:0}); }
+  async function fnPost(fn, action, board, extra){
+    const {data:{session}}=await sb.auth.getSession();
+    const anon=(typeof SUPABASE_KEY!=='undefined')?SUPABASE_KEY:'';
+    const r=await fetch((typeof SUPABASE_URL!=='undefined'?SUPABASE_URL:'')+'/functions/v1/'+fn,{method:'POST',headers:{'Content-Type':'application/json','apikey':anon,'Authorization':'Bearer '+(session?session.access_token:'')},body:JSON.stringify(Object.assign({action,workspace_id:WS.id,board_id:board},extra||{}))});
+    return await r.json();
+  }
+  function refreshType(type,board){ (layout||[]).filter(w=>w.type===type&&webBoardOf(w.cfg)===board).forEach(refreshBody); }
+  const modalVal=id=>{const e=$(id);return e?e.value.trim():'';};
+
+  /* --- Email: Mailchimp --- */
+  async function mcLoad(board){ const c=_dashMc[board]; if(c&&c.started)return; _dashMc[board]={state:'loading',started:true};
+    try{ const st=await fnPost('bbe-mailchimp','status',board); if(!st||!st.connected){_dashMc[board]={state:'disconnected',started:true};refreshType('email',board);return;}
+      const s=await fnPost('bbe-mailchimp','stats',board); _dashMc[board]={state:'ready',started:true,d:s};
+    }catch(_e){ _dashMc[board]={state:'disconnected',started:true}; } refreshType('email',board); }
+  window.dashMcConnect=function(board){ openModal(`<h3>Connect Mailchimp</h3><p style="font-size:12.5px;color:var(--muted);margin:2px 0 12px;line-height:1.5">Paste your Mailchimp API key (Account → Extras → API keys). It ends with something like <b>-us21</b>.</p><label>API key</label><input id="mc-key" type="password" placeholder="xxxxxxxxxxxxxxxx-us21"><div class="row" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn accent" id="mc-go" onclick="dashMcSubmit('${board}')">Connect</button></div>`); setTimeout(()=>{var e=$('mc-key');if(e)e.focus();},60); };
+  window.dashMcSubmit=async function(board){ const key=modalVal('mc-key'); if(!key){toast('Paste your API key');return;} const b=$('mc-go'); if(b){b.disabled=true;b.textContent='Connecting…';}
+    try{ const j=await fnPost('bbe-mailchimp','connect',board,{api_key:key}); if(j&&j.error){toast(j.error);if(b){b.disabled=false;b.textContent='Connect';}return;} closeModal(); delete _dashMc[board]; mcLoad(board); toast('Mailchimp connected'); }catch(e){fail(e);if(b){b.disabled=false;b.textContent='Connect';}} };
+  window.dashMcDisconnect=async function(board){ try{ await fnPost('bbe-mailchimp','disconnect',board);}catch(_e){} _dashMc[board]={state:'disconnected',started:true}; refreshType('email',board); dtoast('Disconnected'); };
+  function emailBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
+    const w=_dashMc[board];
+    if(!w||w.state==='loading'){ mcLoad(board); return `<div class="dw-srcbadge">✉️ Email</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
+    if(w.state==='disconnected') return `<div class="dw-srcbadge">✉️ Email · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Mailchimp to see your audience &amp; campaign stats.</p><button class="btn accent" onclick="dashMcConnect('${board}')">Connect Mailchimp</button></div>`;
+    const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">✉️ Email</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
+    const lc=d.lastCampaign;
+    return `<div class="dw-srcbadge" title="${E(d.account_name||'')}">✉️ ${E(d.account_name||'Mailchimp')} <a href="#" onclick="dashMcDisconnect('${board}');return false" style="color:var(--muted);margin-left:6px">disconnect</a></div>
+      <div class="dw-big">${numF(d.members||0)}</div><div class="dw-cap">subscribers · ${d.lists||0} list${d.lists===1?'':'s'}${d.openRate!=null?' · '+Number(d.openRate).toFixed(0)+'% open':''}</div>
+      ${lc?`<div class="dw-cap" style="margin-top:10px">Last campaign</div><div class="dw-ag"><div class="dw-what"><div class="t">${E(lc.title||'—')}</div><div class="m">${lc.openRate!=null?Number(lc.openRate).toFixed(0)+'% open':''}${lc.clickRate!=null?' · '+Number(lc.clickRate).toFixed(0)+'% click':''}${lc.sent?' · '+numF(lc.sent)+' sent':''}</div></div></div>`:''}`;
+  }
+
+  /* --- Sales: Shopify --- */
+  async function shopLoad(board){ const c=_dashShop[board]; if(c&&c.started)return; _dashShop[board]={state:'loading',started:true};
+    try{ const st=await fnPost('bbe-shopify','status',board); if(!st||!st.connected){_dashShop[board]={state:'disconnected',started:true};refreshType('sales',board);return;}
+      const s=await fnPost('bbe-shopify','stats',board); _dashShop[board]={state:'ready',started:true,d:s};
+    }catch(_e){ _dashShop[board]={state:'disconnected',started:true}; } refreshType('sales',board); }
+  window.dashShopConnect=function(board){ openModal(`<h3>Connect Shopify</h3><p style="font-size:12.5px;color:var(--muted);margin:2px 0 12px;line-height:1.5">In Shopify admin: <b>Settings → Apps → Develop apps</b> → create an app with <b>read_orders</b> access, install it, and copy the <b>Admin API access token</b> (starts with shpat_).</p><label>Store domain</label><input id="sh-dom" placeholder="your-store.myshopify.com"><label>Admin API access token</label><input id="sh-tok" type="password" placeholder="shpat_…"><div class="row" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn accent" id="sh-go" onclick="dashShopSubmit('${board}')">Connect</button></div>`); setTimeout(()=>{var e=$('sh-dom');if(e)e.focus();},60); };
+  window.dashShopSubmit=async function(board){ const dom=modalVal('sh-dom'),tok=modalVal('sh-tok'); if(!dom||!tok){toast('Fill both fields');return;} const b=$('sh-go'); if(b){b.disabled=true;b.textContent='Connecting…';}
+    try{ const j=await fnPost('bbe-shopify','connect',board,{shop_domain:dom,access_token:tok}); if(j&&j.error){toast(j.error);if(b){b.disabled=false;b.textContent='Connect';}return;} closeModal(); delete _dashShop[board]; shopLoad(board); toast('Shopify connected'); }catch(e){fail(e);if(b){b.disabled=false;b.textContent='Connect';}} };
+  window.dashShopDisconnect=async function(board){ try{ await fnPost('bbe-shopify','disconnect',board);}catch(_e){} _dashShop[board]={state:'disconnected',started:true}; refreshType('sales',board); dtoast('Disconnected'); };
+  function salesBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
+    const w=_dashShop[board];
+    if(!w||w.state==='loading'){ shopLoad(board); return `<div class="dw-srcbadge">🛍️ Sales</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
+    if(w.state==='disconnected') return `<div class="dw-srcbadge">🛍️ Sales · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Shopify to see orders &amp; revenue.</p><button class="btn accent" onclick="dashShopConnect('${board}')">Connect Shopify</button></div>`;
+    const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">🛍️ ${E(d.shop_name||'Shopify')}</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
+    return `<div class="dw-srcbadge">🛍️ ${E(d.shop_name||'Shopify')} · 30d <a href="#" onclick="dashShopDisconnect('${board}');return false" style="color:var(--muted);margin-left:6px">disconnect</a></div>
+      <div class="dw-big">${fmtCur(d.revenue,d.currency)}</div><div class="dw-cap">revenue · ${numF(d.orders||0)} orders · ${fmtCur(d.aov,d.currency)} AOV${d.approx?' · approx':''}</div>`;
+  }
+
+  /* --- Ads: Meta --- */
+  async function adsLoad(board){ const c=_dashAds[board]; if(c&&c.started)return; _dashAds[board]={state:'loading',started:true};
+    try{ const st=await fnPost('bbe-ads','status',board); if(!st||!st.connected){_dashAds[board]={state:'disconnected',started:true};refreshType('ads',board);return;}
+      const rec={state:'ready',started:true,acct:st.ad_account_id,acctName:st.ad_account_name};
+      if(!st.ad_account_id){ try{ const l=await fnPost('bbe-ads','list',board); rec.accts=l.accounts||[]; rec.pick=true; }catch(_e){} }
+      else { try{ const s=await fnPost('bbe-ads','stats',board); rec.d=s; }catch(_e){} }
+      _dashAds[board]=rec;
+    }catch(_e){ _dashAds[board]={state:'disconnected',started:true}; } refreshType('ads',board); }
+  window.dashAdsConnect=async function(board){ dtoast('Opening Meta…'); try{ const j=await fnPost('bbe-ads','connect',board); if(j&&j.url) location.href=j.url; else dtoast(j&&j.error?j.error:'Could not start.'); }catch(_e){ dtoast('Could not start.'); } };
+  window.dashAdsDisconnect=async function(board){ try{ await fnPost('bbe-ads','disconnect',board);}catch(_e){} _dashAds[board]={state:'disconnected',started:true}; refreshType('ads',board); dtoast('Disconnected'); };
+  window.dashAdsPick=async function(board,acct,name){ if(!acct)return; try{ await fnPost('bbe-ads','select',board,{ad_account_id:acct,ad_account_name:name}); }catch(_e){} delete _dashAds[board]; adsLoad(board); dtoast('Ad account linked'); };
+  function adsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
+    const w=_dashAds[board];
+    if(!w||w.state==='loading'){ adsLoad(board); return `<div class="dw-srcbadge">📣 Ads</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
+    if(w.state==='disconnected') return `<div class="dw-srcbadge">📣 Ads · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Meta (Facebook/Instagram) ads to see spend &amp; ROAS.</p><button class="btn accent" onclick="dashAdsConnect('${board}')">Connect Meta Ads</button></div>`;
+    if(w.pick&&!w.acct){ const opts=(w.accts||[]).map(a=>`<option value="${E(a.id)}">${E(a.name||a.id)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">📣 Ads</div><div class="dw-mute" style="padding:10px 0">No ad accounts found. <a href="#" onclick="dashAdsDisconnect('${board}');return false">Reconnect</a></div>`; return `<div class="dw-srcbadge">📣 Pick an ad account</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashAdsPick('${board}',this.value,this.options[this.selectedIndex].text)"><option value="">Choose…</option>${opts}</select></div>`; }
+    const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">📣 ${E(w.acctName||'Meta Ads')}</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
+    return `<div class="dw-srcbadge">📣 ${E(w.acctName||'Meta Ads')} · 30d <a href="#" onclick="dashAdsDisconnect('${board}');return false" style="color:var(--muted);margin-left:6px">disconnect</a></div>
+      <div class="dw-big">${fmtCur(d.spend)}</div><div class="dw-cap">spend · ${d.roas!=null?Number(d.roas).toFixed(2)+'x ROAS':'—'} · ${numF(d.purchases||0)} purchases · ${numF(d.clicks||0)} clicks</div>`;
+  }
+
+  /* --- Reviews: Google Business Profile (reuses this board's Google web connection) --- */
+  function starStr(n){ n=Math.max(0,Math.min(5,Math.round(Number(n)||0))); return '★★★★★'.slice(0,n)+'☆☆☆☆☆'.slice(0,5-n); }
+  async function revLoad(board){ const c=_dashRev[board]; if(c&&c.started)return; _dashRev[board]={state:'loading',started:true};
+    try{ const st=await fnPost('bbe-web','status',board); if(!st||!st.connected){_dashRev[board]={state:'noweb',started:true};refreshType('reviews',board);return;}
+      if(!st.gbp_location_id){ let list; try{ list=await fnPost('bbe-web','gbplist',board);}catch(_e){} _dashRev[board]={state:'pick',started:true,locs:(list&&list.locations)||[],err:list&&list.error}; refreshType('reviews',board); return; }
+      const s=await fnPost('bbe-web','gbpstats',board); _dashRev[board]={state:'ready',started:true,d:s,name:st.gbp_location_name};
+    }catch(_e){ _dashRev[board]={state:'noweb',started:true}; } refreshType('reviews',board); }
+  window.dashRevPick=async function(board,val){ if(!val)return; const parts=val.split('|||'); try{ await fnPost('bbe-web','gbpselect',board,{gbp_account_id:parts[0],gbp_location_id:parts[1],gbp_location_name:parts[2]}); }catch(_e){} delete _dashRev[board]; revLoad(board); dtoast('Location linked'); };
+  function reviewsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
+    const w=_dashRev[board];
+    if(!w||w.state==='loading'){ revLoad(board); return `<div class="dw-srcbadge">⭐ Reviews</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
+    if(w.state==='noweb') return `<div class="dw-srcbadge">⭐ Reviews · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Reviews use this board's Google connection (now includes Business Profile). Connect Google here or from a Website/Search tile.</p><button class="btn accent" onclick="dashWebConnect('${board}')">Connect Google</button></div>`;
+    if(w.state==='pick'){ const opts=(w.locs||[]).map(l=>`<option value="${E(l.account)}|||${E(l.location)}|||${E(l.title||'')}">${E(l.title||l.location)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">⭐ Reviews</div><div class="dw-mute" style="padding:10px 0">${w.err?E(w.err):'No Business Profile locations on this Google account.'}</div>`; return `<div class="dw-srcbadge">⭐ Pick a location</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashRevPick('${board}',this.value)"><option value="">Choose location…</option>${opts}</select></div>`; }
+    const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">⭐ ${E(w.name||'Reviews')}</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
+    const g=d.gbp; if(!g) return `<div class="dw-srcbadge">⭐ ${E(w.name||'Reviews')}</div><div class="dw-mute" style="padding:10px 0">No reviews yet.</div>`;
+    const rows=(g.reviews||[]).map(r=>`<div class="dw-ag"><div class="dw-what"><div class="t">${E(r.author||'')} <span style="color:var(--warn,#d99512)">${starStr(r.stars)}</span></div><div class="m" style="white-space:normal">${E((r.comment||'').slice(0,90))}</div></div></div>`).join('');
+    return `<div class="dw-srcbadge">⭐ ${E(w.name||boardName(board))}</div>
+      <div class="dw-big">${g.rating!=null?Number(g.rating).toFixed(1):'—'} <span style="font-size:14px;color:var(--warn,#d99512)">${starStr(g.rating)}</span></div>
+      <div class="dw-cap">${numF(g.total||0)} reviews</div>${rows}`;
+  }
+  // boot handler for Meta Ads OAuth return (?adsconnected=1|err)
+  try{
+    const q=new URLSearchParams(location.search);
+    if(q.has('adsconnected')){ const ok=q.get('adsconnected')==='1'; setTimeout(()=>dtoast(ok?'✅ Meta Ads connected — pick your ad account':'Meta Ads connect failed'),600); Object.keys(_dashAds).forEach(k=>delete _dashAds[k]); q.delete('adsconnected'); history.replaceState(null,'',location.pathname+(q.toString()?('?'+q.toString()):'')+location.hash); }
+  }catch(_e){}
+
   /* ============ CONFIG MODAL ============ */
   let editingId=null;
   window.dashConfig=function(id){
@@ -4517,6 +4724,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     showModal('dashCfgModal');
   };
   function boardOpts(sel){ sel=sel||'all'; return ['<option value="all" '+(sel==='all'?'selected':'')+'>All boards (combined)</option>'].concat(BRDS().map(b=>`<option value="${b.id}" ${sel===b.id?'selected':''}>${E(b.name)}</option>`)).join(''); }
+  function boardOptsSpecific(sel){ const bs=BRDS(); if(!bs.length) return '<option value="">No boards yet</option>'; if(!sel) sel=bs[0].id; return bs.map(b=>`<option value="${b.id}" ${sel===b.id?'selected':''}>${E(b.name)}</option>`).join(''); }
   function appearanceForm(w){
     const cur=(w.cfg&&w.cfg.color)||'';
     const sw=PALETTE.map(c=>`<button type="button" class="dw-sw ${cur===c?'on':''}" data-color="${c}" style="${c?('background:'+c):''}" title="${c||'Default'}">${c?'':'∅'}</button>`).join('');
@@ -4558,6 +4766,9 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
       s+=`<div class="dw-fld"><label>Board</label><select id="i_board">${boardOpts(w.cfg.board)}</select></div>
         <div class="dw-fld"><label>Channel</label><select id="i_channel">${CHANNELS.map(([k,l])=>`<option value="${k}" ${(w.cfg.channel||'all')===k?'selected':''}>${E(l)}</option>`).join('')}</select></div>
         <div class="dw-hint">Combine everything into one inbox, or add a widget per inbox — pick one channel and/or one board each.</div>`;
+    } else if(['website','search','email','sales','reviews','ads'].includes(w.type)){
+      s+=`<div class="dw-fld"><label>Which board?</label><select id="wb_board">${boardOptsSpecific(w.cfg.board)}</select></div>
+        <div class="dw-hint">Each board connects its own account. Connect it from the tile itself.</div>`;
     } else {
       s+=`<div class="dw-hint">No other settings — the header and colour above are all yours.</div>`;
     }
@@ -4585,6 +4796,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(w.type==='analytics'){ w.cfg.platform=document.getElementById('a_platform').value; w.cfg.board=document.getElementById('a_board').value; }
     if(w.type==='calendar') w.cfg.source=document.querySelector('#c_src button.on').dataset.v;
     if(w.type==='inbox'){ w.cfg.board=document.getElementById('i_board').value; w.cfg.channel=document.getElementById('i_channel').value; }
+    if(['website','search','email','sales','reviews','ads'].includes(w.type)){ const wb=document.getElementById('wb_board'); if(wb) w.cfg.board=wb.value; }
     // apply tile colour to the root immediately
     const root=document.querySelector('.dw[data-id="'+w.id+'"]'); if(root){ if(w.cfg.color) root.style.setProperty('--wc',w.cfg.color); else root.style.removeProperty('--wc'); }
     refreshBody(w); hideModal('dashCfgModal'); save(); dtoast('Widget updated');
@@ -4676,6 +4888,79 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   document.addEventListener('click',function(e){ if(e.target.classList&&e.target.classList.contains('dw-scrim')) e.target.classList.remove('on'); });
 })();
 
+</script>
+<script id="wp-js">
+/* ============ WordPress (self-hosted) publishing ============ */
+(function(){
+  if(window.__wpLoaded)return; window.__wpLoaded=true;
+  async function wpApi(body){
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-wordpress`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(session?session.access_token:'')},body:JSON.stringify({workspace_id:WS.id,...body})});
+    return await r.json();
+  }
+  window.wpBlogModal=async function(){
+    if(!S.board){toast('Open a board first');return;}
+    toast('Checking WordPress…');
+    let st; try{ st=await wpApi({action:'status',board_id:S.board}); }catch(e){ fail(e); return; }
+    if(st&&st.connected) wpComposeModal(st); else wpConnectModal();
+  };
+  function wpConnectModal(){
+    openModal(`<h3>Connect WordPress</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:2px 0 12px;line-height:1.5">Self-hosted WordPress. In your WP admin open <b>Users → Profile → Application Passwords</b>, create one named “Boards”, and paste it below. Your normal login password is never used or stored.</p>
+      <label>Site URL</label><input id="wp-url" placeholder="https://yourblog.com">
+      <label>WordPress username</label><input id="wp-user" placeholder="your WP username">
+      <label>Application password</label><input id="wp-pass" type="password" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
+      <div class="row" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn accent" id="wp-conn-go" onclick="wpConnectSubmit()">Connect</button></div>`);
+    setTimeout(()=>{const e=$('wp-url');if(e)e.focus();},60);
+  }
+  window.wpConnectSubmit=async function(){
+    const g=id=>{const e=$(id);return e?e.value.trim():'';};
+    const url=g('wp-url'),user=g('wp-user'),pass=g('wp-pass');
+    if(!url||!user||!pass){toast('Fill in all three fields');return;}
+    const b=$('wp-conn-go'); if(b){b.disabled=true;b.textContent='Connecting…';}
+    try{ const j=await wpApi({action:'connect',board_id:S.board,site_url:url,username:user,app_password:pass});
+      if(j&&j.error){toast(j.error);if(b){b.disabled=false;b.textContent='Connect';}return;}
+      toast('WordPress connected'+(j.site_name?': '+j.site_name:'')); wpComposeModal(j);
+    }catch(e){fail(e);if(b){b.disabled=false;b.textContent='Connect';}}
+  };
+  function wpComposeModal(st){
+    const name=(st&&(st.site_name||st.site_url))||'your blog';
+    openModal(`<h3>New blog post <span style="font-weight:500;font-size:12.5px;color:var(--muted)">· ${esc(name)}</span></h3>
+      <label>Title</label><input id="wp-title" placeholder="Post title">
+      <label>Content</label><textarea id="wp-body" rows="8" placeholder="Write your post…  (HTML is allowed)"></textarea>
+      <label>Publish</label>
+      <select id="wp-status" onchange="var w=document.getElementById('wp-when');if(w)w.style.display=this.value==='future'?'block':'none'">
+        <option value="draft">Save as draft</option>
+        <option value="publish">Publish now</option>
+        <option value="future">Schedule…</option>
+      </select>
+      <div id="wp-when" style="display:none;margin-top:8px"><label>Date &amp; time</label><input id="wp-date" type="datetime-local"></div>
+      <div class="row" style="margin-top:14px"><button class="btn ghost sm" onclick="wpDisconnect()" style="color:var(--danger)">Disconnect site</button>
+      <span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn accent" id="wp-pub-go" onclick="wpPublishNow()">Post to WordPress</button></div>`);
+    setTimeout(()=>{const e=$('wp-title');if(e)e.focus();},60);
+  }
+  window.wpPublishNow=async function(){
+    const g=id=>{const e=$(id);return e?e.value.trim():'';};
+    const title=g('wp-title'),content=g('wp-body'),status=(($('wp-status')||{}).value)||'draft';
+    if(!title&&!content){toast('Write something first');return;}
+    let date=null;
+    if(status==='future'){ const dv=($('wp-date')||{}).value; if(!dv){toast('Pick a date & time');return;} try{date=new Date(dv).toISOString();}catch(_e){} }
+    const b=$('wp-pub-go'); if(b){b.disabled=true;b.textContent='Posting…';}
+    try{ const j=await wpApi({action:'publish',board_id:S.board,title,content,status,date});
+      if(j&&j.error){toast(j.error);if(b){b.disabled=false;b.textContent='Post to WordPress';}return;}
+      closeModal();
+      const msg=status==='publish'?'Published to WordPress':status==='future'?'Scheduled on WordPress':'Saved as draft in WordPress';
+      if(j&&j.link) toast(msg,'Open ↗',()=>window.open(j.link,'_blank')); else toast(msg);
+    }catch(e){fail(e);if(b){b.disabled=false;b.textContent='Post to WordPress';}}
+  };
+  window.wpDisconnect=async function(){
+    if(!confirm('Disconnect this WordPress site from the board? You can reconnect any time.'))return;
+    try{ await wpApi({action:'disconnect',board_id:S.board}); }catch(_e){}
+    closeModal(); toast('WordPress disconnected');
+  };
+})();
 </script>
 </body>
 </html>
