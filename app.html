@@ -2465,6 +2465,7 @@ let _socAccounts=null;
 // Base platform names (facebook/instagram/threads/youtube/tiktok) this board is DIRECTLY
 // connected to via our own apps (not PostPeer). Populated by loadDirectLinks().
 let _directPlatforms=[];
+let _directNames={}; // platform -> connected account name/handle (best effort, for hover tooltips)
 async function socialApi(body){
   const {data:{session}}=await sb.auth.getSession();
   const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-social`,{method:'POST',
@@ -2509,7 +2510,9 @@ function socStripChips(){
   for(const pl of (_directPlatforms||[])){
     if(shown.has(pl))continue; shown.add(pl);
     const nm=(PLAT[pl]||PLAT.other)[0];
-    items.push(`<span class="socic" title="${esc(nm+' · connected')}">${platBadge(pl,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="directDisconnect('${pl}')">✕</b>`:''}</span>`);
+    const acc=(_directNames||{})[pl];
+    const tip=nm+(acc?' · '+acc:' · connected');
+    items.push(`<span class="socic" title="${esc(tip)}">${platBadge(pl,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="directDisconnect('${pl}')">✕</b>`:''}</span>`);
   }
   const html=items.join('');
   return html?`<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${html}</span>`:'';
@@ -2843,24 +2846,30 @@ function inboxLinkFor(pl){return (_inboxLinks||[]).find(l=>l.platform===pl&&l.bo
 // bbe-threads links, bbe-youtube-post links (platform youtube_oauth -> base 'youtube'),
 // and bbe-tiktok links.
 async function loadDirectLinks(){
-  if(!S.board){_directPlatforms=[];return;}
+  if(!S.board){_directPlatforms=[];_directNames={};return;}
   const board=S.board;
   const set=new Set();
+  const names={};
+  // best-effort account name from a link record (handles vary by provider)
+  const nmeOf=l=>(l&&(l.name||l.username||l.display_name||l.handle||l.account_name||l.title||l.page_name||l.user||''))||'';
   // Ensure the meta links (facebook/instagram/threads/youtube-by-handle) are loaded.
   if(_inboxLinks===null){try{await loadInboxConnects();}catch(_){}}
   for(const l of (_inboxLinks||[])){
     if(l.board_id!==board)continue;
-    if(l.platform==='facebook')set.add('facebook');
-    else if(l.platform==='instagram')set.add('instagram');
-    else if(l.platform==='threads')set.add('threads');
+    if(l.platform==='facebook'){set.add('facebook'); if(nmeOf(l))names.facebook=nmeOf(l);}
+    else if(l.platform==='instagram'){set.add('instagram'); if(nmeOf(l))names.instagram=nmeOf(l);}
+    else if(l.platform==='threads'){set.add('threads'); if(nmeOf(l))names.threads=nmeOf(l);}
     // NOTE: YouTube posts via PostPeer (shows through _socAccounts), so it is NOT a
     // "direct" platform. The by-handle reader is a comment-only Inbox connection.
   }
+  // Instagram rides the FB Page (shared Meta connection) — fall back to the Page name.
+  if(set.has('instagram')&&!names.instagram&&names.facebook)names.instagram=names.facebook;
   // Threads — dedicated endpoint (in case meta links doesn't carry it).
-  try{const j=await thApi({action:'links'}); if(((j&&j.links)||[]).some(l=>l.board_id===board))set.add('threads');}catch(_){}
+  try{const j=await thApi({action:'links'}); const l=((j&&j.links)||[]).find(x=>x.board_id===board); if(l){set.add('threads'); if(nmeOf(l))names.threads=nmeOf(l);}}catch(_){}
   // TikTok (bbe-tiktok).
-  try{const j=await ttApi({action:'links'}); if(((j&&j.links)||[]).some(l=>l.board_id===board))set.add('tiktok');}catch(_){}
+  try{const j=await ttApi({action:'links'}); const l=((j&&j.links)||[]).find(x=>x.board_id===board); if(l){set.add('tiktok'); if(nmeOf(l))names.tiktok=nmeOf(l);}}catch(_){}
   _directPlatforms=[...set];
+  _directNames=names;
 }
 function inboxConnectsHtml(){
   const defs=[['facebook','FB Page'],['youtube','YouTube'],['threads','Threads']];
