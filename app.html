@@ -1009,6 +1009,7 @@ function boardSetupView(){
       <button class="btn accent" onclick="saveBoardSetup()">Save name</button>
     </div>
   </div>
+  ${canManage()?boardAccessCard(b):''}
   ${canManage()?`<div class="card" style="max-width:580px;margin-top:16px;border-color:var(--danger)">
     <b style="font-size:11px;letter-spacing:.05em;color:var(--danger);text-transform:uppercase">Danger zone</b>
     <div style="display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap">
@@ -1016,6 +1017,35 @@ function boardSetupView(){
       <button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" onclick="boardDeleteModal('${b.id}')">${ic('trash',13)} Delete board</button>
     </div>
   </div>`:''}`;
+}
+// ===== Board access (per-board membership) =====
+// Owners and the board's creator always see the board. Everyone else must be added here
+// (their user id goes into bbe_boards.shared_with). RLS enforces the same rule server-side.
+function boardAccessCard(b){
+  const shared=Array.isArray(b.shared_with)?b.shared_with:[];
+  const rows=(MEMBERS||[]).map(m=>{
+    const always=(m.role==='owner')||(m.user_id===b.created_by);
+    const on=always||shared.includes(m.user_id);
+    const ctrl=always
+      ? `<span style="font-size:10px;font-weight:800;color:var(--muted);background:var(--bg);border-radius:6px;padding:3px 7px">ALWAYS</span>`
+      : `<button onclick="toggleBoardShare('${m.user_id}')" title="${on?'Remove access':'Give access'}" style="width:42px;height:24px;border-radius:20px;background:${on?'var(--accent)':'var(--line-strong)'};position:relative;flex:none;padding:0"><i style="position:absolute;top:2px;left:${on?'20px':'2px'};width:20px;height:20px;border-radius:50%;background:#fff;display:block;transition:.15s"></i></button>`;
+    return `<div style="display:flex;align-items:center;gap:11px;padding:9px 2px;border-bottom:1px solid var(--line)">${avatar(m)}
+      <div style="flex:1;min-width:0"><b style="font-size:13px">${esc(m.name)}${m.user_id===SESSION.user.id?' (you)':''}</b><span style="display:block;font-size:11px;color:var(--muted)">${esc(m.email||'')} · ${m.role}</span></div>
+      ${ctrl}</div>`;
+  }).join('');
+  return `<div class="card" style="max-width:580px;margin-top:16px">
+    <b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Board access</b>
+    <p style="font-size:11.5px;color:var(--muted);line-height:1.5;margin:6px 0 10px">Choose who can open <b>${esc(b.name)}</b>. You (the owner) and the board's creator always have access. Add a teammate to share just this board with them — they won't see your other boards.</p>
+    ${rows||'<div class="empty" style="padding:8px">No teammates yet — add people on the Team screen first.</div>'}</div>`;
+}
+async function toggleBoardShare(uid){
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return;
+  let shared=Array.isArray(b.shared_with)?[...b.shared_with]:[];
+  if(shared.includes(uid))shared=shared.filter(x=>x!==uid); else shared.push(uid);
+  b.shared_with=shared;
+  try{const {error}=await sb.from('bbe_boards').update({shared_with:shared}).eq('id',b.id); if(error)throw error;
+    toast('Board access updated');}catch(e){fail(e);}
+  render();
 }
 async function toggleModule(k){
   const b=BOARDS.find(x=>x.id===S.board); if(!b)return;
@@ -2298,7 +2328,7 @@ function contentView(){
       <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
       <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();await loadDirectLinks();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
       <span style="flex:1"></span>
-      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].filter(p=>!(_socAccounts||[]).some(a=>a.platform===p)&&!(_directPlatforms||[]).includes(p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
+      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].filter(p=>!platConnected(p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
     </div>
   </div>`:''}
   <div id="th-insights"></div>
@@ -2485,6 +2515,15 @@ let _socAccounts=null;
 // connected to via our own apps (not PostPeer). Populated by loadDirectLinks().
 let _directPlatforms=[];
 let _directNames={}; // platform -> connected account name/handle (best effort, for hover tooltips)
+// These platforms post ONLY through our own apps (bbe-meta / bbe-threads / bbe-tiktok),
+// tracked in bbe_platform_links. A leftover PostPeer "account" for one of them can no longer
+// post, so we never treat PostPeer as the source of truth for these — only a direct link counts.
+const DIRECT_SET=['facebook','instagram','threads','tiktok'];
+// Is `pl` connected for THIS board in a way that can actually post right now?
+function platConnected(pl){
+  if(DIRECT_SET.includes(pl))return (_directPlatforms||[]).includes(pl);
+  return (_socAccounts||[]).some(a=>a.platform===pl)||(_directPlatforms||[]).includes(pl);
+}
 async function socialApi(body){
   const {data:{session}}=await sb.auth.getSession();
   const res=await fetch(`${SUPABASE_URL}/functions/v1/bbe-social`,{method:'POST',
@@ -2520,7 +2559,9 @@ function socStripChips(){
   // icon (with hover-✕) + a visible account-name label beside it
   const chip=(icon,name)=>`<span style="display:inline-flex;align-items:center;gap:6px">${icon}${name?`<b style="font-size:11.5px;font-weight:600;color:var(--ink);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</b>`:''}</span>`;
   // PostPeer accounts (existing behaviour, keeps its per-account disconnect ✕).
-  const items=(_socAccounts||[]).map(a=>{
+  // Skip any PostPeer account for a direct-app platform — those post via our own apps now,
+  // so a stale PostPeer entry there would falsely read as "connected".
+  const items=(_socAccounts||[]).filter(a=>!DIRECT_SET.includes(a.platform)).map(a=>{
     shown.add(a.platform);
     const nm=(PLAT[a.platform]||PLAT.other)[0];
     const tip=nm+(a.user?' · '+a.user:'');
@@ -2623,18 +2664,26 @@ async function fbPickStart(board){
     if(j.error){toast(j.error);return;}
     const pages=j.pages||[];
     if(!pages.length){toast('No Facebook Pages found on that account — make sure you granted at least one Page.');return;}
-    if(pages.length===1){await fbPickChoose(board,pages[0].id);return;}
+    // Always show the picker — never silently auto-connect a single Page. Facebook often
+    // re-grants only the previously-chosen Page, so auto-picking would keep linking the wrong
+    // one (e.g. MuscleGuard) with no way to choose. The modal lets the user confirm or re-grant.
     fbPickModal(board,pages);
   }catch(e){fail(e);}
 }
 function fbPickModal(board,pages){
+  const only=pages.length===1;
   openModal(`<h3>Choose the Page to connect</h3>
     <p style="font-size:12.5px;color:var(--muted);margin:4px 0 14px;line-height:1.5">Pick which Facebook Page (and its linked Instagram) to connect to this board. You can connect a different Page to each board.</p>
     <div style="display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto">
       ${pages.map(p=>`<button class="btn ghost" style="justify-content:flex-start;text-align:left;padding:11px 13px;height:auto" onclick="fbPickChoose('${board}','${esc(String(p.id))}')"><span><b>${esc(p.name||'Page')}</b>${p.ig?`<span style="color:var(--muted);font-weight:500"> · Instagram @${esc(p.ig)}</span>`:''}</span></button>`).join('')}
     </div>
-    <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`);
+    ${only?`<p style="font-size:11.5px;color:var(--muted);margin:14px 0 0;line-height:1.5;background:var(--bg);border-radius:8px;padding:9px 11px">Only <b>${esc(pages[0].name||'one Page')}</b> came back from Facebook. If that's not the Page you want, re-open Facebook and on its screen tap <b>“Edit access” / “Choose what you allow”</b>, then tick the Page you need.</p>`:''}
+    <div class="row" style="margin-top:16px;justify-content:space-between">
+      <button class="btn ghost" onclick="fbRechoosePages('${board}')" title="Re-open Facebook to grant a different Page">↻ Choose Pages on Facebook</button>
+      <button class="btn ghost" onclick="closeModal()">Cancel</button></div>`);
 }
+// Re-launch the Facebook connect so the user can grant a different / additional Page.
+async function fbRechoosePages(board){ closeModal(); toast('Re-opening Facebook — tap “Edit access” and pick your Page'); try{await fbConnect();}catch(e){fail(e);} }
 async function fbPickChoose(board,pageId){
   const btns=document.querySelectorAll('#modal button'); btns.forEach(b=>b.disabled=true);
   try{
@@ -4944,7 +4993,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   function adsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
     const w=_dashAds[board];
     if(!w||w.state==='loading'){ adsLoad(board); return `<div class="dw-srcbadge">📣 Ads</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
-    if(w.state==='disconnected') return `<div class="dw-srcbadge">📣 Ads · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Meta (Facebook/Instagram) ads to see spend &amp; ROAS.</p><button class="btn accent" onclick="dashAdsConnect('${board}')">Connect Meta Ads</button></div>`;
+    if(w.state==='disconnected') return `<div class="dw-srcbadge">📣 Ads · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Meta (Facebook/Instagram) ads to see spend &amp; ROAS.</p><button class="btn accent" onclick="dashAdsConnect('${board}')">Connect Meta Ads</button><p class="dw-mute" style="font-size:10.5px;margin-top:8px;line-height:1.45">Needs the Facebook <b>ads_read</b> permission. If the popup shows an "Invalid Scopes" error, the Facebook app still needs Ads (Marketing API) access enabled — see setup.</p></div>`;
     if(w.pick&&!w.acct){ const opts=(w.accts||[]).map(a=>`<option value="${E(a.id)}">${E(a.name||a.id)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">📣 Ads</div><div class="dw-mute" style="padding:10px 0">No ad accounts found. <a href="#" onclick="dashAdsDisconnect('${board}');return false">Reconnect</a></div>`; return `<div class="dw-srcbadge">📣 Pick an ad account</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashAdsPick('${board}',this.value,this.options[this.selectedIndex].text)"><option value="">Choose…</option>${opts}</select></div>`; }
     const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">📣 ${E(w.acctName||'Meta Ads')}</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
     return `<div class="dw-srcbadge">📣 ${E(w.acctName||'Meta Ads')} · 30d <a href="#" onclick="dashAdsDisconnect('${board}');return false" style="color:var(--muted);margin-left:6px">disconnect</a></div>
