@@ -2498,12 +2498,15 @@ function socListHtml(){
 }
 function socStripChips(){
   const shown=new Set();
+  // icon (with hover-✕) + a visible account-name label beside it
+  const chip=(icon,name)=>`<span style="display:inline-flex;align-items:center;gap:6px">${icon}${name?`<b style="font-size:11.5px;font-weight:600;color:var(--ink);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</b>`:''}</span>`;
   // PostPeer accounts (existing behaviour, keeps its per-account disconnect ✕).
   const items=(_socAccounts||[]).map(a=>{
     shown.add(a.platform);
     const nm=(PLAT[a.platform]||PLAT.other)[0];
     const tip=nm+(a.user?' · '+a.user:'');
-    return `<span class="socic" title="${esc(tip)}">${platBadge(a.platform,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="disconnectSocial('${a.id}')">✕</b>`:''}</span>`;
+    const icon=`<span class="socic" title="${esc(tip)}">${platBadge(a.platform,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="disconnectSocial('${a.id}')">✕</b>`:''}</span>`;
+    return chip(icon, a.user||'');
   });
   // Directly-connected platforms (our own apps) not already shown via PostPeer — de-duped.
   // Each carries its own disconnect ✕ (routes via directDisconnect -> the matching direct API).
@@ -2512,10 +2515,11 @@ function socStripChips(){
     const nm=(PLAT[pl]||PLAT.other)[0];
     const acc=(_directNames||{})[pl];
     const tip=nm+(acc?' · '+acc:' · connected');
-    items.push(`<span class="socic" title="${esc(tip)}">${platBadge(pl,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="directDisconnect('${pl}')">✕</b>`:''}</span>`);
+    const icon=`<span class="socic" title="${esc(tip)}">${platBadge(pl,26)}${canManage()?`<b class="x" title="Disconnect ${esc(nm)}" onclick="directDisconnect('${pl}')">✕</b>`:''}</span>`;
+    items.push(chip(icon, acc||''));
   }
   const html=items.join('');
-  return html?`<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${html}</span>`:'';
+  return html?`<span style="display:inline-flex;gap:14px;align-items:center;flex-wrap:wrap;vertical-align:middle">${html}</span>`:'';
 }
 async function disconnectSocial(id){
   const a=(_socAccounts||[]).find(x=>x.id===id); if(!a)return;
