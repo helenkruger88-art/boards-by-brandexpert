@@ -2429,7 +2429,25 @@ async function postNowComposer(existingId){
   if(platform==='tiktok'&&!media.find(m=>m.type==='video')){toast('TikTok needs a video attached — add one under Images / video first.');return;}
   if(platform==='instagram'&&!media.find(m=>m.type==='image'||m.type==='video')){toast('Instagram needs an image or video attached first.');return;}
   if((platform==='facebook'||platform==='threads')&&!caption&&!media.length){toast('Add a caption or media first.');return;}
-  const ask=platform==='tiktok'?'Upload this video to your TikTok inbox as a draft now?':('Publish this to '+nm+' live right now?');
+  if(platform==='tiktok'){
+    const vid=media.find(m=>m.type==='video');
+    // Save the post first so it can be marked published afterwards.
+    const trow={workspace_id:WS.id,board_id:S.board,platform:'tiktok',caption,media_note:$('po-media').value.trim(),media:_postMedia,post_date:$('po-date').value||saDate(),post_time:($('po-time').value||'09:00'),status:'draft',created_by:SESSION.user.id};
+    let pid=existingId;
+    try{ if(pid){await sb.from('bbe_posts').update(trow).eq('id',pid);} else {const {data,error}=await sb.from('bbe_posts').insert(trow).select('id').single(); if(error)throw error; pid=data.id;} }catch(e){fail(e);return;}
+    if(await ttTryDirect(pid,caption,vid.url)) return;   // Direct Post: compliant modal takes over
+    // Fallback: draft-to-inbox (Direct Post not enabled / not yet granted)
+    if(!confirm('Upload this video to your TikTok inbox as a draft now?'))return;
+    toast('Uploading to TikTok…');
+    try{ const j=await ttApi({action:'publish',board_id:S.board,caption,video_url:vid.url});
+      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      await sb.from('bbe_posts').update({status:'posted'}).eq('id',pid);
+      closeModal();await loadBoard();render();
+      toast('✓ Uploaded to your TikTok inbox as a draft — open the TikTok app to add a caption and publish it.');
+    }catch(e){fail(e);}
+    return;
+  }
+  const ask='Publish this to '+nm+' live right now?';
   if(!confirm(ask))return;
   const row={workspace_id:WS.id,board_id:S.board,platform,caption,media_note:$('po-media').value.trim(),
     post_date:$('po-date').value||saDate(),post_time:$('po-time').value||'09:00',created_by:SESSION.user.id,media:_postMedia};
@@ -2676,6 +2694,84 @@ async function ttApi(body){
   const {data:{session}}=await sb.auth.getSession();
   const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-tiktok`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,...body})});
   return await r.json();
+}
+/* ===== TikTok Direct Post — compliant composer (TikTok UX guidelines) =====
+   Publishes straight to the creator's profile. Only reachable when the account has
+   granted video.publish (creator_info succeeds); otherwise callers fall back to the
+   draft-to-inbox flow. Until TikTok's Direct Post audit is approved, TikTok forces
+   these posts private regardless of the chosen audience. */
+let _ttCtx=null;
+const TT_PRIV_LABEL={PUBLIC_TO_EVERYONE:'Everyone',MUTUAL_FOLLOW_FRIENDS:'Friends',FOLLOWER_OF_CREATOR:'Followers',SELF_ONLY:'Only me (private)'};
+// Returns true if it opened the compliant Direct Post modal; false → caller does the draft flow.
+async function ttTryDirect(postId, caption, videoUrl){
+  let ci=null; try{ ci=await ttApi({action:'creator_info',board_id:S.board}); }catch(_e){}
+  if(ci&&ci.ok&&ci.creator){ ttDirectModal(postId, caption, videoUrl, ci.creator); return true; }
+  return false;
+}
+function ttDirectModal(postId, caption, videoUrl, cr){
+  _ttCtx={postId, caption, videoUrl, cr};
+  const opts=(cr.privacy_options&&cr.privacy_options.length)?cr.privacy_options:['SELF_ONLY'];
+  const tog=(id,label,disabled)=>`<label style="display:flex;align-items:center;gap:9px;padding:6px 0;${disabled?'opacity:.55':''}"><input type="checkbox" id="${id}" ${disabled?'disabled':'checked'} onchange="ttDirectValidate()" style="width:16px;height:16px;accent-color:var(--accent)">${label}${disabled?' <span style="color:var(--muted);font-size:11px">— turned off on this account</span>':''}</label>`;
+  openModal(`<h3>Post to TikTok <span style="font-weight:500;font-size:12.5px;color:var(--muted)">· ${esc(cr.nickname||'your account')}</span></h3>
+    <p style="font-size:12px;color:var(--muted);margin:2px 0 14px;line-height:1.5">This publishes straight to your TikTok profile. TikTok requires you to set who can see it and how people can interact, each time you post.</p>
+    <label>Who can view this video</label>
+    <select id="tt-priv" onchange="ttDirectValidate()">${opts.map(o=>`<option value="${o}">${esc(TT_PRIV_LABEL[o]||o)}</option>`).join('')}</select>
+    <div style="margin-top:12px"><label>Interactions</label>
+      ${tog('tt-comment','Allow comments',cr.comment_disabled)}
+      ${tog('tt-duet','Allow Duet',cr.duet_disabled)}
+      ${tog('tt-stitch','Allow Stitch',cr.stitch_disabled)}
+    </div>
+    <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+      <label style="display:flex;align-items:center;gap:9px;font-weight:600"><input type="checkbox" id="tt-disc" onchange="ttDirectDisc()" style="width:16px;height:16px;accent-color:var(--accent)">Disclose commercial content</label>
+      <div id="tt-disc-box" style="display:none;margin-top:8px;padding-left:4px">
+        <label style="display:flex;align-items:center;gap:9px;padding:4px 0"><input type="checkbox" id="tt-brand-org" onchange="ttDirectValidate()" style="width:15px;height:15px;accent-color:var(--accent)">Your brand <span style="color:var(--muted);font-size:11px">— promoting yourself or your own business</span></label>
+        <label style="display:flex;align-items:center;gap:9px;padding:4px 0"><input type="checkbox" id="tt-brand-content" onchange="ttDirectValidate()" style="width:15px;height:15px;accent-color:var(--accent)">Branded content <span style="color:var(--muted);font-size:11px">— a paid partnership with another brand</span></label>
+        <div id="tt-disc-note" style="font-size:11.5px;color:var(--muted);margin-top:5px;min-height:16px"></div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5">By posting, you agree to TikTok's <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener" style="color:var(--accent)">Music Usage Confirmation</a><span id="tt-bc-terms"></span>.</div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end;gap:8px">
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn accent" id="tt-go" onclick="ttDirectSubmit()">Post to TikTok</button>
+    </div>`);
+  ttDirectValidate();
+}
+function ttDirectDisc(){ const b=$('tt-disc-box'); if(b) b.style.display=($('tt-disc')&&$('tt-disc').checked)?'block':'none'; ttDirectValidate(); }
+function ttDirectValidate(){
+  const disc=$('tt-disc')&&$('tt-disc').checked;
+  const org=$('tt-brand-org')&&$('tt-brand-org').checked;
+  const bc=$('tt-brand-content')&&$('tt-brand-content').checked;
+  const priv=$('tt-priv')?$('tt-priv').value:'SELF_ONLY';
+  const note=$('tt-disc-note'); const terms=$('tt-bc-terms');
+  let ok=true;
+  if(disc){
+    if(!org&&!bc) ok=false;
+    if(bc&&priv==='SELF_ONLY') ok=false;
+    if(note){ note.innerHTML = (!org&&!bc)?'Pick at least one below.' : (bc? (priv==='SELF_ONLY'?'<b style="color:var(--danger)">Branded content can’t be private — choose a wider audience.</b>':'Your video will be labelled <b>Paid partnership</b>.') : 'Your video will be labelled <b>Promotional content</b>.'); }
+    if(terms) terms.innerHTML = bc? ' and <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener" style="color:var(--accent)">Branded Content Policy</a>' : '';
+  } else { if(note) note.textContent=''; if(terms) terms.innerHTML=''; }
+  const go=$('tt-go'); if(go) go.disabled=!ok;
+  return ok;
+}
+async function ttDirectSubmit(){
+  if(!ttDirectValidate()||!_ttCtx) return;
+  const go=$('tt-go'); if(go){go.disabled=true;go.textContent='Posting…';}
+  const on=id=>{ const e=$(id); return !!(e&&!e.disabled&&e.checked); };
+  const post_info={
+    privacy_level: $('tt-priv').value,
+    disable_comment: !on('tt-comment'),
+    disable_duet: !on('tt-duet'),
+    disable_stitch: !on('tt-stitch'),
+    brand_organic_toggle: !!($('tt-disc').checked&&on('tt-brand-org')),
+    brand_content_toggle: !!($('tt-disc').checked&&on('tt-brand-content'))
+  };
+  try{
+    const j=await ttApi({action:'publish',direct:true,board_id:S.board,caption:_ttCtx.caption,video_url:_ttCtx.videoUrl,post_info});
+    if(j&&j.error){ toast('⚠ '+(j.message||j.error)); if(go){go.disabled=false;go.textContent='Post to TikTok';} return; }
+    if(_ttCtx.postId){ try{ await sb.from('bbe_posts').update({status:'posted'}).eq('id',_ttCtx.postId); }catch(_e){} }
+    closeModal(); await loadBoard(); render();
+    toast(post_info.privacy_level==='SELF_ONLY'?'✓ Posted to TikTok (private — only you can see it)':'✓ Posted to TikTok');
+  }catch(e){ fail(e); if(go){go.disabled=false;go.textContent='Post to TikTok';} }
 }
 // YouTube posting OAuth connect (Google) — full-page redirect; returns to ?ytconnected=1.
 async function ytPostConnect(){
@@ -3612,6 +3708,8 @@ async function publishPost(id){
     if(postNow && p.platform==='tiktok'){
       const vid=media.find(m=>m.type==='video');
       if(!vid){toast('TikTok needs a video to publish.');return;}
+      // Direct Post (compliant modal) when the account has granted it; else draft-to-inbox.
+      if(await ttTryDirect(id,p.caption,vid.url)) return;
       toast('Uploading to TikTok…');
       const j=await ttApi({action:'publish',board_id:S.board,caption:p.caption,video_url:vid.url});
       if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
