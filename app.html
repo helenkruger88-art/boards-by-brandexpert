@@ -2154,7 +2154,7 @@ function allBoardsView(){
     cells+=`<div style="min-height:74px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:5px 6px;${ds===today?'outline:2px solid var(--accent);outline-offset:-2px;':''}">
       <div style="font-size:10.5px;font-weight:700;color:var(--muted)">${d}</div>
       ${dp.slice(0,3).map(p=>{const bn=BOARDS.find(b=>b.id===p.board_id);
-        return `<div onclick="openPostFromAll('${p.id}','${p.board_id}')" title="${esc((bn?bn.name+' · ':'')+p.caption.slice(0,70))}" style="cursor:pointer;font-size:9.5px;font-weight:700;color:#fff;background:${boardHue(p.board_id)};border-radius:5px;padding:2px 5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${p.status==='posted'?'opacity:.45;':''}">${p.status==='scheduled'?'⏱ ':p.status==='approved'?'✓ ':''}${(PLAT[p.platform]||PLAT.other)[0]}</div>`;}).join('')}
+        return `<div onclick="openPostFromAll('${p.id}','${p.board_id}')" title="${esc((bn?bn.name+' · ':'')+p.caption.slice(0,70))}" style="cursor:pointer;font-size:9.5px;font-weight:700;color:#fff;background:${boardHue(p.board_id)};border-radius:5px;padding:2px 5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${p.status==='posted'&&p.platform!=='tiktok'?'opacity:.45;':''}">${p.status==='posted'&&p.platform==='tiktok'?'📥 ':p.status==='scheduled'?'⏱ ':p.status==='approved'?'✓ ':''}${(PLAT[p.platform]||PLAT.other)[0]}</div>`;}).join('')}
       ${dp.length>3?`<div style="font-size:9px;color:var(--muted);font-weight:700;margin-top:2px">+${dp.length-3}</div>`:''}
     </div>`;
   }
@@ -2252,7 +2252,7 @@ function contentView(){
     const dp=byDate[ds]||[];
     cells+=`<div onclick="postModal(null,'${ds}')" style="min-height:74px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:5px 6px;cursor:pointer;${ds===today?'outline:2px solid var(--accent);outline-offset:-2px;':''}">
       <div style="font-size:10.5px;font-weight:700;color:var(--muted)">${d}</div>
-      ${dp.slice(0,3).map(p=>`<div onclick="event.stopPropagation();postModal('${p.id}')" title="${esc(p.caption.slice(0,80))}" style="font-size:9.5px;font-weight:700;color:#fff;background:${PLAT[p.platform][1]};border-radius:5px;padding:2px 5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${p.status==='posted'?'opacity:.45;':''}">${p.status==='approved'?'✓ ':p.status==='scheduled'?'⏱ ':''}${PLAT[p.platform][0]}</div>`).join('')}
+      ${dp.slice(0,3).map(p=>`<div onclick="event.stopPropagation();postModal('${p.id}')" title="${esc(p.caption.slice(0,80))}" style="font-size:9.5px;font-weight:700;color:#fff;background:${PLAT[p.platform][1]};border-radius:5px;padding:2px 5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${p.status==='posted'&&p.platform!=='tiktok'?'opacity:.45;':''}">${p.status==='posted'&&p.platform==='tiktok'?'📥 ':p.status==='approved'?'✓ ':p.status==='scheduled'?'⏱ ':''}${PLAT[p.platform][0]}</div>`).join('')}
       ${dp.length>3?`<div style="font-size:9px;color:var(--muted);font-weight:700;margin-top:2px">+${dp.length-3} more</div>`:''}
     </div>`;
   }
@@ -2338,12 +2338,13 @@ function postModal(id,dateStr){
     </div>
     ${p&&p.postpeer_id?`<div id="po-stats" style="display:flex;gap:14px;flex-wrap:wrap;background:var(--panel,#F4F3EE);border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:var(--muted)">Loading stats…${(()=>{setTimeout(()=>postStats(p.id),80);return '';})()}</div>`:''}
     ${p&&p.status==='failed'&&p.stats&&p.stats._sched?`<div style="background:#FDECEA;border:1px solid #F5C6CB;border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:#8A1C1C">⚠ Auto-post failed: ${esc(p.stats._sched.last_error||'unknown error')}. Fix the issue, set the status back to Approved, then Auto-post again.</div>`:''}
+    ${p&&p.platform==='tiktok'&&p.status==='posted'?`<div style="background:#FFF7E6;border:1px solid #F0D9A8;border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:#8a5a00;line-height:1.5">📥 <b>Uploaded to TikTok as a draft.</b> Open the TikTok app (signed in as your connected account) → Notifications / Inbox, or ＋ Create → Drafts → confirm the caption and tap Post. TikTok doesn't let apps publish directly until its Direct Post audit is approved.</div>`:''}
     <label>Status</label>
     <select id="po-status">
       <option value="draft" ${!p||p.status==='draft'?'selected':''}>Draft</option>
       <option value="approved" ${p&&p.status==='approved'?'selected':''}>Approved — ready to post</option>
       <option value="scheduled" ${p&&p.status==='scheduled'?'selected':''}>Scheduled — waiting to auto-post</option>
-      <option value="posted" ${p&&p.status==='posted'?'selected':''}>Posted</option>
+      <option value="posted" ${p&&p.status==='posted'?'selected':''}>${p&&p.platform==='tiktok'?'Uploaded — draft on TikTok':'Posted'}</option>
       ${p&&p.status==='failed'?`<option value="failed" selected>Failed — needs attention</option>`:''}
     </select>
     <div class="row">
