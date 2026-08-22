@@ -2595,6 +2595,38 @@ async function fbConnect(){
   metaApi({action:'setup'});
   location.href=j.url;}catch(e){fail(e);}
 }
+// After Facebook OAuth returns (?fbpick), let the user pick which Page (+ its IG) to
+// connect to THIS board — so an account managing several Pages links the right one.
+async function fbPickStart(board){
+  try{
+    toast('Loading your Facebook Pages…');
+    const j=await metaApi({action:'pages',board_id:board});
+    if(j.error){toast(j.error);return;}
+    const pages=j.pages||[];
+    if(!pages.length){toast('No Facebook Pages found on that account — make sure you granted at least one Page.');return;}
+    if(pages.length===1){await fbPickChoose(board,pages[0].id);return;}
+    fbPickModal(board,pages);
+  }catch(e){fail(e);}
+}
+function fbPickModal(board,pages){
+  openModal(`<h3>Choose the Page to connect</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:4px 0 14px;line-height:1.5">Pick which Facebook Page (and its linked Instagram) to connect to this board. You can connect a different Page to each board.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto">
+      ${pages.map(p=>`<button class="btn ghost" style="justify-content:flex-start;text-align:left;padding:11px 13px;height:auto" onclick="fbPickChoose('${board}','${esc(String(p.id))}')"><span><b>${esc(p.name||'Page')}</b>${p.ig?`<span style="color:var(--muted);font-weight:500"> · Instagram @${esc(p.ig)}</span>`:''}</span></button>`).join('')}
+    </div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`);
+}
+async function fbPickChoose(board,pageId){
+  const btns=document.querySelectorAll('#modal button'); btns.forEach(b=>b.disabled=true);
+  try{
+    const j=await metaApi({action:'select_page',board_id:board,page_external_id:pageId});
+    if(j.error){toast(j.error);btns.forEach(b=>b.disabled=false);return;}
+    closeModal();
+    toast('✅ '+(j.name?esc(j.name)+' ':'Page ')+'connected'+(j.instagram?' + Instagram @'+esc(j.instagram):''));
+    // refresh the "posts to" strip if we're on that board's content
+    try{if(typeof S!=='undefined'&&S.board===board){await loadDirectLinks();const el=$('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style="font-size:12.5px;color:var(--muted)">nothing yet — connect below</span>';}}catch(_){}
+  }catch(e){fail(e);}
+}
 function fbComposeModal(){
   const l=inboxLinkFor('facebook'); if(!l){toast('Connect a Facebook Page first');return;}
   openModal(`<h3>Post to Facebook <span style="font-weight:500;font-size:12.5px;color:var(--muted)">· ${esc(l.name||'your Page')}</span></h3>
@@ -3918,6 +3950,9 @@ async function authLinkCheck(){
   const confirm=q.get('confirm'), pwreset=q.get('pwreset');
   const fbc=q.get('fbconnected');
   if(fbc){history.replaceState({},'',location.pathname);setTimeout(()=>toast(fbc==='err'?'Facebook connection failed — try again':'✅ Facebook Page linked — comments & messages will now land in your Inbox'),800);}
+  // Facebook returned — let the user choose WHICH Page (+ its Instagram) to link to this board.
+  const fbpick=q.get('fbpick');
+  if(fbpick){const pboard=q.get('board')||'';history.replaceState({},'',location.pathname);const tryOpen=()=>{if(typeof WS!=='undefined'&&WS&&WS.id){fbPickStart(pboard);}else{setTimeout(tryOpen,300);}};setTimeout(tryOpen,700);}
   // Direct YouTube posting (bbe-youtube-post) OAuth return.
   const ytc=q.get('ytconnected');
   if(ytc){history.replaceState({},'',location.pathname);setTimeout(()=>toast(ytc==='err'?'YouTube connection failed — try again':'✅ YouTube channel connected — you can now post & schedule to it'),800);}
