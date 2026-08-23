@@ -2395,14 +2395,14 @@ function postModal(id,dateStr){
     <button type="button" class="btn ghost sm" onclick="document.getElementById('po-file').click()">＋ Add images / video</button>
     <span id="po-upl" style="font-size:11.5px;color:var(--muted);margin-left:8px"></span>
     <div style="display:flex;gap:10px">
-      <div style="flex:1"><label>Date</label><input type="date" id="po-date" value="${p?p.post_date:(dateStr||saDate())}"></div>
-      <div style="width:110px"><label>Time</label><input type="time" id="po-time" value="${p?(p.post_time||'09:00').slice(0,5):'09:00'}"></div>
+      <div style="flex:1"><label>Date</label><input type="date" id="po-date" value="${p?p.post_date:(dateStr||saDate())}" onchange="postBtnSync()"></div>
+      <div style="width:110px"><label>Time</label><input type="time" id="po-time" value="${p?(p.post_time||'09:00').slice(0,5):'09:00'}" onchange="postBtnSync()"></div>
     </div>
     ${p&&p.postpeer_id?`<div id="po-stats" style="display:flex;gap:14px;flex-wrap:wrap;background:var(--panel,#F4F3EE);border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:var(--muted)">Loading stats…${(()=>{setTimeout(()=>postStats(p.id),80);return '';})()}</div>`:''}
     ${p&&p.status==='failed'&&p.stats&&p.stats._sched?`<div style="background:#FDECEA;border:1px solid #F5C6CB;border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:#8A1C1C">⚠ Auto-post failed: ${esc(p.stats._sched.last_error||'unknown error')}. Fix the issue, set the status back to Approved, then Auto-post again.</div>`:''}
     ${p&&p.platform==='tiktok'&&p.status==='posted'?`<div style="background:#FFF7E6;border:1px solid #F0D9A8;border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:#8a5a00;line-height:1.5">📥 <b>Uploaded to TikTok as a draft.</b> Open the TikTok app (signed in as your connected account) → Notifications / Inbox, or ＋ Create → Drafts → confirm the caption and tap Post. TikTok doesn't let apps publish directly until its Direct Post audit is approved.</div>`:''}
     <label>Status</label>
-    <select id="po-status">
+    <select id="po-status" onchange="postBtnSync()">
       <option value="draft" ${!p||p.status==='draft'?'selected':''}>Draft</option>
       <option value="approved" ${p&&p.status==='approved'?'selected':''}>Approved — ready to post</option>
       <option value="scheduled" ${p&&p.status==='scheduled'?'selected':''}>Scheduled — waiting to auto-post</option>
@@ -2413,11 +2413,27 @@ function postModal(id,dateStr){
       ${p?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="delPost('${p.id}')">${ic('trash',13)}</button>`:''}
       ${p?`<button class="btn ghost" onclick="copyCaption('${p.id}')">Copy caption</button>`:''}
       ${p?`<button class="btn ghost" onclick="dupModal('${p.id}')" title="Create copies of this post for other platforms — tweak each caption before it goes out">⧉ Also post on…</button>`:''}
-      ${canManage()&&paidAI()&&(!p||p.status!=='posted')?`<button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="postNowComposer(${p?`'${p.id}'`:'null'})" title="Publish right now — Facebook, Instagram & Threads go live; TikTok uploads to your inbox as a draft to caption & publish in the app">↗ Post now</button>`:''}
-      ${p&&paidAI()&&p.status!=='posted'&&p.platform!=='other'?`<button class="btn" onclick="publishPost('${p.id}')" title="For a future date/time: schedules it to auto-post then">⏱ Auto-post</button>`:''}
+      ${canManage()&&paidAI()&&(!p||p.status!=='posted')?`<button class="btn ghost" onclick="postNowComposer(${p?`'${p.id}'`:'null'})" title="Publish right now — Facebook, Instagram & Threads go live; TikTok uploads to your inbox as a draft to caption & publish in the app">↗ Post now</button>`:''}
+      ${p&&paidAI()&&p.status!=='posted'&&p.platform!=='other'&&['youtube','linkedin'].includes(p.platform)?`<button class="btn ghost" onclick="publishPost('${p.id}')" title="Register this post to auto-post at its date/time">⏱ Auto-post</button>`:''}
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn accent" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save':'Add to calendar'}</button>
-    </div>`);
+      <button class="btn accent" id="po-save" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save':'Add to calendar'}</button>
+    </div>
+    <div id="po-hint" style="font-size:11.5px;color:var(--muted);margin:9px 2px 0;line-height:1.45;text-align:right"></div>`);
+  setTimeout(postBtnSync,20);
+}
+function postBtnSync(){
+  const sel=document.getElementById('po-status'); if(!sel)return;
+  const st=sel.value;
+  const save=document.getElementById('po-save'), hint=document.getElementById('po-hint');
+  const d=(document.getElementById('po-date')||{}).value||'', t=(document.getElementById('po-time')||{}).value||'';
+  const when=(d||'the set date')+(t?' at '+t:'');
+  let lbl, msg;
+  if(st==='scheduled'){ lbl='✓ Schedule it'; msg='Saves to the calendar and auto-posts on '+when+'. To publish right now instead, use ↗ Post now.'; }
+  else if(st==='draft'){ lbl='Save draft'; msg='Saved as a draft only — it won’t post until you set the status to Scheduled, or use ↗ Post now.'; }
+  else if(st==='approved'){ lbl='Save'; msg='Marked ready. It won’t auto-post on its own — set the status to Scheduled to auto-post, or use ↗ Post now.'; }
+  else { lbl='Save'; msg=''; }
+  if(save) save.textContent=lbl;
+  if(hint) hint.textContent=msg;
 }
 async function draftAI(){
   const brief=$('po-cap').value.trim()||prompt('What is this post about? One or two lines:');
