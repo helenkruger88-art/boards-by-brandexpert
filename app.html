@@ -2219,6 +2219,33 @@ let _contentSplit=localStorage.getItem('bbe_csplit')==='1';
 function toggleContentSplit(){_contentSplit=!_contentSplit;localStorage.setItem('bbe_csplit',_contentSplit?'1':'0');render();}
 let _cShow=(()=>{try{return JSON.parse(localStorage.getItem('bbe_cshow'))||{tasks:true,cal:true,inbox:true};}catch(_){return {tasks:true,cal:true,inbox:true};}})();
 function colToggle(k){_cShow[k]=!_cShow[k];localStorage.setItem('bbe_cshow',JSON.stringify(_cShow));render();}
+// Content page is a tabbed workspace: Calendar · Tasks · Inbox · Channels.
+let _ctab=localStorage.getItem('bbe_ctab')||'calendar';
+function ctabGo(t){_ctab=t;localStorage.setItem('bbe_ctab',t);render();}
+// Small overlapping badges of the platforms this board can post to — shown on the Channels tab.
+function channelAvatarHtml(){
+  const seen=new Set(),pls=[];
+  (_socAccounts||[]).filter(a=>!DIRECT_SET.includes(a.platform)).forEach(a=>{if(!seen.has(a.platform)){seen.add(a.platform);pls.push(a.platform);}});
+  (_directPlatforms||[]).forEach(pl=>{if(!seen.has(pl)){seen.add(pl);pls.push(pl);}});
+  if(!pls.length)return '';
+  return `<span style="display:inline-flex;align-items:center">${pls.slice(0,5).map((pl,i)=>`<span style="margin-left:${i?'-6px':'0'};border:2px solid var(--bg);border-radius:7px;display:inline-flex;line-height:0">${platBadge(pl,17)}</span>`).join('')}</span>`;
+}
+// The Channels tab body — all the "posts to" + inbox + email setup that used to crowd the header.
+function contentChannelsPanel(){
+  return `<div style="display:grid;grid-template-columns:1fr;gap:14px;max-width:660px">
+    <div class="card" style="padding:16px 18px">
+      <b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Posts to</b>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:6px 0 12px">The accounts this board publishes to. Each board can post to its own set of accounts.</p>
+      <span id="soc-strip">${socStripChips()||'<span style="font-size:12.5px;color:var(--muted)">nothing yet — add a platform below</span>'}</span>
+      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].filter(p=>!platConnected(p));return un.length?`<div style="margin-top:12px"><select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:7px 12px;font-size:12px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select></div>`:'';})():''}
+    </div>
+    <div class="card" style="padding:16px 18px">
+      <b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Inbox &amp; setup</b>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:6px 0 12px">Where this board's comments &amp; messages come from — plus posting straight to Facebook and email setup.</p>
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span id="inbox-connects">${inboxConnectsHtml()}</span></div>
+    </div>
+  </div>`;
+}
 function contentTasksPanel(){
   const open=cur.notes.filter(n=>!n.archived&&!n.done);
   const doneN=cur.notes.filter(n=>!n.archived&&n.done).length;
@@ -2307,33 +2334,38 @@ function contentView(){
       </div>`).join('')||'<div class="empty">Nothing scheduled — click a day on the calendar to plan a post.</div>'}
     </div>
   </div>`;
-  const _cols=[];
-  if(_cShow.tasks)_cols.push(`<div style="flex:1;min-width:250px">${contentTasksPanel()}</div>`);
-  if(_cShow.cal)_cols.push(`<div style="flex:1.5;min-width:300px">${calCol}</div>`);
-  if(_cShow.inbox)_cols.push(`<div style="flex:1;min-width:260px">${boardInboxHtml(S.board)}</div>`);
+  // Load the board's connections (once per board) so the Channels avatar cluster + panel populate,
+  // then refresh those spots in place. loadSocials also triggers a one-time re-render on first load.
+  setTimeout(async()=>{try{
+    if(typeof loadSocials==='function')await loadSocials();
+    if(typeof loadDirectLinks==='function')await loadDirectLinks();
+    const s=document.getElementById('soc-strip');if(s)s.innerHTML=socStripChips()||'<span style="font-size:12.5px;color:var(--muted)">nothing yet — add a platform below</span>';
+    const av=document.getElementById('ctab-chan-avs');if(av)av.innerHTML=channelAvatarHtml();
+    const ib=document.getElementById('inbox-connects');if(ib)ib.innerHTML=inboxConnectsHtml();
+  }catch(_){}},60);
+  const tab=(id,label,icon,extra='')=>`<button onclick="ctabGo('${id}')" style="background:none;border:none;padding:11px 3px;font-size:13.5px;font-weight:${_ctab===id?'700':'600'};color:${_ctab===id?'var(--ink)':'var(--muted)'};border-bottom:2px solid ${_ctab===id?'var(--accent)':'transparent'};cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;margin-bottom:-1px">${ic(icon,13)}${label}${extra}</button>`;
+  if(_ctab==='channels'&&!paidAI())_ctab='calendar';
+  const body = _ctab==='tasks' ? `<div style="max-width:640px">${contentTasksPanel()}</div>`
+    : _ctab==='inbox' ? boardInboxHtml(S.board)
+    : _ctab==='channels' ? contentChannelsPanel()
+    : calCol;
   return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2>
     <select onchange="switchContentBoard(this.value)" style="width:auto;padding:7px 12px;font-weight:600;font-size:13px">
       ${BOARDS.map(x=>`<option value="${x.id}" ${!_contentAll&&x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}
       ${BOARDS.length>1?`<option value="__all" ${_contentAll?'selected':''}>▦ All boards</option>`:''}
     </select>
     <span style="flex:1"></span>
-    <span style="font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-right:2px">COLUMNS</span>
-    <button class="btn ${_cShow.tasks?'accent':'ghost'} sm" onclick="colToggle('tasks')" title="Show or hide the Tasks column">${ic('board',12)} Tasks</button>
-    <button class="btn ${_cShow.cal?'accent':'ghost'} sm" onclick="colToggle('cal')" title="Show or hide the Calendar column">${ic('calendar',12)} Calendar</button>
-    <button class="btn ${_cShow.inbox?'accent':'ghost'} sm" onclick="colToggle('inbox')" title="Show or hide the Inbox column">${ic('mail',12)} Inbox</button>
+    <button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button>
     <button class="btn ghost sm" style="color:var(--accent)" onclick="openImportBrief()" title="Paste a brief — AI turns it into tasks and content drafts">✦ Import brief</button>
-    <button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button>${canManage()?`<button class="btn ghost sm" style="color:var(--accent)" onclick="wpBlogModal()" title="Write &amp; publish a blog post to a connected WordPress site">${ic('note',12)} Blog post</button>`:''}</div>
-  ${paidAI()?`<div class="card" style="padding:12px 16px;margin-bottom:14px">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <b style="font-size:12.5px;color:var(--muted)">THIS BOARD POSTS TO</b>
-      <span id="soc-strip">${(()=>{setTimeout(async()=>{await loadSocials();await loadDirectLinks();const el=document.getElementById('soc-strip');if(el)el.innerHTML=socStripChips()||'<span style=\"font-size:12.5px;color:var(--muted)\">nothing yet — connect below</span>';},60);return '…';})()}</span>
-      <span style="flex:1"></span>
-      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].filter(p=>!platConnected(p));const dd=un.length?`<select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select>`:'';return dd+`<span id="inbox-connects">${inboxConnectsHtml()}</span>`;})():''}
-    </div>
-  </div>`:''}
+    ${canManage()?`<button class="btn ghost sm" style="color:var(--accent)" onclick="wpBlogModal()" title="Write &amp; publish a blog post to a connected WordPress site">${ic('note',12)} Blog post</button>`:''}</div>
+  <div style="display:flex;gap:24px;border-bottom:1px solid var(--line);margin:0 0 18px;padding-left:2px;flex-wrap:wrap;align-items:center">
+    ${tab('calendar','Calendar','calendar')}
+    ${tab('tasks','Tasks','board')}
+    ${tab('inbox','Inbox','mail')}
+    ${paidAI()?tab('channels','Channels','link',`&nbsp;<span id="ctab-chan-avs" style="display:inline-flex">${channelAvatarHtml()}</span>`):''}
+  </div>
   <div id="th-insights"></div>
-  
-  <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">${_cols.join('')||'<div class="empty" style="flex:1;text-align:center;padding:40px">All columns hidden — use the Tasks / Calendar / Inbox buttons above to bring them back.</div>'}</div>`;
+  <div>${body}</div>`;
 }
 async function switchContentBoard(id){
   if(id==='__all'){_contentAll=true;await loadAllPosts();render();return;}
@@ -2835,6 +2867,15 @@ async function ttConnect(){
   try{const j=await ttApi({action:'connect',board_id:S.board});
   if(j&&j.url){location.href=j.url;}else{toast((j&&(j.message||j.error))||'Could not start TikTok connect');}
   }catch(e){fail(e);}
+}
+// Shown when the TikTok account just authorised is already linked to another board.
+// TikTok links one account to one board (inbound routing keys off the account), and TikTok
+// gives no account picker — it connects whoever is logged in — so explain how to switch.
+function ttInUseModal(acct,bd){
+  openModal(`<h3>${platBadge('tiktok',20)} That TikTok account is already in use</h3>
+    <p style="font-size:13px;color:var(--muted);line-height:1.55;margin:8px 0 12px">The TikTok account <b>${esc(acct||'you just authorised')}</b> is already connected to <b>${esc(bd||'another board')}</b>. TikTok links one account to a single board, so it can't also be added here.</p>
+    <p style="font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 14px">To post to a <b>different</b> TikTok account from this board: TikTok always connects whichever account you're signed into and has no account picker. Open <a href="https://www.tiktok.com/login" target="_blank" rel="noopener">tiktok.com</a>, switch to (or log in as) the account you want, then come back and use <b>＋ Add platform → TikTok</b> again. To reuse this same account here, first disconnect it from ${esc(bd||'the other board')}.</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn accent" onclick="closeModal()">Got it</button></div>`);
 }
 async function thApi(body){
   const {data:{session}}=await sb.auth.getSession();
@@ -4106,7 +4147,7 @@ async function authLinkCheck(){
   if(ytc){history.replaceState({},'',location.pathname);setTimeout(()=>toast(ytc==='err'?'YouTube connection failed — try again':'✅ YouTube channel connected — you can now post & schedule to it'),800);}
   // TikTok (bbe-tiktok) OAuth return.
   const ttc=q.get('ttconnected');
-  if(ttc){history.replaceState({},'',location.pathname);setTimeout(()=>toast(ttc==='err'?'TikTok connection failed — try again':'✅ TikTok connected — you can now post & schedule to it'),800);}
+  if(ttc){const ttr=q.get('tt_r')||'';const ttAcct=q.get('tt_acct')||'';const ttBoard=q.get('tt_board')||'';history.replaceState({},'',location.pathname);setTimeout(()=>{if(ttc==='1'){toast('✅ TikTok connected — you can now post & schedule to it');}else if(ttr==='inuse'){ttInUseModal(ttAcct,ttBoard);}else{toast('TikTok connection didn\'t finish — try again');}},800);}
   const gm=q.get('gmail');
   if(gm){history.replaceState({},'',location.pathname);const gmEmail=q.get('email')||'';const gmReason=q.get('reason')||'';setTimeout(()=>{if(gm==='connected'){toast('✅ Gmail connected'+(gmEmail?' — '+gmEmail:'')+' — new mail will land in your Inbox');if(typeof loadInbox==='function'){loadInbox().then(()=>{if(typeof render==='function')render();});}}else{toast('Gmail sign-in didn\'t finish'+(gmReason?' ('+gmReason+')':'')+' — please try again');}},800);}
   const msc=q.get('ms');
@@ -5008,12 +5049,21 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
       const s=await fnPost('bbe-web','gbpstats',board); _dashRev[board]={state:'ready',started:true,d:s,name:st.gbp_location_name};
     }catch(_e){ _dashRev[board]={state:'noweb',started:true}; } refreshType('reviews',board); }
   window.dashRevPick=async function(board,val){ if(!val)return; const parts=val.split('|||'); try{ await fnPost('bbe-web','gbpselect',board,{gbp_account_id:parts[0],gbp_location_id:parts[1],gbp_location_name:parts[2]}); }catch(_e){} delete _dashRev[board]; revLoad(board); dtoast('Location linked'); };
+  // Turn a raw Google Business Profile API error into a plain, actionable message.
+  function gbpErr(raw){
+    const s=String(raw||'');
+    if(/quota|rate limit|RESOURCE_EXHAUSTED|per minute/i.test(s))
+      return "Google is rate-limiting review requests — the Business Profile API quota on the Google project needs to be raised. Reviews appear here once that's approved (see setup); it'll retry on its own.";
+    if(/permission|PERMISSION_DENIED|not authorized|insufficient|disabled|has not been used/i.test(s))
+      return "Google hasn't granted Business Profile access to this app yet. Reviews will show once Business Profile API access is enabled and approved.";
+    return s.slice(0,160);
+  }
   function reviewsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
     const w=_dashRev[board];
     if(!w||w.state==='loading'){ revLoad(board); return `<div class="dw-srcbadge">⭐ Reviews</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
     if(w.state==='noweb') return `<div class="dw-srcbadge">⭐ Reviews · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Reviews use this board's Google connection (now includes Business Profile). Connect Google here or from a Website/Search tile.</p><button class="btn accent" onclick="dashWebConnect('${board}')">Connect Google</button></div>`;
-    if(w.state==='pick'){ const opts=(w.locs||[]).map(l=>`<option value="${E(l.account)}|||${E(l.location)}|||${E(l.title||'')}">${E(l.title||l.location)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">⭐ Reviews</div><div class="dw-mute" style="padding:10px 0">${w.err?E(w.err):'No Business Profile locations on this Google account.'}</div>`; return `<div class="dw-srcbadge">⭐ Pick a location</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashRevPick('${board}',this.value)"><option value="">Choose location…</option>${opts}</select></div>`; }
-    const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">⭐ ${E(w.name||'Reviews')}</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
+    if(w.state==='pick'){ const opts=(w.locs||[]).map(l=>`<option value="${E(l.account)}|||${E(l.location)}|||${E(l.title||'')}">${E(l.title||l.location)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">⭐ Reviews</div><div class="dw-mute" style="padding:10px 0">${w.err?E(gbpErr(w.err)):'No Business Profile locations on this Google account.'}</div>`; return `<div class="dw-srcbadge">⭐ Pick a location</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashRevPick('${board}',this.value)"><option value="">Choose location…</option>${opts}</select></div>`; }
+    const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">⭐ ${E(w.name||'Reviews')}</div><div class="dw-mute" style="padding:10px 0">${E(gbpErr(d.error))}</div>`;
     const g=d.gbp; if(!g) return `<div class="dw-srcbadge">⭐ ${E(w.name||'Reviews')}</div><div class="dw-mute" style="padding:10px 0">No reviews yet.</div>`;
     const rows=(g.reviews||[]).map(r=>`<div class="dw-ag"><div class="dw-what"><div class="t">${E(r.author||'')} <span style="color:var(--warn,#d99512)">${starStr(r.stars)}</span></div><div class="m" style="white-space:normal">${E((r.comment||'').slice(0,90))}</div></div></div>`).join('');
     return `<div class="dw-srcbadge">⭐ ${E(w.name||boardName(board))}</div>
