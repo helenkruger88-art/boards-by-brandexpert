@@ -66,6 +66,7 @@ main{padding:16px;max-width:1280px;margin:0 auto;padding-bottom:calc(84px + env(
 .sb-item:hover{background:#F1EFEA;color:var(--ink)}
 .sb-item.on{background:var(--accent-soft);color:var(--accent)}
 .sb-item .sb-b{margin-left:auto;background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:800}
+.sb-grp{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);opacity:.72;margin:13px 10px 3px}
 .sb-sec{font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:14px 10px 5px}
 .sb-dot{width:10px;height:10px;border-radius:3px;flex:none}
 .sb-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line);margin-top:16px}
@@ -361,11 +362,12 @@ function planEff(){
   if(!WS)return 'free';
   if(WS.plan==='agency')return 'agency';
   if(WS.plan==='pro')return 'pro';
+  if(WS.plan==='starter')return 'starter';
   if(WS.plan==='basic')return 'basic';
   if(WS.plan==='trial'&&WS.trial_ends>=saDate())return 'pro';
   return 'free';
 }
-const paidAI=()=>['pro','agency'].includes(planEff());
+const paidAI=()=>['starter','pro','agency'].includes(planEff());
 function trialDaysLeft(){
   if(!WS||WS.plan!=='trial')return 0;
   return Math.max(0,Math.round((new Date(WS.trial_ends)-new Date(saDate()))/86400000));
@@ -469,7 +471,7 @@ function render(){
   const tdOpen=TD.filter(t=>!t.removed&&t.reason!=='__init__'&&!tdDone(t)).length;
   const nav=navItems();
   const b=nav.board;
-  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,wa:whatsappView,settings:settingsView,btoday:boardTodayView,board:boardView,plan:planView,content:contentView,analytics:analyticsView,binbox:boardInboxView,files:filesView,money:moneyView,team:teamView,setup:boardSetupView};
+  const VIEWS={boards:boardsView,today:todayView,inbox:inboxView,wa:whatsappView,settings:settingsView,overview:function(){return (typeof window.overviewView==='function')?window.overviewView(S.board):boardTodayView();},btoday:boardTodayView,board:boardView,plan:planView,content:contentView,analytics:analyticsView,binbox:boardInboxView,files:filesView,money:moneyView,team:teamView,setup:boardSetupView};
   const viewFn=VIEWS[S.view]||boardsView;
   const sItem=([v,i,l])=>`<button class="sb-item ${S.view===v?'on':''}" onclick="go('${v}')">${ic(i,16)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="sb-b">${tdOpen}</span>`:''}</button>`;
   const bItem=([v,i,l])=>`<button class="${S.view===v?'active':''}" onclick="go('${v}')">${ic(i,19)}<span>${l}</span>${(v==='today'||v==='btoday')&&tdOpen?`<span class="bdot">${tdOpen}</span>`:''}</button>`;
@@ -479,15 +481,15 @@ function render(){
     <button class="sb-item ${S.view==='settings'?'on':''}" onclick="go('settings')">${ic('gear',16)}<span>Settings</span></button>
   </div>`;
   const sideHead=nav.ws
-    ?`<div class="sb-brand" onclick="go('boards')">${esc(WS.name)} <small>· BOARDS</small></div>`
-    :`<button class="sb-back" onclick="leaveBoard()">‹ All boards</button>
+    ?`<div class="sb-brand" onclick="go('boards')">${esc(WS.name)} <small>· PROJECTS</small></div>`
+    :`<button class="sb-back" onclick="leaveBoard()">‹ All projects</button>
       <div class="sb-bhead"><span class="sb-sw" style="background:${b?b.color||'var(--accent)':'var(--accent)'}"></span><select class="sb-switch" onchange="switchBoardTo(this.value)">${BOARDS.map(x=>`<option value="${x.id}" ${x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
   app.innerHTML=`
   <div class="appshell">
-    <aside class="sidebar">${sideHead}<div>${nav.items.map(sItem).join('')}${nav.ws?boardsSideNav():''}</div>${foot}</aside>
+    <aside class="sidebar">${sideHead}<div>${nav.groups.map(g=>`${g.label?`<div class="sb-grp">${g.label}</div>`:''}${g.items.map(sItem).join('')}`).join('')}${nav.ws?boardsSideNav():''}</div>${foot}</aside>
     <div class="contentarea">
       <div class="topbar">
-        ${nav.ws?`<div class="wordmark" onclick="go('boards')">${esc(WS.name)} <small>· Boards</small></div>`:`<button class="tb-back" onclick="leaveBoard()">‹</button><div class="wordmark">${esc(b?b.name:'')}</div>`}
+        ${nav.ws?`<div class="wordmark" onclick="go('boards')">${esc(WS.name)} <small>· Projects</small></div>`:`<button class="tb-back" onclick="leaveBoard()">‹</button><div class="wordmark">${esc(b?b.name:'')}</div>`}
         <span style="flex:1"></span>
         ${WS.plan!=='basic'&&_credits!==null?`<span class="pill" style="background:var(--accent);cursor:pointer" onclick="go('settings')">✦ ${_credits}</span>`:''}
         <span onclick="go('settings')" style="cursor:pointer">${avatar(MEM)}</span>
@@ -511,7 +513,7 @@ function pwToggle(inp){
 }
 function enhancePasswords(){ try{ document.querySelectorAll('input[type="password"]').forEach(pwToggle); }catch(_e){} }
 function go(v){
-  const bv=['btoday','board','plan','content','analytics','binbox','files','money','team','setup'];
+  const bv=['overview','btoday','board','plan','content','analytics','binbox','files','money','team','setup'];
   S.scope=bv.includes(v)?'board':'workspace';
   S.view=v;
   if(v==='content')_contentAll=false;
@@ -519,28 +521,23 @@ function go(v){
   render();
 }
 function leaveBoard(){S.scope='workspace';go('boards');}
-async function switchBoardTo(id){S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;await loadBoard();go('btoday');}
+async function switchBoardTo(id){S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;await loadBoard();go('overview');}
 function navItems(){
   if(S.scope==='board'&&S.board){
     const b=BOARDS.find(x=>x.id===S.board);
     if(b){
       const m=b.modules||{content:true,inbox:true,money:true,team:true};
-      const items=[['btoday','sun','Today']];
-      if(m.plan!==false)items.push(['plan','route','Plan']);
-      items.push(['board','board','Board']);
-      if(m.content)items.push(['content','calendar','Content']);
-      if(m.content)items.push(['analytics','chart','Analytics']);
-      if(m.inbox)items.push(['binbox','mail','Inbox']);
-      if(m.files)items.push(['files','note','Files']);
-      if(m.money)items.push(['money','money','Money']);
-      if(m.team)items.push(['team','users','Team']);
-      items.push(['setup','gear','Setup']);
-      return {ws:false,items,board:b};
+      const work=[]; if(m.plan!==false)work.push(['plan','route','Plan']); work.push(['board','board','Board']); if(m.content)work.push(['content','calendar','Content']);
+      const engage=[]; if(m.content)engage.push(['analytics','chart','Analytics']); if(m.inbox)engage.push(['binbox','mail','Inbox']);
+      const manage=[]; if(m.money)manage.push(['money','money','Money']); if(m.files)manage.push(['files','note','Files']); if(m.team)manage.push(['team','users','Team']); manage.push(['setup','gear','Setup']);
+      const groups=[{label:null,items:[['overview','eye','Overview']]},{label:'Work',items:work},{label:'Engage',items:engage},{label:'Manage',items:manage}].filter(g=>g.items.length);
+      const items=groups.reduce((a,g)=>a.concat(g.items),[]);
+      return {ws:false,groups,items,board:b};
     }
   }
   const wsItems=[['boards','home','Dashboard'],['today','sun','Today'],['inbox','mail','Inbox']];
   if((_waAccounts||[]).some(a=>a&&a.status!=='disabled'))wsItems.push(['wa','chat','WhatsApp Usage']);
-  return {ws:true,items:wsItems};
+  return {ws:true,groups:[{label:null,items:wsItems}],items:wsItems};
 }
 /* ============ AUTH ============ */
 let _authMode='in';
@@ -552,7 +549,7 @@ function authView(){
     </div>
     <div class="auth-card">
       ${_authMode==='in'?`
-      <h3>Sign in</h3><div class="sub">Welcome back — your boards are waiting.</div>
+      <h3>Sign in</h3><div class="sub">Welcome back — your projects are waiting.</div>
       <div class="auth-err" id="a-err"></div>
       <label>Email</label><input id="a-email" type="email" autocomplete="username" placeholder="you@company.co.za">
       <label>Password</label>${pwField('a-pw','current-password','doSignIn')}
@@ -736,9 +733,9 @@ function dayBriefPanel(){
   </div>`;
 }
 function boardsSideNav(){
-  return `<div class="sb-sec">Boards</div>
+  return `<div class="sb-sec">Projects</div>
     ${BOARDS.map(b=>`<button class="sb-item" onclick="openBoard('${b.id}')"><span class="sb-dot" style="background:${b.color||'var(--accent)'}"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.private_to?ic('lock',12)+' ':''}${esc(b.name)}</span></button>`).join('')}
-    <button class="sb-item" style="color:var(--muted)" onclick="newBoardModal()">${ic('plus',15)}<span>New board</span></button>`;
+    <button class="sb-item" style="color:var(--muted)" onclick="newBoardModal()">${ic('plus',15)}<span>New project</span></button>`;
 }
 function statsFor(notes,colId){
   const ns=colId?notes.filter(n=>n.column_id===colId):notes;
@@ -763,13 +760,13 @@ function boardsView(){
   <div class="view-title" style="margin-top:26px"><h2 style="font-size:13px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase">${ic('board',14)} Your boards</h2><span class="sub">${BOARDS.length} board${BOARDS.length!==1?'s':''}</span></div>
   <div class="boards-grid">
     ${BOARDS.map(b=>`<div class="board-card" style="border-top-color:${b.color||'var(--accent)'}" onclick="openBoard('${b.id}')">
-      ${canManage()?`<button class="board-del" title="Delete board" onclick="delBoardCard(event,'${b.id}')">${ic('trash',13)}</button>`:''}
+      ${canManage()?`<button class="board-del" title="Delete project" onclick="delBoardCard(event,'${b.id}')">${ic('trash',13)}</button>`:''}
       <h3>${b.private_to?ic('lock',13)+' ':''}${esc(b.name)}</h3>
       <div class="meta">${ic('calendar',11)} ${esc(b.date_label||'no date')}</div>
       <div class="prog"><i id="bp-${b.id}" style="width:0%"></i></div>
       <div class="prog-row"><span id="bt-${b.id}">…</span></div>
     </div>`).join('')}
-    <div class="new-board" onclick="newBoardModal()">${ic('plus',20)} New board</div>
+    <div class="new-board" onclick="newBoardModal()">${ic('plus',20)} New project</div>
   </div>
   ${(()=>{setTimeout(loadBoardStats,40);return '';})()}`;
 }
@@ -841,21 +838,21 @@ async function homeTodayRemove(id){
 }
 function delBoardCard(ev,id){ if(ev){ev.stopPropagation();} boardDeleteModal(id); }
 function boardDeleteModal(id){
-  if(!canManage()){toast('Only the owner or an admin can delete a board');return;}
+  if(!canManage()){toast('Only the owner or an admin can delete a project');return;}
   const b=BOARDS.find(x=>x.id===id); if(!b)return;
-  openModal(`<h3 style="color:var(--danger);display:flex;align-items:center;gap:8px">${ic('trash',16)} Delete board</h3>
+  openModal(`<h3 style="color:var(--danger);display:flex;align-items:center;gap:8px">${ic('trash',16)} Delete project</h3>
     <p style="font-size:13px;line-height:1.55;margin:8px 0 4px">You're about to permanently delete <b>“${esc(b.name)}”</b>.</p>
-    <p style="font-size:12.5px;color:var(--muted);line-height:1.55;margin:0 0 14px">Everything on this board goes with it — tasks, planner, scheduled &amp; posted content, files, budget, inbox, connected accounts &amp; analytics. <b style="color:var(--danger)">This can't be undone.</b></p>
+    <p style="font-size:12.5px;color:var(--muted);line-height:1.55;margin:0 0 14px">Everything on this project goes with it — tasks, planner, scheduled &amp; posted content, files, budget, inbox, connected accounts &amp; analytics. <b style="color:var(--danger)">This can't be undone.</b></p>
     <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px">Type <b>DELETE</b> to confirm</label>
     <input id="bd-confirm" autocomplete="off" placeholder="DELETE" style="text-transform:none" oninput="var g=$('bd-go');g.disabled=(this.value.trim()!=='DELETE')" onkeydown="if(event.key==='Enter'&&this.value.trim()==='DELETE')boardDeleteConfirmed('${id}')">
     <div class="row" style="margin-top:14px;justify-content:flex-end;gap:8px">
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn" id="bd-go" disabled style="background:var(--danger);color:#fff;border-color:var(--danger)" onclick="boardDeleteConfirmed('${id}')">${ic('trash',13)} Delete board</button>
+      <button class="btn" id="bd-go" disabled style="background:var(--danger);color:#fff;border-color:var(--danger)" onclick="boardDeleteConfirmed('${id}')">${ic('trash',13)} Delete project</button>
     </div>`);
   setTimeout(()=>{var e=$('bd-confirm');if(e)e.focus();},60);
 }
 async function boardDeleteConfirmed(id){
-  if(!canManage()){toast('Only the owner or an admin can delete a board');return;}
+  if(!canManage()){toast('Only the owner or an admin can delete a project');return;}
   const btn=$('bd-go'); if(btn){btn.disabled=true;btn.textContent='Deleting…';}
   try{
     const {error}=await sb.rpc('bbe_delete_board',{p_board:id}); if(error)throw error;
@@ -864,8 +861,8 @@ async function boardDeleteConfirmed(id){
     closeModal();
     await loadWs();
     if(wasCurrent){ try{await loadBoard();}catch(_e){} go('boards'); } else { render(); }
-    toast('Board deleted');
-  }catch(e){fail(e); if(btn){btn.disabled=false;btn.innerHTML=ic('trash',13)+' Delete board';}}
+    toast('Project deleted');
+  }catch(e){fail(e); if(btn){btn.disabled=false;btn.innerHTML=ic('trash',13)+' Delete project';}}
 }
 function homeInbox(rows){
   if(!rows.length)return homeEmpty('Inbox zero.');
@@ -941,13 +938,13 @@ async function loadBoardStats(){
     if(lbl)lbl.textContent=s.t?`${s.d} of ${s.t} tasks done`:'no tasks yet';
   }
 }
-async function openBoard(id){S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;await loadBoard();go('btoday');}
+async function openBoard(id){S.board=id;localStorage.setItem('bbe_board_'+WS.id,id);S.col=null;await loadBoard();go('overview');}
 async function openBoardView(id,view){ S.board=id; localStorage.setItem('bbe_board_'+WS.id,id); S.col=null; await loadBoard(); go(view); }
 function newBoardModal(){
-  openModal(`<h3>New board</h3>
-    <label>Board name</label><input id="nb-name" placeholder="e.g. Spring Launch 2026">
+  openModal(`<h3>New project</h3>
+    <label>Project name</label><input id="nb-name" placeholder="e.g. Spring Launch 2026">
     <label>Date label (optional)</label><input id="nb-date" placeholder="e.g. Sep 2026">
-    <label>Board colour</label>${swatchGrid('nb-col','#C75B12')}
+    <label>Project colour</label>${swatchGrid('nb-col','#C75B12')}
     <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer">
       <input type="checkbox" id="nb-priv" style="width:auto"> ${ic('lock',12)} Private — only you (share it later)</label>
     <label>Smart sections — dedicated screens (change any time in Setup)</label>
@@ -958,7 +955,7 @@ function newBoardModal(){
     <input id="nb-cols" value="Planning, Design, Suppliers, Admin" placeholder="e.g. Planning, Design, Suppliers, Admin">
     <div style="font-size:11px;color:var(--muted);margin-top:4px">These become the columns on the board. Leave blank for an empty board.</div>
     <div class="row"><button class="btn ghost" onclick="closeModal()">Cancel</button>
-    <button class="btn accent" onclick="createBoard()">Create board</button></div>`);
+    <button class="btn accent" onclick="createBoard()">Create project</button></div>`);
   setTimeout(()=>{const e=$('nb-name');if(e)e.focus();},60);
 }
 async function createBoard(){
@@ -966,17 +963,17 @@ async function createBoard(){
   const modules={plan:$('nb-mod-plan')?$('nb-mod-plan').checked:true,content:$('nb-mod-content').checked,inbox:$('nb-mod-inbox').checked,files:$('nb-mod-files').checked,money:$('nb-mod-money').checked,team:$('nb-mod-team').checked};
   try{
     const {data,error}=await sb.from('bbe_boards').insert({workspace_id:WS.id,name,date_label:$('nb-date').value.trim(),color:gridColor('nb-col','#C75B12'),private_to:$('nb-priv').checked?SESSION.user.id:null,created_by:SESSION.user.id,modules}).select().single();
-    if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 board — upgrade for more.');if(/PRO_LIMIT_BOARDS/.test(error.message))throw new Error('Pro includes 10 boards — move to Agency for unlimited.');throw error;}
+    if(error){if(/FREE_LIMIT_BOARDS/.test(error.message))throw new Error('Free plan is 1 project — upgrade to Starter for 3.');if(/STARTER_LIMIT_BOARDS/.test(error.message))throw new Error('Starter includes 3 projects — move to Pro for 5.');if(/PRO_LIMIT_BOARDS/.test(error.message))throw new Error('Pro includes 5 projects — move to Agency for 10.');if(/AGENCY_LIMIT_BOARDS/.test(error.message))throw new Error('Agency includes 10 projects — the current maximum.');throw error;}
     const colNames=($('nb-cols').value||'').split(',').map(s=>s.trim()).filter(Boolean);
     if(colNames.length){
       await sb.from('bbe_columns').insert(colNames.map((n,i)=>({workspace_id:WS.id,board_id:data.id,name:n,color:CYCLE[i%CYCLE.length],position:i})));
     }
-    closeModal();await loadWs();S.board=data.id;localStorage.setItem('bbe_board_'+WS.id,data.id);await loadBoard();go('btoday');toast('Board created');
+    closeModal();await loadWs();S.board=data.id;localStorage.setItem('bbe_board_'+WS.id,data.id);await loadBoard();go('overview');toast('Project created');
   }catch(e){fail(e);}
 }
 /* ============ BOARD-SCOPED VIEWS (Today / Inbox / Setup) ============ */
 function boardTodayView(){
-  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No project selected.</div>';
   const m=b.modules||{content:true,inbox:true,money:true,team:true};
   const open=cur.notes.filter(n=>!n.archived&&!n.done);
   return `<div class="view-title"><h2>${ic('sun',18)} Today <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">${open.length} open task${open.length!==1?'s':''}</span></div>
@@ -986,21 +983,21 @@ function boardTodayView(){
   </div>`;
 }
 function boardInboxView(){
-  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No project selected.</div>';
   setTimeout(()=>{if(typeof loadInboxConnects==='function')loadInboxConnects();},60);
-  return `<div class="view-title"><h2>${ic('mail',18)} Inbox <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">emails, WhatsApp, comments &amp; messages for this board</span><span style="flex:1"></span><button class="btn ghost sm" onclick="syncInbox()">↻ Refresh</button></div>
+  return `<div class="view-title"><h2>${ic('mail',18)} Inbox <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">emails, WhatsApp, comments &amp; messages for this project</span><span style="flex:1"></span><button class="btn ghost sm" onclick="syncInbox()">↻ Refresh</button></div>
   <div class="card" style="padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Connect</b><span style="flex:1"></span><span id="inbox-connects">${inboxConnectsHtml()}</span></div>
   <div id="wa-tpl-panel">${waTplPanelHtml()}</div>
   ${boardInboxHtml(b.id)}`;
 }
 function boardSetupView(){
-  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No project selected.</div>';
   const m=b.modules||{content:true,inbox:true,money:true,team:true};
-  const MOD=[['plan','route','Plan','Sketch the campaign as a flow, then turn nodes into tasks'],['content','calendar','Content','Social calendar, AI drafting & auto-posting'],['inbox','mail','Inbox',"Comments & DMs from this board's connected pages"],['files','note','Files','Link Drive/Dropbox folders & documents for the board'],['money','money','Money','Budget & spend tracking'],['team','users','Team','The team screen for this board']];
+  const MOD=[['plan','route','Plan','Sketch the campaign as a flow, then turn nodes into tasks'],['content','calendar','Content','Social calendar, AI drafting & auto-posting'],['inbox','mail','Inbox',"Comments & DMs from this project's connected pages"],['files','note','Files','Link Drive/Dropbox folders & documents for the project'],['money','money','Money','Budget & spend tracking'],['team','users','Team','The team screen for this project']];
   return `<div class="view-title"><h2>${ic('gear',18)} Setup <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2></div>
   <div class="card" style="max-width:580px">
-    <label>Board name</label><input id="bs-name" value="${esc(b.name)}">
-    <label>What this board needs</label>
+    <label>Project name</label><input id="bs-name" value="${esc(b.name)}">
+    <label>What this project needs</label>
     <div style="display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;opacity:.85">${ic('board',16)}<div style="flex:1"><b style="font-size:13px">Tasks board</b><div style="font-size:11px;color:var(--muted)">Columns, deadlines, assignments</div></div><span style="font-size:9px;font-weight:800;color:var(--muted);background:var(--bg);border-radius:6px;padding:3px 7px">ALWAYS ON</span></div>
     ${MOD.map(([k,i,t,s])=>{const on=k==='plan'?(m[k]!==false):m[k];
       return `<div style="display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px">${ic(i,16)}<div style="flex:1"><b style="font-size:13px">${t}</b><div style="font-size:11px;color:var(--muted)">${s}</div></div>
@@ -1013,8 +1010,8 @@ function boardSetupView(){
   ${canManage()?`<div class="card" style="max-width:580px;margin-top:16px;border-color:var(--danger)">
     <b style="font-size:11px;letter-spacing:.05em;color:var(--danger);text-transform:uppercase">Danger zone</b>
     <div style="display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap">
-      <div style="flex:1;min-width:220px"><b style="font-size:13px">Delete this board</b><div style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:2px">Permanently removes “${esc(b.name)}” and everything on it. You'll be asked to type DELETE to confirm.</div></div>
-      <button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" onclick="boardDeleteModal('${b.id}')">${ic('trash',13)} Delete board</button>
+      <div style="flex:1;min-width:220px"><b style="font-size:13px">Delete this project</b><div style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:2px">Permanently removes “${esc(b.name)}” and everything on it. You'll be asked to type DELETE to confirm.</div></div>
+      <button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" onclick="boardDeleteModal('${b.id}')">${ic('trash',13)} Delete project</button>
     </div>
   </div>`:''}`;
 }
@@ -1034,8 +1031,8 @@ function boardAccessCard(b){
       ${ctrl}</div>`;
   }).join('');
   return `<div class="card" style="max-width:580px;margin-top:16px">
-    <b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Board access</b>
-    <p style="font-size:11.5px;color:var(--muted);line-height:1.5;margin:6px 0 10px">Choose who can open <b>${esc(b.name)}</b>. You (the owner) and the board's creator always have access. Add a teammate to share just this board with them — they won't see your other boards.</p>
+    <b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Project access</b>
+    <p style="font-size:11.5px;color:var(--muted);line-height:1.5;margin:6px 0 10px">Choose who can open <b>${esc(b.name)}</b>. You (the owner) and the board's creator always have access. Add a teammate to share just this project with them — they won't see your other projects.</p>
     ${rows||'<div class="empty" style="padding:8px">No teammates yet — add people on the Team screen first.</div>'}</div>`;
 }
 async function toggleBoardShare(uid){
@@ -1044,7 +1041,7 @@ async function toggleBoardShare(uid){
   if(shared.includes(uid))shared=shared.filter(x=>x!==uid); else shared.push(uid);
   b.shared_with=shared;
   try{const {error}=await sb.from('bbe_boards').update({shared_with:shared}).eq('id',b.id); if(error)throw error;
-    toast('Board access updated');}catch(e){fail(e);}
+    toast('Project access updated');}catch(e){fail(e);}
   render();
 }
 async function toggleModule(k){
@@ -1064,7 +1061,7 @@ const PLAN_COLORS=['#0F6E56','#185FA5','#C4356B','#BA7517','#534AB7','#C75B12'];
 let _planConnect=false,_planConnectFrom=null,_planColor=null,_pd=null,_planChannels=null,_planFrameColor=null,_pf=null;
 const PLAN_CHANNELS=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'];
 function planView(){
-  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No project selected.</div>';
   const nodes=cur.planNodes||[],edges=cur.planEdges||[],frames=cur.planFrames||[];
   const NW=150,NH=54;
   const W=Math.max(900,...nodes.map(n=>(Number(n.x)||0)+NW+80),...frames.map(f=>(Number(f.x)||0)+(Number(f.w)||0)+80));
@@ -1388,7 +1385,7 @@ function planFrameModal(id){
     <label>Name</label><input id="pf-name" value="${esc(f.name||'')}" placeholder="e.g. Week 1, Content, Setup">
     <label>Colour</label>
     <div class="pswatch" id="pf-colors">${PLAN_COLORS.map(c=>`<button type="button" class="${c.toLowerCase()===(_planFrameColor||'').toLowerCase()?'sel':''}" style="background:${c}" data-c="${c}" onclick="planSetFrameColor(this)"></button>`).join('')}</div>
-    <div style="font-size:11.5px;color:var(--muted);margin-top:10px">Steps inside a frame become a column with this name when you turn the plan into a board.</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:10px">Steps inside a frame become a column with this name when you turn the plan into a project.</div>
     <div class="row">
       <button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="planDelFrame('${id}')">${ic('trash',13)}</button>
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
@@ -1467,13 +1464,13 @@ document.addEventListener('keydown',e=>{
 });
 let _files=[];
 function filesView(){
-  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No board selected.</div>';
+  const b=BOARDS.find(x=>x.id===S.board); if(!b)return '<div class="empty">No project selected.</div>';
   setTimeout(async()=>{try{const {data}=await sb.from('bbe_board_files').select('*').eq('board_id',b.id).order('created_at',{ascending:false});_files=data||[];}catch(_){_files=[];}const el=document.getElementById('files-body');if(el)el.innerHTML=filesBody();},50);
-  return `<div class="view-title"><h2>${ic('note',18)} Files <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">links &amp; documents for this board</span><span style="flex:1"></span>${canManage()?`<button class="btn accent sm" onclick="fileModal()">${ic('plus',12)} Add link / folder</button>`:''}</div>
+  return `<div class="view-title"><h2>${ic('note',18)} Files <span style="color:var(--muted);font-weight:600">· ${esc(b.name)}</span></h2><span class="sub">links &amp; documents for this project</span><span style="flex:1"></span>${canManage()?`<button class="btn accent sm" onclick="fileModal()">${ic('plus',12)} Add link / folder</button>`:''}</div>
   <div id="files-body">${filesBody()}</div>`;
 }
 function filesBody(){
-  if(!_files.length)return '<div class="empty" style="padding:26px 4px">No files yet. Link a Google Drive or Dropbox folder, or paste a document link, so the whole board team can find it.</div>';
+  if(!_files.length)return '<div class="empty" style="padding:26px 4px">No files yet. Link a Google Drive or Dropbox folder, or paste a document link, so the whole project team can find it.</div>';
   return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px">${_files.map(f=>`<div class="card" style="padding:13px 14px;display:flex;align-items:center;gap:12px">
     <span style="color:var(--accent);flex:none">${f.kind==='folder'?ic('link',20):ic('note',20)}</span>
     <div style="flex:1;min-width:0">
@@ -1510,7 +1507,7 @@ async function delFile(id){
 /* ============ BOARD ============ */
 function boardView(){
   const b=BOARDS.find(x=>x.id===S.board);
-  if(!b)return `<div class="empty" style="text-align:center;padding:60px 20px">${ic('board',26)}<br><br>No board selected.<br><br><button class="btn accent" onclick="go('boards')">Choose a board</button></div>`;
+  if(!b)return `<div class="empty" style="text-align:center;padding:60px 20px">${ic('board',26)}<br><br>No project selected.<br><br><button class="btn accent" onclick="go('boards')">Choose a project</button></div>`;
   const s=statsFor(cur.notes.filter(n=>!n.archived));
   if(!cur.cols.find(c=>c.id===S.col))S.col=cur.cols[0]?cur.cols[0].id:null;
   const c=cur.cols.find(x=>x.id===S.col);
@@ -1523,7 +1520,7 @@ function boardView(){
     <button class="btn ghost sm" onclick="delBoard()">${ic('trash',12)}</button>
     <button class="btn ghost sm" onclick="addCol()">${ic('plus',12)} Column</button>
     <button class="btn ghost sm" style="color:var(--accent)" onclick="openImportBrief()" title="Paste a brief — AI turns it into tasks and content drafts">✦ Import brief</button>
-    <button class="btn ${_boardInbox?'accent':'ghost'} sm" onclick="_boardInbox=!_boardInbox;render()" title="Incoming comments & messages for this board">${ic('mail',12)} Inbox</button>
+    <button class="btn ${_boardInbox?'accent':'ghost'} sm" onclick="_boardInbox=!_boardInbox;render()" title="Incoming comments & messages for this project">${ic('mail',12)} Inbox</button>
   </div>
   <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
     ${_boardInbox?`<div style="flex:none;width:300px;max-width:100%">${boardInboxHtml(b.id)}</div>`:''}
@@ -1655,10 +1652,10 @@ async function delCol(id){
 }
 function renameBoard(){
   const b=BOARDS.find(x=>x.id===S.board);
-  openModal(`<h3>Edit board</h3>
+  openModal(`<h3>Edit project</h3>
     <label>Name</label><input id="bb-name" value="${esc(b.name)}">
     <label>Date label</label><input id="bb-date" value="${esc(b.date_label||'')}">
-    <label>Board colour</label>${swatchGrid('bb-col',b.color||'#C75B12')}
+    <label>Project colour</label>${swatchGrid('bb-col',b.color||'#C75B12')}
     <div style="border-top:1px solid var(--line);margin:16px 0 4px;padding-top:12px">
       <b style="font-size:12px;letter-spacing:.04em;color:var(--muted)">INBOX — WHO ANSWERS SOCIAL MESSAGES</b>
       <label>Responders <span style="font-weight:500;text-transform:none;letter-spacing:0">(new items go to their Today; blank = owner &amp; admins)</span></label>
@@ -1746,7 +1743,7 @@ const _sumInv=a=>(a||[]).reduce((t,x)=>t+Number(x.amount||0),0);
 const budgetName=id=>{const b=cur.budget.find(x=>x.id===id);return b?b.name:'';};
 function moneyView(){
   const b=BOARDS.find(x=>x.id===S.board);
-  if(!b)return `<div class="empty">Choose a board first.</div>`;
+  if(!b)return `<div class="empty">Choose a project first.</div>`;
   const inc=cur.invs.filter(i=>i.kind==='in'),out=cur.invs.filter(i=>i.kind==='out');
   return `<div class="view-title"><h2>${ic('money',18)} Money</h2><span class="sub">${esc(b.name)}</span>
     <div class="mtabs"><button class="${_moneyTab!=='budget'?'on':''}" onclick="moneyTab('cashflow')">Cashflow</button><button class="${_moneyTab==='budget'?'on':''}" onclick="moneyTab('budget')">Budget</button></div>
@@ -2100,14 +2097,15 @@ function settingsView(){
       <label>Name</label><input id="st-name" value="${esc(WS.name)}" ${canManage()?'':'disabled'}>
       <label>Plan</label>
       <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
-        <span class="pill" style="background:${planEff()!=='free'?'var(--ok)':'var(--muted)'}">${WS.plan==='trial'?`Trial · ${trialDaysLeft()} days left`:WS.plan==='pro'?'Pro':WS.plan==='agency'?'Agency':WS.plan==='basic'?'Basic — AI available on Pro':'Free'}</span>
-        ${planEff()==='free'?'<span style="font-size:12px;color:var(--muted)">1 board · 3 members · powered by Brand Expert</span>':''}
+        <span class="pill" style="background:${planEff()!=='free'?'var(--ok)':'var(--muted)'}">${WS.plan==='trial'?`Trial · ${trialDaysLeft()} days left`:WS.plan==='starter'?'Starter':WS.plan==='pro'?'Pro':WS.plan==='agency'?'Agency':WS.plan==='basic'?'Basic — AI available on paid plans':'Free'}</span>
+        ${planEff()==='free'?'<span style="font-size:12px;color:var(--muted)">1 project · 3 members · powered by Brand Expert</span>':''}
       </div>
       <label>AI credits</label>
       <div id="cred-line">${(()=>{if(WS.plan!=='basic')setTimeout(loadCredits,60);return creditsHtml();})()}</div>
       ${canManage()?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-        ${!['pro','agency','basic'].includes(WS.plan)?`<button class="btn accent sm" onclick="checkout('pro')">Upgrade to Pro — R399/month</button>`:''}
-        ${WS.plan!=='agency'&&WS.plan!=='basic'?`<button class="btn ${WS.plan==='pro'?'accent':'ghost'} sm" onclick="checkout('agency')">${WS.plan==='pro'?'Move to':'Or'} Agency — R799/month</button>`:''}
+        ${!['starter','pro','agency','basic'].includes(WS.plan)?`<button class="btn accent sm" onclick="checkout('starter')">Start with Starter — R499/month · 3 projects</button>`:''}
+        ${!['pro','agency','basic'].includes(WS.plan)?`<button class="btn ${WS.plan==='starter'?'accent':'ghost'} sm" onclick="checkout('pro')">${WS.plan==='starter'?'Move to':'Or'} Pro — R600/month · 5 projects</button>`:''}
+        ${WS.plan!=='agency'&&WS.plan!=='basic'?`<button class="btn ${WS.plan==='pro'?'accent':'ghost'} sm" onclick="checkout('agency')">${WS.plan==='pro'?'Move to':'Or'} Agency — R999/month · 10 projects</button>`:''}
         ${paidAI()?`<button class="btn ghost sm" onclick="checkout('topup')">Top up — R99 for 120 credits</button>`:''}
       </div>`:''}
       ${canManage()?`<div class="row" style="justify-content:flex-start"><button class="btn accent sm" onclick="saveWsName()">Save name</button></div>`:''}
@@ -2117,13 +2115,13 @@ function settingsView(){
       <h3 style="font-size:15px;margin-bottom:4px">Theme</h3>
       <label>Workspace accent</label>${swatchGrid('th-col',(t.accent||'#C75B12'))}
       ${canManage()?`<div class="row" style="justify-content:flex-start"><button class="btn accent sm" onclick="saveAccent()">Apply accent</button></div>`:''}
-      <p style="font-size:12px;color:var(--muted);margin-top:12px">The accent colours buttons, highlights and progress bars — set it to your client's brand colour. Board colours are set per board (✎ on the board), category colours per category.</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:12px">The accent colours buttons, highlights and progress bars — set it to your client's brand colour. Project colours are set per project (✎ on the board), category colours per category.</p>
     </div>
     <div class="card">
-      <h3 style="font-size:15px;margin-bottom:4px">Content boards</h3>
-      <p style="font-size:12px;color:var(--muted);margin:6px 0 10px">Socials connect per board — open a board's Content tab to connect its accounts (one account per platform per board).</p>
-      <div style="font-size:13.5px;font-weight:600">${paidAI()?`Using <b>${_cbUsed}</b> of <b>${_cbAllowed}</b> content board${_cbAllowed>1?'s':''}</b>`:'Auto-posting is a Pro feature.'}</div>
-      ${paidAI()&&canManage()?`<div class="row" style="justify-content:flex-start;margin-top:12px"><button class="btn ghost sm" onclick="checkout('extraboard')">＋ Add a content board — R149/month</button></div>`:''}
+      <h3 style="font-size:15px;margin-bottom:4px">Content projects</h3>
+      <p style="font-size:12px;color:var(--muted);margin:6px 0 10px">Socials connect per project — open a project's Content tab to connect its accounts (one account per platform per project).</p>
+      <div style="font-size:13.5px;font-weight:600">${paidAI()?`Using <b>${_cbUsed}</b> of <b>${_cbAllowed}</b> content project${_cbAllowed>1?'s':''}</b>`:'Auto-posting is a paid feature — upgrade to switch it on.'}</div>
+      ${paidAI()&&canManage()?`<div class="row" style="justify-content:flex-start;margin-top:12px"><button class="btn ghost sm" onclick="checkout('extraboard')">＋ Add a content project — R149/month</button></div>`:''}
     </div>
     <div class="card">
       <h3 style="font-size:15px;margin-bottom:4px">You</h3>
@@ -2192,9 +2190,9 @@ function allBoardsView(){
   return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2>
     <select onchange="switchContentBoard(this.value)" style="width:auto;padding:7px 12px;font-weight:600;font-size:13px">
       ${BOARDS.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}
-      <option value="__all" selected>▦ All boards</option>
+      <option value="__all" selected>▦ All projects</option>
     </select>
-    <span class="sub">every board's posts in one view · pick a board to add or edit</span></div>
+    <span class="sub">every board's posts in one view · pick a project to add or edit</span></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
     ${BOARDS.map(b=>`<span class="chip" style="cursor:pointer" onclick="switchContentBoard('${b.id}')"><span style="width:10px;height:10px;border-radius:3px;background:${boardHue(b.id)};display:inline-block"></span> ${esc(b.name)}</span>`).join('')}
   </div>
@@ -2222,7 +2220,7 @@ function colToggle(k){_cShow[k]=!_cShow[k];localStorage.setItem('bbe_cshow',JSON
 // Content page is a tabbed workspace: Calendar · Tasks · Inbox · Channels.
 let _ctab=localStorage.getItem('bbe_ctab')||'calendar';
 function ctabGo(t){_ctab=t;localStorage.setItem('bbe_ctab',t);render();}
-// Small overlapping badges of the platforms this board can post to — shown on the Channels tab.
+// Small overlapping badges of the platforms this project can post to — shown on the Channels tab.
 function channelAvatarHtml(){
   const seen=new Set(),pls=[];
   (_socAccounts||[]).filter(a=>!DIRECT_SET.includes(a.platform)).forEach(a=>{if(!seen.has(a.platform)){seen.add(a.platform);pls.push(a.platform);}});
@@ -2235,13 +2233,13 @@ function contentChannelsPanel(){
   return `<div style="display:grid;grid-template-columns:1fr;gap:14px;max-width:660px">
     <div class="card" style="padding:16px 18px">
       <b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Posts to</b>
-      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:6px 0 12px">The accounts this board publishes to. Each board can post to its own set of accounts.</p>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:6px 0 12px">The accounts this project publishes to. Each board can post to its own set of accounts.</p>
       <span id="soc-strip">${socStripChips()||'<span style="font-size:12.5px;color:var(--muted)">nothing yet — add a platform below</span>'}</span>
-      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].filter(p=>!platConnected(p));return un.length?`<div style="margin-top:12px"><select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this board" style="width:auto;padding:7px 12px;font-size:12px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select></div>`:'';})():''}
+      ${canManage()?(()=>{const un=['instagram','facebook','youtube','tiktok','threads','linkedin','twitter','pinterest'].filter(p=>!platConnected(p));return un.length?`<div style="margin-top:12px"><select onchange="if(this.value){connectSocial(this.value);this.value='';}" title="Connect another platform to post from this project" style="width:auto;padding:7px 12px;font-size:12px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Add platform</option>${un.map(p=>`<option value="${p}">${PLAT[p][0]}</option>`).join('')}</select></div>`:'';})():''}
     </div>
     <div class="card" style="padding:16px 18px">
       <b style="font-size:11px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase">Inbox &amp; setup</b>
-      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:6px 0 12px">Where this board's comments &amp; messages come from — plus posting straight to Facebook and email setup.</p>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:6px 0 12px">Where this project's comments &amp; messages come from — plus posting straight to Facebook and email setup.</p>
       <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span id="inbox-connects">${inboxConnectsHtml()}</span></div>
     </div>
   </div>`;
@@ -2269,7 +2267,7 @@ function contentTasksPanel(){
             ${u?`<span title="${esc(u.name)}">${avatar(u)}</span>`:''}
           </div>`;}).join('')}
       </div>`;
-    }).join('')||'<div class="empty">No open tasks on this board — lovely.</div>'}
+    }).join('')||'<div class="empty">No open tasks on this project — lovely.</div>'}
     <div style="display:flex;align-items:center;gap:8px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
       <input id="qa-panel" placeholder="Add a task — type and press Enter" style="flex:1;padding:8px 10px;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();panelQuickAdd();}">
       <button class="btn accent sm" style="flex:none;padding:8px 11px" onclick="panelQuickAdd()" title="Add a task">${ic('plus',14)}</button>
@@ -2293,7 +2291,7 @@ async function panelQuickAdd(){
 function contentView(){
   if(_contentAll)return allBoardsView();
   const b=BOARDS.find(x=>x.id===S.board);
-  if(!b)return `<div class="empty" style="text-align:center;padding:60px 20px">Choose a board first.<br><br><button class="btn accent" onclick="go('boards')">Boards</button></div>`;
+  if(!b)return `<div class="empty" style="text-align:center;padding:60px 20px">Choose a project first.<br><br><button class="btn accent" onclick="go('boards')">Boards</button></div>`;
   if(!_calMonth)_calMonth=saDate().slice(0,7);
   const [Y,M]=_calMonth.split('-').map(Number);
   const first=new Date(Date.UTC(Y,M-1,1));
@@ -2334,7 +2332,7 @@ function contentView(){
       </div>`).join('')||'<div class="empty">Nothing scheduled — click a day on the calendar to plan a post.</div>'}
     </div>
   </div>`;
-  // Load the board's connections (once per board) so the Channels avatar cluster + panel populate,
+  // Load the board's connections (once per project) so the Channels avatar cluster + panel populate,
   // then refresh those spots in place. loadSocials also triggers a one-time re-render on first load.
   setTimeout(async()=>{try{
     if(typeof loadSocials==='function')await loadSocials();
@@ -2352,7 +2350,7 @@ function contentView(){
   return `<div class="view-title"><h2>${ic('calendar',18)} Content</h2>
     <select onchange="switchContentBoard(this.value)" style="width:auto;padding:7px 12px;font-weight:600;font-size:13px">
       ${BOARDS.map(x=>`<option value="${x.id}" ${!_contentAll&&x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}
-      ${BOARDS.length>1?`<option value="__all" ${_contentAll?'selected':''}>▦ All boards</option>`:''}
+      ${BOARDS.length>1?`<option value="__all" ${_contentAll?'selected':''}>▦ All projects</option>`:''}
     </select>
     <span style="flex:1"></span>
     <button class="btn accent sm" onclick="postModal()">${ic('plus',12)} New post</button>
@@ -2543,7 +2541,7 @@ async function copyCaption(id){
 
 /* ============ CONNECTED SOCIALS (PostPeer) ============ */
 let _socAccounts=null;
-// Base platform names (facebook/instagram/threads/youtube/tiktok) this board is DIRECTLY
+// Base platform names (facebook/instagram/threads/youtube/tiktok) this project is DIRECTLY
 // connected to via our own apps (not PostPeer). Populated by loadDirectLinks().
 let _directPlatforms=[];
 let _directNames={}; // platform -> connected account name/handle (best effort, for hover tooltips)
@@ -2571,7 +2569,7 @@ async function loadSocials(){
   if(j.content_boards_used!==undefined){_cbUsed=j.content_boards_used;_cbAllowed=j.content_boards_allowed;}
   const el=$('soc-list'); if(el)el.innerHTML=socListHtml();
   loadInboxConnects();
-  // Re-render once per board when social accounts first load (so the "posts to" strip reflects them).
+  // Re-render once per project when social accounts first load (so the "posts to" strip reflects them).
   // Guard on the board id — NOT on a #perf-card element (that strip was removed in the analytics
   // redesign, so the old check was always true and looped render() → loadSocials() → render() forever.)
   if(S.view==='content'&&_socRenderedFor!==S.board){_socRenderedFor=S.board;render();}}catch(_){_socAccounts=[];}
@@ -2615,7 +2613,7 @@ function socStripChips(){
 }
 async function disconnectSocial(id){
   const a=(_socAccounts||[]).find(x=>x.id===id); if(!a)return;
-  if(!confirm(`Disconnect ${a.user||a.platform} from this board? Auto-posting to it stops immediately. You can reconnect any time.`))return;
+  if(!confirm(`Disconnect ${a.user||a.platform} from this project? Auto-posting to it stops immediately. You can reconnect any time.`))return;
   try{
     const j=await socialApi({action:'disconnect',board_id:S.board,account_id:id});
     if(j.error){toast(j.message||j.error);return;}
@@ -2632,8 +2630,8 @@ async function directDisconnect(pl){
   const nm=(PLAT[pl]||PLAT.other)[0];
   const metaPair=(pl==='facebook'||pl==='instagram');
   const msg=metaPair
-    ? 'Disconnect Facebook & Instagram from this board? They share one Meta connection, so both stop together. Auto-posting and Inbox for them stop immediately. You can reconnect any time.'
-    : `Disconnect ${nm} from this board? Auto-posting to it stops immediately. You can reconnect any time.`;
+    ? 'Disconnect Facebook & Instagram from this project? They share one Meta connection, so both stop together. Auto-posting and Inbox for them stop immediately. You can reconnect any time.'
+    : `Disconnect ${nm} from this project? Auto-posting to it stops immediately. You can reconnect any time.`;
   if(!confirm(msg))return;
   try{
     let j;
@@ -2705,7 +2703,7 @@ async function fbPickStart(board){
 function fbPickModal(board,pages){
   const only=pages.length===1;
   openModal(`<h3>Choose the Page to connect</h3>
-    <p style="font-size:12.5px;color:var(--muted);margin:4px 0 14px;line-height:1.5">Pick which Facebook Page (and its linked Instagram) to connect to this board. You can connect a different Page to each board.</p>
+    <p style="font-size:12.5px;color:var(--muted);margin:4px 0 14px;line-height:1.5">Pick which Facebook Page (and its linked Instagram) to connect to this project. You can connect a different Page to each project.</p>
     <div style="display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto">
       ${pages.map(p=>`<button class="btn ghost" style="justify-content:flex-start;text-align:left;padding:11px 13px;height:auto" onclick="fbPickChoose('${board}','${esc(String(p.id))}')"><span><b>${esc(p.name||'Page')}</b>${p.ig?`<span style="color:var(--muted);font-weight:500"> · Instagram @${esc(p.ig)}</span>`:''}</span></button>`).join('')}
     </div>
@@ -2753,8 +2751,8 @@ async function ytApi(body){
   return await r.json();
 }
 async function ytConnect(){
-  if(!S.board){toast('Open a board first');return;}
-  const channel=prompt('Connect a YouTube channel to this board.\n\nPaste the channel URL or @handle (e.g. @YourChannel).\nNew comments on the channel’s videos will land in this board’s Inbox.');
+  if(!S.board){toast('Open a project first');return;}
+  const channel=prompt('Connect a YouTube channel to this project.\n\nPaste the channel URL or @handle (e.g. @YourChannel).\nNew comments on the channel’s videos will land in this project’s Inbox.');
   if(!channel)return;
   toast('Connecting YouTube…');
   try{const j=await ytApi({action:'connect',board_id:S.board,channel:channel.trim()});
@@ -2856,14 +2854,14 @@ async function ttDirectSubmit(){
 }
 // YouTube posting OAuth connect (Google) — full-page redirect; returns to ?ytconnected=1.
 async function ytPostConnect(){
-  if(!S.board){toast('Open a board first');return;}
+  if(!S.board){toast('Open a project first');return;}
   try{const j=await ytPostApi({action:'connect',board_id:S.board});
   if(j&&j.url){location.href=j.url;}else{toast((j&&(j.message||j.error))||'Could not start YouTube connect');}
   }catch(e){fail(e);}
 }
 // TikTok connect (Login Kit v2) — full-page redirect; returns to ?ttconnected=1.
 async function ttConnect(){
-  if(!S.board){toast('Open a board first');return;}
+  if(!S.board){toast('Open a project first');return;}
   try{const j=await ttApi({action:'connect',board_id:S.board});
   if(j&&j.url){location.href=j.url;}else{toast((j&&(j.message||j.error))||'Could not start TikTok connect');}
   }catch(e){fail(e);}
@@ -2874,7 +2872,7 @@ async function ttConnect(){
 function ttInUseModal(acct,bd){
   openModal(`<h3>${platBadge('tiktok',20)} That TikTok account is already in use</h3>
     <p style="font-size:13px;color:var(--muted);line-height:1.55;margin:8px 0 12px">The TikTok account <b>${esc(acct||'you just authorised')}</b> is already connected to <b>${esc(bd||'another board')}</b>. TikTok links one account to a single board, so it can't also be added here.</p>
-    <p style="font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 14px">To post to a <b>different</b> TikTok account from this board: TikTok always connects whichever account you're signed into and has no account picker. Open <a href="https://www.tiktok.com/login" target="_blank" rel="noopener">tiktok.com</a>, switch to (or log in as) the account you want, then come back and use <b>＋ Add platform → TikTok</b> again. To reuse this same account here, first disconnect it from ${esc(bd||'the other board')}.</p>
+    <p style="font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 14px">To post to a <b>different</b> TikTok account from this project: TikTok always connects whichever account you're signed into and has no account picker. Open <a href="https://www.tiktok.com/login" target="_blank" rel="noopener">tiktok.com</a>, switch to (or log in as) the account you want, then come back and use <b>＋ Add platform → TikTok</b> again. To reuse this same account here, first disconnect it from ${esc(bd||'the other board')}.</p>
     <div class="row" style="justify-content:flex-end"><button class="btn accent" onclick="closeModal()">Got it</button></div>`);
 }
 async function thApi(body){
@@ -2883,7 +2881,7 @@ async function thApi(body){
   return await r.json();
 }
 function thConnect(){
-  if(!S.board){toast('Open a board first');return;}
+  if(!S.board){toast('Open a project first');return;}
   openModal(`<h3>Connect Threads</h3>
     <p style="font-size:13px;color:var(--muted);margin:4px 0 12px;line-height:1.5">Threads uses your <b>Instagram</b> login — you'll approve the connection on threads.net in a moment. Make sure you're logged in to Threads as the account you want to post from.</p>
     <div style="background:#FFF6E5;border:1px solid #F0D9A8;border-radius:11px;padding:12px 14px;margin-bottom:14px">
@@ -3124,14 +3122,14 @@ function inboxConnectsHtml(){
   un.push(['appstore','App Store reviews']);
   let dd='';
   if(canManage()&&un.length){
-    dd=`<select onchange="inboxConnectPick(this.value);this.value='';" title="Connect a source so its messages land in this board's Inbox" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Inbox source</option>${un.map(([pl,label])=>`<option value="${pl}">${label}</option>`).join('')}</select>`;
+    dd=`<select onchange="inboxConnectPick(this.value);this.value='';" title="Connect a source so its messages land in this project's Inbox" style="width:auto;padding:6px 12px;font-size:11.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">＋ Inbox source</option>${un.map(([pl,label])=>`<option value="${pl}">${label}</option>`).join('')}</select>`;
   }
   const lbl=`<b style="font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.04em;margin:0 4px 0 10px">INBOX</b>`;
   const iconWrap=icons.length?`${lbl}<span style="display:inline-flex;gap:9px;align-items:center;vertical-align:middle">${icons.join('')}</span>`:(dd?lbl:'');
   let acts='';
   if(inboxLinkFor('facebook')&&S.view==='content')acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Publish a post straight to the connected Facebook Page" onclick="fbComposeModal()">${ic('pencil',12)} Post to Facebook</button>`;
   if(inboxLinkFor('threads'))acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Views, likes & replies for the connected Threads account" onclick="thInsights()">View insights</button>`;
-  if(canManage())acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Forward, connect Gmail, or add any mailbox to this board's Inbox" onclick="openEmailConnect()">${ic('mail',12)} Email setup</button>`;
+  if(canManage())acts+=`<button class="btn ghost sm" style="margin-left:8px" title="Forward, connect Gmail, or add any mailbox to this project's Inbox" onclick="openEmailConnect()">${ic('mail',12)} Email setup</button>`;
   return iconWrap+dd+acts;
 }
 function inboxConnectPick(v){ if(v==='facebook')fbConnect(); else if(v==='youtube')ytConnect(); else if(v==='threads')thConnect(); else if(v==='whatsapp')waEmbeddedConnect(); else if(v==='email')openEmailConnect(); else if(v==='appstore')appStoreConnect(); }
@@ -3171,7 +3169,7 @@ async function reviewsApi(body){
 }
 function appStoreConnect(){
   openModal(`<h3>${platBadge('appstore',22)} App Store reviews</h3>
-    <div style="font-size:13px;color:var(--muted);margin:2px 0 12px;line-height:1.5">New customer reviews from Apple&rsquo;s App Store land in this board&rsquo;s Inbox, star-rated, so you never miss one. Paste your app&rsquo;s App Store link (or its numeric App&nbsp;ID).</div>
+    <div style="font-size:13px;color:var(--muted);margin:2px 0 12px;line-height:1.5">New customer reviews from Apple&rsquo;s App Store land in this project&rsquo;s Inbox, star-rated, so you never miss one. Paste your app&rsquo;s App Store link (or its numeric App&nbsp;ID).</div>
     <input id="appstore-input" placeholder="https://apps.apple.com/za/app/yourapp/id123456789" style="width:100%;font-size:13px;padding:9px 11px;border:1px solid var(--line-strong);border-radius:8px;box-sizing:border-box">
     <div id="appstore-msg" style="font-size:12px;color:var(--muted);margin-top:8px;min-height:16px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
@@ -3230,7 +3228,7 @@ function emailShowForm(accounts){
     </div>${a.last_error?`<div style="font-size:11px;color:var(--danger);margin:-2px 0 8px 2px">${esc(a.last_error)}</div>`:''}`;
   };
   openModal(`<h3>Email setup</h3>
-    ${accounts.length?`<label>Connected mailboxes</label>${accounts.map(acctRow).join('')}<div style="height:12px"></div>`:'<div style="font-size:13px;color:var(--muted);margin:2px 0 12px;line-height:1.5">Get your email landing in this board’s Inbox. Pick whichever is easiest — forwarding needs no password and works everywhere.</div>'}
+    ${accounts.length?`<label>Connected mailboxes</label>${accounts.map(acctRow).join('')}<div style="height:12px"></div>`:'<div style="font-size:13px;color:var(--muted);margin:2px 0 12px;line-height:1.5">Get your email landing in this project’s Inbox. Pick whichever is easiest — forwarding needs no password and works everywhere.</div>'}
     ${fwd?`<div style="border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-bottom:12px;background:#F6FBF7">
       <div style="font-weight:800;font-size:13px;margin-bottom:3px">Easiest — forward your mail here (no password)</div>
       <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">Works with any provider. In your email account settings, add a forwarding rule to this address — new mail then lands here automatically:</div>
@@ -3365,7 +3363,7 @@ function whatsappView(){
     const el=document.getElementById('wa-usage-body'); if(el)el.innerHTML=whatsappBody(counts);
   },60);
   return `<div class="view-title"><h2>${ic('chat',18)} WhatsApp Usage</h2>
-    <span class="sub">connected numbers, usage &amp; billing across all your boards</span><span style="flex:1"></span>
+    <span class="sub">connected numbers, usage &amp; billing across all your projects</span><span style="flex:1"></span>
     ${canManage()?`<button class="btn accent sm" onclick="waEmbeddedConnect()">+ Connect a number</button>`:''}
   </div><div id="wa-usage-body">${whatsappBody(null)}</div>`;
 }
@@ -3420,9 +3418,9 @@ function anSpark(series,color){
 }
 function analyticsView(){
   const b=BOARDS.find(x=>x.id===S.board);
-  if(!b)return `<div class="empty" style="text-align:center;padding:60px">No board selected.</div>`;
+  if(!b)return `<div class="empty" style="text-align:center;padding:60px">No project selected.</div>`;
   setTimeout(()=>anLoad(),50);
-  const goalSel=canManage()?`<select onchange="anSetGoal(this.value)" title="What is this board trying to achieve? The dashboard reframes around it." style="width:auto;padding:6px 12px;font-size:12px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">Set a goal…</option>${AN_GOALS.map(([v,l])=>`<option value="${v}" ${(_an&&_an.goal===v)?'selected':''}>${l}</option>`).join('')}</select>`:'';
+  const goalSel=canManage()?`<select onchange="anSetGoal(this.value)" title="What is this project trying to achieve? The dashboard reframes around it." style="width:auto;padding:6px 12px;font-size:12px;font-weight:700;border:1px solid var(--line-strong);border-radius:16px;background:#fff;cursor:pointer;color:var(--accent)"><option value="">Set a goal…</option>${AN_GOALS.map(([v,l])=>`<option value="${v}" ${(_an&&_an.goal===v)?'selected':''}>${l}</option>`).join('')}</select>`:'';
   return `<div class="view-title"><h2>${ic('chart',18)} Analytics</h2><span class="sub">${esc(b.name)}</span><span style="flex:1"></span>${goalSel}<button class="btn ghost sm" onclick="anLoad(true)" title="Refresh from your socials">↻</button></div>
     <div id="an-body">${_an?anBody():'<div class="empty" style="padding:40px;text-align:center">Loading your numbers…</div>'}</div>`;
 }
@@ -3662,7 +3660,7 @@ function boardInboxHtml(boardId){
 }
 function boardInboxBody(boardId){
   const rows=(_inbox||[]).filter(i=>(i.board_id===boardId||(!i.board_id&&(i.platform==='whatsapp'||i.platform==='email')))&&i.status!=='dismissed');
-  if(!rows.length)return '<div class="empty" style="padding:20px 8px;text-align:center;font-size:12px">No messages yet.<br>New comments on this board&rsquo;s connected pages will land here.</div>';
+  if(!rows.length)return '<div class="empty" style="padding:20px 8px;text-align:center;font-size:12px">No messages yet.<br>New comments on this project&rsquo;s connected pages will land here.</div>';
   return rows.map(i=>{const P=emlParts(i);const open=_inboxOpen.has(i.id);const isE=i.platform==='email';const isR=i.kind==='review';const title=isE?(P.subj||'(no subject)'):P.body;return `<div style="border-left:3px solid ${(PLAT[i.platform]||PLAT.other)[1]};padding:7px 9px;margin-bottom:7px;background:var(--panel,#F4F3EE);border-radius:7px">
     <div onclick="inboxToggle('${i.id}')" style="cursor:pointer">
       <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);font-weight:700">${platBadge(i.platform,16)}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="color:${(PLAT[i.platform]||PLAT.other)[1]}">${(PLAT[i.platform]||PLAT.other)[0]}</b> · ${isR?'★':i.kind==='message'?'✉':'💬'} ${esc(i.author_name||'someone')} · ${new Date(i.received_at).toLocaleString('en-ZA',{dateStyle:'short',timeStyle:'short'})}</span><span style="flex:1"></span><span style="color:var(--muted);flex:none">${open?'▾':'▸'}</span></div>
@@ -3844,7 +3842,7 @@ async function loadCredits(){
 function creditsHtml(){
   if(WS.plan==='basic')return '<span style="font-size:12px;color:var(--muted)">AI is not part of this plan.</span>';
   if(_credits===null)return '<span style="font-size:12px;color:var(--muted)">Checking credits…</span>';
-  return `<b style="font-size:20px">${_credits}</b> <span style="font-size:12px;color:var(--muted)">AI credits left${planEff()==='agency'?' · 300 refill monthly':planEff()==='pro'?' · 100 refill monthly':' · taster credits'}</span>`;
+  return `<b style="font-size:20px">${_credits}</b> <span style="font-size:12px;color:var(--muted)">AI credits left${planEff()==='agency'?' · 300 refill monthly':(planEff()==='pro'||planEff()==='starter')?' · 100 refill monthly':' · top up to use AI'}</span>`;
 }
 async function checkout(kind){
   try{
@@ -3933,7 +3931,7 @@ async function dayBrief(force){
   const box=$('brief-box'); if(!box)return;
   const cached=localStorage.getItem(key);
   if(cached&&!force){box.textContent=cached;return;}
-  box.textContent='✦ Reading your boards… (1 credit)';
+  box.textContent='✦ Reading your projects… (1 credit)';
   try{
     const j=await aiApi({mode:'brief'});
     if(j.error==='OUT_OF_CREDITS'){box.textContent=j.message;return;}
@@ -3954,7 +3952,7 @@ async function importBriefApi(body){
 }
 function ibFormHtml(){
   return `<h3>Import a brief</h3>
-    <div style="font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.5">Paste a marketing brief and I'll turn it into tasks and ready-to-schedule content on this board. Uses AI credits.</div>
+    <div style="font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.5">Paste a marketing brief and I'll turn it into tasks and ready-to-schedule content on this project. Uses AI credits.</div>
     <label>Attach brief files (txt, md, csv, docx, pdf) — or paste below</label>
     <input type="file" id="ib-files" multiple accept=".txt,.md,.markdown,.csv,.json,.html,.htm,.docx,.pdf" onchange="ibFilesPicked(event)">
     <div id="ib-files-note" style="font-size:11.5px;color:var(--muted);margin:4px 0 0 2px"></div>
@@ -4047,7 +4045,7 @@ async function ibFilesPicked(ev){
   if(ok)toast(`Added text from ${ok} file(s)`);
 }
 function openImportBrief(){
-  if(!S.board){toast('Open a board first');return;}
+  if(!S.board){toast('Open a project first');return;}
   _ibData=null; ibShowForm();
 }
 async function importBriefGenerate(){
@@ -4139,7 +4137,7 @@ async function authLinkCheck(){
   const confirm=q.get('confirm'), pwreset=q.get('pwreset');
   const fbc=q.get('fbconnected');
   if(fbc){history.replaceState({},'',location.pathname);setTimeout(()=>toast(fbc==='err'?'Facebook connection failed — try again':'✅ Facebook Page linked — comments & messages will now land in your Inbox'),800);}
-  // Facebook returned — let the user choose WHICH Page (+ its Instagram) to link to this board.
+  // Facebook returned — let the user choose WHICH Page (+ its Instagram) to link to this project.
   const fbpick=q.get('fbpick');
   if(fbpick){const pboard=q.get('board')||'';history.replaceState({},'',location.pathname);const tryOpen=()=>{if(typeof WS!=='undefined'&&WS&&WS.id){fbPickStart(pboard);}else{setTimeout(tryOpen,300);}};setTimeout(tryOpen,700);}
   // Direct YouTube posting (bbe-youtube-post) OAuth return.
@@ -4217,8 +4215,7 @@ async function doResetPw(){
 }
 </script>
 <div class="an-tip" id="an-tip"></div>
-<style id="dash-css">
-/* ===== Customizable Home Dashboard ===== */
+<style id="dash-css">/* ===== Customizable Home Dashboard ===== */
 .dash-wrap{position:relative}
 .dash-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:4px 2px 14px}
 .dash-h{font-size:20px;display:flex;align-items:center;gap:8px;margin:0}
@@ -4346,9 +4343,22 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
 .dw-sw{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;padding:0;background:var(--card)}
 .dw-sw.on{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--ink)}
 
+/* ---- per-project Overview: widget picker ---- */
+.dash-setup{max-width:720px}
+.dw-pgrp{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 0 9px}
+.dw-pickgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+@media (max-width:620px){.dw-pickgrid{grid-template-columns:1fr}}
+.dw-pickcard{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer;transition:.12s;background:var(--card,#fff)}
+.dw-pickcard:hover{border-color:var(--accent)}
+.dw-pickcard.on{border-color:#3E7C34;box-shadow:inset 0 0 0 1px #3E7C34;background:color-mix(in srgb,#3E7C34 5%,transparent)}
+.dw-pk{width:18px;height:18px;border-radius:6px;border:1.5px solid #CBD0C4;flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:800}
+.dw-pickcard.on .dw-pk{background:#3E7C34;border-color:#3E7C34}
+.dw-pi{font-size:16px;flex:none;margin-top:-1px}
+.dw-pt{font-size:13px;font-weight:700;line-height:1.2}
+.dw-pd{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.35}
+.dash-setup-foot{display:flex;align-items:center;gap:14px;margin-top:22px}
 </style>
-<script id="dash-js">
-/* ============================================================
+<script id="dash-js">/* ============================================================
    CUSTOMIZABLE HOME DASHBOARD  (appended module, overrides boardsView)
    Personal widget grid per member. Layout persisted to bbe_dashboard.
    ============================================================ */
@@ -4377,7 +4387,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     inbox:    {icon:'💬', name:'Inbox activity',       desc:'Latest comments & messages across connected accounts.', w:4,h:3},
     posts:    {icon:'🗓️', name:'Upcoming posts',       desc:'What’s scheduled to go out next.', w:4,h:3},
     boards:   {icon:'📋', name:'Boards',              desc:'Your boards with live progress.', w:8,h:4},
-    links:    {icon:'🔗', name:'Quick links',         desc:'Jump straight to a board.', w:4,h:2},
+    links:    {icon:'🔗', name:'Quick links',         desc:'Jump straight to a project.', w:4,h:2},
     website:  {icon:'🌐', name:'Website (GA4)',       desc:'Live website traffic — visitors, sessions, pageviews & sources from Google Analytics.', w:5,h:5},
     search:   {icon:'🔎', name:'Search (Google)',     desc:'How the site shows up in Google Search — clicks, impressions, CTR, position & top queries.', w:4,h:5},
     email:    {icon:'✉️', name:'Email (Mailchimp)',    desc:'Audience size, list count, open & click rates, and your last campaign.', w:4,h:4},
@@ -4389,7 +4399,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     focus:    {icon:'✨', name:'Daily focus',          desc:'Your one thing for the day, plus a rotating spark of inspiration.', w:4,h:2},
     countdown:{icon:'⏳', name:'Countdown',            desc:'Days to go until a launch, campaign go-live or any deadline.', w:3,h:2},
     top3:     {icon:'✅', name:'Weekly top 3',         desc:'The three things that matter this week — tick them off right here.', w:4,h:3},
-    activity: {icon:'📡', name:'Recent activity',      desc:'A live stream of what just happened on a board — comments, messages, scheduled posts.', w:4,h:4},
+    activity: {icon:'📡', name:'Recent activity',      desc:'A live stream of what just happened on a project — comments, messages, scheduled posts.', w:4,h:4},
     news:     {icon:'📰', name:'News feed',            desc:'Headlines from any RSS feed — an industry blog, a client, or a Google News topic.', w:4,h:4},
     besttime: {icon:'🕰️', name:'Best time to post',    desc:'When your audience actually engages, learned from your own inbox activity.', w:5,h:4},
     toppost:  {icon:'🏆', name:'Top post',             desc:'Your best-performing published post over the last 30 days.', w:4,h:3},
@@ -4451,6 +4461,21 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   let seq = 1;
   let dataReady = false;
   let saveT = null;
+  // ---- dashboard scope: null = personal home; a project id = that project's Overview ----
+  const HOME_SENTINEL = '00000000-0000-0000-0000-000000000000';
+  let curScope = null;      // current dashboard scope (null = home)
+  let loadedScope = undefined; // which scope `layout` currently holds
+  let needSetup = false;    // true when a project has no dashboard yet -> show the picker
+  function scopeId(){ return curScope || HOME_SENTINEL; }
+  // Widgets whose data is board-specific — on a project dashboard they default to that project.
+  const BOARD_SCOPED = new Set(['analytics','inbox','activity','besttime','toppost','mentions','trends','goal','website','search','email','sales','reviews','ads','ai','posts']);
+  // The project starter template: which widgets to offer, and which are pre-ticked.
+  const PICK_GROUPS = [
+    ['This project', ['posts','analytics','inbox','activity','toppost','besttime','ads','reviews']],
+    ['Ambient & tools', ['focus','weather','clock','ai','news','countdown']]
+  ];
+  const PICK_DEFAULT = ['posts','analytics','inbox','activity','focus'];
+  let _pickSel = null;      // Set of chosen widget types in the picker
   const EMPTY_M = { reach:0, followers:0, engRate:0, plats:[], spark:[], delta:null };
   const D = { all:Object.assign({},EMPTY_M), by:{}, revAll:0, revBy:{}, postAll:0, postBy:{}, inbox:[] };
   function mSrc(board){ return (board&&board!=='all') ? (D.by[board]||EMPTY_M) : D.all; }
@@ -4481,13 +4506,13 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         boardIds.length? sb.from('bbe_metrics').select('board_id,source,metric,value,captured_for').in('board_id',boardIds).gte('captured_for',new Date(Date.now()-60*864e5).toISOString().slice(0,10)).order('captured_for') : P0,
         boardIds.length? sb.from('bbe_interactions').select('*').in('board_id',boardIds).order('received_at',{ascending:false}).limit(60) : P0
       ]);
-      // revenue per board + total
+      // revenue per project + total
       D.revAll=0; D.revBy={};
       (inv.data||[]).forEach(x=>{ const a=Number(x.amount)||0; D.revAll+=a; D.revBy[x.board_id]=(D.revBy[x.board_id]||0)+a; });
-      // posts published per board + total
+      // posts published per project + total
       D.postAll=0; D.postBy={};
       (posted.data||[]).forEach(x=>{ D.postAll++; D.postBy[x.board_id]=(D.postBy[x.board_id]||0)+1; });
-      // metrics: combined + per board
+      // metrics: combined + per project
       const rows=metrics.data||[];
       D.all=computeMetrics(rows);
       D.by={};
@@ -4554,7 +4579,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(cfg.mode==='auto'){ const s=GOAL_SRC[cfg.source]||GOAL_SRC.reach; cur=dataReady? mVal(s.metric, board):0; fmt=s.fmt; }
     else { cur=Number(cfg.current)||0; const u=cfg.unit||''; fmt=n=> u==='R'? money(n) : (numF(n)+(u&&u!=='R'?' '+u:'')); }
     const pct= target>0? cur/target : 0;
-    const scope= cfg.mode==='auto' ? (board==='all'?'All boards':E(boardName(board))) : '';
+    const scope= cfg.mode==='auto' ? (board==='all'?'All projects':E(boardName(board))) : '';
     const srcPill= cfg.mode==='auto'
       ? `<span class="dw-pill link">● ${E((GOAL_SRC[cfg.source]||{}).label||'')}${scope?' · '+scope:''}</span>`
       : `<span class="dw-pill manual">Manual</span>`;
@@ -4575,7 +4600,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const plat=cfg.platform||'all';
     const board=cfg.board||'all';
     const m=mSrc(board);
-    const scope = board==='all' ? 'all boards' : E(boardName(board));
+    const scope = board==='all' ? 'all projects' : E(boardName(board));
     if(plat==='all'){
       if(!m.reach) return `<div class="dw-mute" style="padding:10px 0">No metrics yet for ${scope}. Connect an account on the Content tab and analytics start flowing here.</div>`;
       const mx=m.plats.length?m.plats[0][1]:1;
@@ -4622,17 +4647,17 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   }
   function boardsBody(){
     const B=BRDS();
-    if(!B.length) return `<div class="dw-mute" style="padding:10px 0">No boards yet. <a href="#" onclick="newBoardModal();return false">Create one</a>.</div>`;
+    if(!B.length) return `<div class="dw-mute" style="padding:10px 0">No projects yet. <a href="#" onclick="newBoardModal();return false">Create one</a>.</div>`;
     setTimeout(()=>{ try{ if(typeof loadBoardStats!=='undefined') loadBoardStats(); }catch(_e){} },30);
     return `<div class="dw-boards">${B.map(b=>`<div class="dw-bc" style="border-top-color:${b.color||'var(--accent)'}" onclick="openBoard('${b.id}')">
       <div class="dw-bt">${b.private_to?'🔒 ':''}${E(b.name)}</div>
       <div class="dw-bprog"><i id="bp-${b.id}" style="width:0%"></i></div>
       <div class="dw-bmeta" id="bt-${b.id}">…</div></div>`).join('')}
-      <div class="dw-bc dw-bnew" onclick="newBoardModal()">＋ New board</div></div>`;
+      <div class="dw-bc dw-bnew" onclick="newBoardModal()">＋ New project</div></div>`;
   }
   function linksBody(){
     const B=BRDS();
-    return `<div class="dw-links">${B.map(b=>`<a href="#" onclick="openBoard('${b.id}');return false"><span class="dw-lsq" style="background:${b.color||'var(--accent)'}"></span>${E(b.name)}</a>`).join('')||'<span class="dw-mute">No boards yet.</span>'}</div>`;
+    return `<div class="dw-links">${B.map(b=>`<a href="#" onclick="openBoard('${b.id}');return false"><span class="dw-lsq" style="background:${b.color||'var(--accent)'}"></span>${E(b.name)}</a>`).join('')||'<span class="dw-mute">No projects yet.</span>'}</div>`;
   }
   function inboxBody(cfg){
     cfg=cfg||{};
@@ -4657,7 +4682,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         case 'analytics': return analyticsBody(w.cfg);
         case 'calendar': return calBody(w.cfg);
         case 'inbox': return inboxBody(w.cfg);
-        case 'posts': return typeof homePosts!=='undefined'? homePosts(HOME().posts||[]) : '';
+        case 'posts': { const bd=w.cfg&&w.cfg.board; const pl=(HOME().posts||[]).filter(p=>!bd||bd==='all'||p.board_id===bd); return typeof homePosts!=='undefined'? homePosts(pl) : ''; }
         case 'boards': return boardsBody();
         case 'links': return linksBody();
         case 'website': return websiteBody(w.cfg);
@@ -4736,7 +4761,9 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   function nextPos(){ let maxB=0; (layout||[]).forEach(w=>{ maxB=Math.max(maxB,(w.y||0)+(w.h||1)); }); return maxB; }
   function addWidget(type){
     const c=CAT[type];
-    const w={id:'w'+(seq++), type, cfg:defaultCfg(type), w:c.w, h:c.h, x:0, y:nextPos()};
+    const cfg=defaultCfg(type);
+    if(curScope && BOARD_SCOPED.has(type)) cfg.board=curScope; // new tiles on a project scope to it
+    const w={id:'w'+(seq++), type, cfg, w:c.w, h:c.h, x:0, y:nextPos()};
     layout.push(w); mountWidget(w); refreshEmpty(); save();
     return w;
   }
@@ -4780,17 +4807,18 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     syncPositions();
     clearTimeout(saveT);
     saveT=setTimeout(async()=>{
-      try{ await sb.from('bbe_dashboard').upsert({workspace_id:WS.id,user_id:SESSION.user.id,layout:layout,updated_at:new Date().toISOString()},{onConflict:'workspace_id,user_id'}); }
+      try{ await sb.from('bbe_dashboard').upsert({workspace_id:WS.id,user_id:SESSION.user.id,board_id:scopeId(),layout:layout,updated_at:new Date().toISOString()},{onConflict:'workspace_id,user_id,board_id'}); }
       catch(e){ console.error('dash save',e); }
     },600);
   }
   async function loadLayout(){
     try{
-      const {data,error}=await sb.from('bbe_dashboard').select('layout').eq('workspace_id',WS.id).eq('user_id',SESSION.user.id).maybeSingle();
+      const {data,error}=await sb.from('bbe_dashboard').select('layout').eq('workspace_id',WS.id).eq('user_id',SESSION.user.id).eq('board_id',scopeId()).maybeSingle();
       if(error) throw error;
-      if(data&&Array.isArray(data.layout)&&data.layout.length){ layout=data.layout; }
-      else { layout=JSON.parse(JSON.stringify(DEFAULT_LAYOUT)).map((w,i)=>Object.assign({id:'w'+(seq++)},w)); save(); }
-    }catch(e){ console.error('dash load',e); layout=JSON.parse(JSON.stringify(DEFAULT_LAYOUT)).map(w=>Object.assign({id:'w'+(seq++)},w)); }
+      if(data&&Array.isArray(data.layout)&&data.layout.length){ layout=data.layout; needSetup=false; }
+      else if(!curScope){ layout=JSON.parse(JSON.stringify(DEFAULT_LAYOUT)).map((w,i)=>Object.assign({id:'w'+(seq++)},w)); save(); needSetup=false; }
+      else { layout=[]; needSetup=true; } // a project with no dashboard yet -> offer the picker
+    }catch(e){ console.error('dash load',e); if(curScope){ layout=[]; needSetup=true; } else { layout=JSON.parse(JSON.stringify(DEFAULT_LAYOUT)).map(w=>Object.assign({id:'w'+(seq++)},w)); } }
     // ensure ids + seq
     layout.forEach(w=>{ if(!w.id) w.id='w'+(seq++); const n=parseInt((w.id||'').replace('w',''),10); if(!isNaN(n)&&n>=seq) seq=n+1; });
   }
@@ -4884,7 +4912,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     }
   }catch(_e){}
 
-  /* ---- website + search analytics (Google GA4 + Search Console), per board ---- */
+  /* ---- website + search analytics (Google GA4 + Search Console), per project ---- */
   const _dashWeb={}; // boardId -> {state,email,ga4,ga4name,ga4sel,scsel,ga4List,siteList,sc,started}
   function webUrl(){ return (typeof SUPABASE_URL!=='undefined'?SUPABASE_URL:'')+'/functions/v1/bbe-web'; }
   async function webPost(action, board, extra){
@@ -4914,12 +4942,12 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   window.dashWebPickSite=async function(board,site){ if(!site)return; try{ await webPost('select',board,{sc_site_url:site}); }catch(_e){} delete _dashWeb[board]; webLoad(board); dtoast('Search Console site linked'); };
   function webConnectPrompt(board,label){
     return `<div class="dw-srcbadge">${label} · ${E(boardName(board))}</div>
-      <div class="dw-connect"><p class="dw-mute">Connect Google Analytics &amp; Search Console for this board to see its website numbers.</p>
+      <div class="dw-connect"><p class="dw-mute">Connect Google Analytics &amp; Search Console for this project to see its website numbers.</p>
       <button class="btn accent" onclick="dashWebConnect('${board}')">Connect Google</button></div>`;
   }
   function websiteBody(cfg){
     const board=webBoardOf(cfg);
-    if(!board) return `<div class="dw-mute" style="padding:10px 0">No boards yet.</div>`;
+    if(!board) return `<div class="dw-mute" style="padding:10px 0">No projects yet.</div>`;
     const w=_dashWeb[board];
     if(!w||w.state==='loading'){ webLoad(board); return `<div class="dw-srcbadge">🌐 Website</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
     if(w.state==='disconnected') return webConnectPrompt(board,'🌐 Website');
@@ -4939,7 +4967,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   }
   function searchBody(cfg){
     const board=webBoardOf(cfg);
-    if(!board) return `<div class="dw-mute" style="padding:10px 0">No boards yet.</div>`;
+    if(!board) return `<div class="dw-mute" style="padding:10px 0">No projects yet.</div>`;
     const w=_dashWeb[board];
     if(!w||w.state==='loading'){ webLoad(board); return `<div class="dw-srcbadge">🔎 Search</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
     if(w.state==='disconnected') return webConnectPrompt(board,'🔎 Search');
@@ -4991,7 +5019,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   window.dashMcSubmit=async function(board){ const key=modalVal('mc-key'); if(!key){toast('Paste your API key');return;} const b=$('mc-go'); if(b){b.disabled=true;b.textContent='Connecting…';}
     try{ const j=await fnPost('bbe-mailchimp','connect',board,{api_key:key}); if(j&&j.error){toast(j.error);if(b){b.disabled=false;b.textContent='Connect';}return;} closeModal(); delete _dashMc[board]; mcLoad(board); toast('Mailchimp connected'); }catch(e){fail(e);if(b){b.disabled=false;b.textContent='Connect';}} };
   window.dashMcDisconnect=async function(board){ try{ await fnPost('bbe-mailchimp','disconnect',board);}catch(_e){} _dashMc[board]={state:'disconnected',started:true}; refreshType('email',board); dtoast('Disconnected'); };
-  function emailBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
+  function emailBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No projects yet.</div>`;
     const w=_dashMc[board];
     if(!w||w.state==='loading'){ mcLoad(board); return `<div class="dw-srcbadge">✉️ Email</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
     if(w.state==='disconnected') return `<div class="dw-srcbadge">✉️ Email · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Mailchimp to see your audience &amp; campaign stats.</p><button class="btn accent" onclick="dashMcConnect('${board}')">Connect Mailchimp</button></div>`;
@@ -5011,7 +5039,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   window.dashShopSubmit=async function(board){ const dom=modalVal('sh-dom'),tok=modalVal('sh-tok'); if(!dom||!tok){toast('Fill both fields');return;} const b=$('sh-go'); if(b){b.disabled=true;b.textContent='Connecting…';}
     try{ const j=await fnPost('bbe-shopify','connect',board,{shop_domain:dom,access_token:tok}); if(j&&j.error){toast(j.error);if(b){b.disabled=false;b.textContent='Connect';}return;} closeModal(); delete _dashShop[board]; shopLoad(board); toast('Shopify connected'); }catch(e){fail(e);if(b){b.disabled=false;b.textContent='Connect';}} };
   window.dashShopDisconnect=async function(board){ try{ await fnPost('bbe-shopify','disconnect',board);}catch(_e){} _dashShop[board]={state:'disconnected',started:true}; refreshType('sales',board); dtoast('Disconnected'); };
-  function salesBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
+  function salesBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No projects yet.</div>`;
     const w=_dashShop[board];
     if(!w||w.state==='loading'){ shopLoad(board); return `<div class="dw-srcbadge">🛍️ Sales</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
     if(w.state==='disconnected') return `<div class="dw-srcbadge">🛍️ Sales · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Shopify to see orders &amp; revenue.</p><button class="btn accent" onclick="dashShopConnect('${board}')">Connect Shopify</button></div>`;
@@ -5031,17 +5059,17 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   window.dashAdsConnect=async function(board){ dtoast('Opening Meta…'); try{ const j=await fnPost('bbe-ads','connect',board); if(j&&j.url) location.href=j.url; else dtoast(j&&j.error?j.error:'Could not start.'); }catch(_e){ dtoast('Could not start.'); } };
   window.dashAdsDisconnect=async function(board){ try{ await fnPost('bbe-ads','disconnect',board);}catch(_e){} _dashAds[board]={state:'disconnected',started:true}; refreshType('ads',board); dtoast('Disconnected'); };
   window.dashAdsPick=async function(board,acct,name){ if(!acct)return; try{ await fnPost('bbe-ads','select',board,{ad_account_id:acct,ad_account_name:name}); }catch(_e){} delete _dashAds[board]; adsLoad(board); dtoast('Ad account linked'); };
-  function adsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
+  function adsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No projects yet.</div>`;
     const w=_dashAds[board];
     if(!w||w.state==='loading'){ adsLoad(board); return `<div class="dw-srcbadge">📣 Ads</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
-    if(w.state==='disconnected') return `<div class="dw-srcbadge">📣 Ads · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Meta (Facebook/Instagram) ads to see spend &amp; ROAS.</p><button class="btn accent" onclick="dashAdsConnect('${board}')">Connect Meta Ads</button><p class="dw-mute" style="font-size:10.5px;margin-top:8px;line-height:1.45">Needs the Facebook <b>ads_read</b> permission. If the popup shows an "Invalid Scopes" error, the Facebook app still needs Ads (Marketing API) access enabled — see setup.</p></div>`;
+    if(w.state==='disconnected') return `<div class="dw-srcbadge">📣 Ads · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Meta (Facebook/Instagram) ads to see spend &amp; ROAS.</p><button class="btn accent" onclick="dashAdsConnect('${board}')">Connect Meta Ads</button></div>`;
     if(w.pick&&!w.acct){ const opts=(w.accts||[]).map(a=>`<option value="${E(a.id)}">${E(a.name||a.id)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">📣 Ads</div><div class="dw-mute" style="padding:10px 0">No ad accounts found. <a href="#" onclick="dashAdsDisconnect('${board}');return false">Reconnect</a></div>`; return `<div class="dw-srcbadge">📣 Pick an ad account</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashAdsPick('${board}',this.value,this.options[this.selectedIndex].text)"><option value="">Choose…</option>${opts}</select></div>`; }
     const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">📣 ${E(w.acctName||'Meta Ads')}</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
     return `<div class="dw-srcbadge">📣 ${E(w.acctName||'Meta Ads')} · 30d <a href="#" onclick="dashAdsDisconnect('${board}');return false" style="color:var(--muted);margin-left:6px">disconnect</a></div>
       <div class="dw-big">${fmtCur(d.spend)}</div><div class="dw-cap">spend · ${d.roas!=null?Number(d.roas).toFixed(2)+'x ROAS':'—'} · ${numF(d.purchases||0)} purchases · ${numF(d.clicks||0)} clicks</div>`;
   }
 
-  /* --- Reviews: Google Business Profile (reuses this board's Google web connection) --- */
+  /* --- Reviews: Google Business Profile (reuses this project's Google web connection) --- */
   function starStr(n){ n=Math.max(0,Math.min(5,Math.round(Number(n)||0))); return '★★★★★'.slice(0,n)+'☆☆☆☆☆'.slice(0,5-n); }
   async function revLoad(board){ const c=_dashRev[board]; if(c&&c.started)return; _dashRev[board]={state:'loading',started:true};
     try{ const st=await fnPost('bbe-web','status',board); if(!st||!st.connected){_dashRev[board]={state:'noweb',started:true};refreshType('reviews',board);return;}
@@ -5049,21 +5077,12 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
       const s=await fnPost('bbe-web','gbpstats',board); _dashRev[board]={state:'ready',started:true,d:s,name:st.gbp_location_name};
     }catch(_e){ _dashRev[board]={state:'noweb',started:true}; } refreshType('reviews',board); }
   window.dashRevPick=async function(board,val){ if(!val)return; const parts=val.split('|||'); try{ await fnPost('bbe-web','gbpselect',board,{gbp_account_id:parts[0],gbp_location_id:parts[1],gbp_location_name:parts[2]}); }catch(_e){} delete _dashRev[board]; revLoad(board); dtoast('Location linked'); };
-  // Turn a raw Google Business Profile API error into a plain, actionable message.
-  function gbpErr(raw){
-    const s=String(raw||'');
-    if(/quota|rate limit|RESOURCE_EXHAUSTED|per minute/i.test(s))
-      return "Google is rate-limiting review requests — the Business Profile API quota on the Google project needs to be raised. Reviews appear here once that's approved (see setup); it'll retry on its own.";
-    if(/permission|PERMISSION_DENIED|not authorized|insufficient|disabled|has not been used/i.test(s))
-      return "Google hasn't granted Business Profile access to this app yet. Reviews will show once Business Profile API access is enabled and approved.";
-    return s.slice(0,160);
-  }
-  function reviewsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No boards yet.</div>`;
+  function reviewsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No projects yet.</div>`;
     const w=_dashRev[board];
     if(!w||w.state==='loading'){ revLoad(board); return `<div class="dw-srcbadge">⭐ Reviews</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
-    if(w.state==='noweb') return `<div class="dw-srcbadge">⭐ Reviews · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Reviews use this board's Google connection (now includes Business Profile). Connect Google here or from a Website/Search tile.</p><button class="btn accent" onclick="dashWebConnect('${board}')">Connect Google</button></div>`;
-    if(w.state==='pick'){ const opts=(w.locs||[]).map(l=>`<option value="${E(l.account)}|||${E(l.location)}|||${E(l.title||'')}">${E(l.title||l.location)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">⭐ Reviews</div><div class="dw-mute" style="padding:10px 0">${w.err?E(gbpErr(w.err)):'No Business Profile locations on this Google account.'}</div>`; return `<div class="dw-srcbadge">⭐ Pick a location</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashRevPick('${board}',this.value)"><option value="">Choose location…</option>${opts}</select></div>`; }
-    const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">⭐ ${E(w.name||'Reviews')}</div><div class="dw-mute" style="padding:10px 0">${E(gbpErr(d.error))}</div>`;
+    if(w.state==='noweb') return `<div class="dw-srcbadge">⭐ Reviews · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Reviews use this project's Google connection (now includes Business Profile). Connect Google here or from a Website/Search tile.</p><button class="btn accent" onclick="dashWebConnect('${board}')">Connect Google</button></div>`;
+    if(w.state==='pick'){ const opts=(w.locs||[]).map(l=>`<option value="${E(l.account)}|||${E(l.location)}|||${E(l.title||'')}">${E(l.title||l.location)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">⭐ Reviews</div><div class="dw-mute" style="padding:10px 0">${w.err?E(w.err):'No Business Profile locations on this Google account.'}</div>`; return `<div class="dw-srcbadge">⭐ Pick a location</div><div class="dw-fld" style="margin-top:8px"><select onchange="dashRevPick('${board}',this.value)"><option value="">Choose location…</option>${opts}</select></div>`; }
+    const d=w.d||{}; if(d.error) return `<div class="dw-srcbadge">⭐ ${E(w.name||'Reviews')}</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
     const g=d.gbp; if(!g) return `<div class="dw-srcbadge">⭐ ${E(w.name||'Reviews')}</div><div class="dw-mute" style="padding:10px 0">No reviews yet.</div>`;
     const rows=(g.reviews||[]).map(r=>`<div class="dw-ag"><div class="dw-what"><div class="t">${E(r.author||'')} <span style="color:var(--warn,#d99512)">${starStr(r.stars)}</span></div><div class="m" style="white-space:normal">${E((r.comment||'').slice(0,90))}</div></div></div>`).join('');
     return `<div class="dw-srcbadge">⭐ ${E(w.name||boardName(board))}</div>
@@ -5372,8 +5391,8 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     wireCfg(w);
     showModal('dashCfgModal');
   };
-  function boardOpts(sel){ sel=sel||'all'; return ['<option value="all" '+(sel==='all'?'selected':'')+'>All boards (combined)</option>'].concat(BRDS().map(b=>`<option value="${b.id}" ${sel===b.id?'selected':''}>${E(b.name)}</option>`)).join(''); }
-  function boardOptsSpecific(sel){ const bs=BRDS(); if(!bs.length) return '<option value="">No boards yet</option>'; if(!sel) sel=bs[0].id; return bs.map(b=>`<option value="${b.id}" ${sel===b.id?'selected':''}>${E(b.name)}</option>`).join(''); }
+  function boardOpts(sel){ sel=sel||'all'; return ['<option value="all" '+(sel==='all'?'selected':'')+'>All projects (combined)</option>'].concat(BRDS().map(b=>`<option value="${b.id}" ${sel===b.id?'selected':''}>${E(b.name)}</option>`)).join(''); }
+  function boardOptsSpecific(sel){ const bs=BRDS(); if(!bs.length) return '<option value="">No projects yet</option>'; if(!sel) sel=bs[0].id; return bs.map(b=>`<option value="${b.id}" ${sel===b.id?'selected':''}>${E(b.name)}</option>`).join(''); }
   function appearanceForm(w){
     const cur=(w.cfg&&w.cfg.color)||'';
     const sw=PALETTE.map(c=>`<button type="button" class="dw-sw ${cur===c?'on':''}" data-color="${c}" style="${c?('background:'+c):''}" title="${c||'Default'}">${c?'':'∅'}</button>`).join('');
@@ -5398,7 +5417,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         </select></div>
         <div class="dw-fld"><label>For which board?</label><select id="g_board">${boardOpts(g.board)}</select></div>
         <div class="dw-fld"><label>Target</label><input type="number" id="g_target2" value="${Number(g.target)||0}"></div>
-        <div class="dw-hint">The number fills itself from that board's data (or all boards combined) and moves as it changes.</div></div>
+        <div class="dw-hint">The number fills itself from that board's data (or all projects combined) and moves as it changes.</div></div>
       <div class="dw-fld"><label>Deadline (optional)</label><input type="date" id="g_deadline" value="${E(g.deadline||'')}">
         <div class="dw-hint" style="margin-top:8px">Add a deadline for a countdown with pace tracking. Leave blank for open-ended.</div></div>`;
     } else if(w.type==='analytics'){
@@ -5553,10 +5572,19 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   }
 
   /* ============ INIT (called each time home view renders) ============ */
-  window.dashInit=function(){
+  window.dashInit=function(scope){
+    scope = scope || null;
     const host=document.getElementById('dashGrid'); if(!host) return;
     ensureLib(async()=>{
+      if(loadedScope!==scope){ curScope=scope; layout=null; needSetup=false; loadedScope=scope; _pickSel=null; }
       if(layout===null){ await loadLayout(); }
+      const picker=document.getElementById('dashPicker'), tools=document.getElementById('dashTools');
+      if(needSetup){ // project with no dashboard yet — show the tick-list, hide grid + tools
+        host.style.display='none'; if(tools)tools.style.display='none';
+        if(picker){ picker.style.display='block'; picker.innerHTML=pickerHtml(); }
+        return;
+      }
+      host.style.display=''; if(tools)tools.style.display=''; if(picker)picker.style.display='none';
       // (re)build grid fresh
       host.innerHTML='';
       if(grid){ try{ grid.destroy(false); }catch(_e){} grid=null; }
@@ -5621,10 +5649,75 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     </div>`;
   };
 
+  /* ============ PER-PROJECT OVERVIEW (widget tick-list + scoped dashboard) ============ */
+  function pickerHtml(){
+    if(_pickSel===null) _pickSel=new Set(PICK_DEFAULT);
+    const proj=BRDS().find(b=>b.id===curScope); const nm=proj?E(proj.name):'this project';
+    const card=(t)=>{ const c=CAT[t]; if(!c) return ''; const on=_pickSel.has(t);
+      return `<div class="dw-pickcard${on?' on':''}" onclick="dashPickToggle('${t}')">
+        <span class="dw-pk">${on?'✓':''}</span><span class="dw-pi">${c.icon}</span>
+        <div><div class="dw-pt">${E(c.name)}</div><div class="dw-pd">${E(c.desc)}</div></div></div>`; };
+    return `<div class="dash-setup">
+      <h2 class="dash-h">Set up the ${nm} dashboard</h2>
+      <p class="dash-sub" style="margin:4px 0 16px">Pick the widgets you want on this project's Overview. The ticked ones are a suggested starter set — add or remove any, then build. You can change it any time.</p>
+      ${PICK_GROUPS.map(([g,types])=>`<div class="dw-pgrp">${g}</div><div class="dw-pickgrid">${types.map(card).join('')}</div>`).join('')}
+      <div class="dash-setup-foot"><button class="btn accent" onclick="dashBuildFromPicker()">Build my dashboard →</button><span class="dw-mute" style="font-size:12.5px">${_pickSel.size} selected · change any time</span></div>
+    </div>`;
+  }
+  window.dashPickToggle=function(t){ if(!_pickSel)_pickSel=new Set(PICK_DEFAULT); if(_pickSel.has(t))_pickSel.delete(t); else _pickSel.add(t); const p=document.getElementById('dashPicker'); if(p)p.innerHTML=pickerHtml(); };
+  window.dashBuildFromPicker=async function(){
+    const picks=[...(_pickSel||new Set(PICK_DEFAULT))];
+    let y=0; layout=[];
+    picks.forEach(t=>{ const c=CAT[t]; if(!c) return; const cfg=defaultCfg(t);
+      if(curScope && BOARD_SCOPED.has(t)) cfg.board=curScope;
+      layout.push({id:'w'+(seq++), type:t, cfg, x:0, y, w:c.w, h:c.h}); y+=c.h; });
+    needSetup=false; loadedScope=curScope;
+    save();
+    const p=document.getElementById('dashPicker'); if(p){ p.style.display='none'; p.innerHTML=''; }
+    window.dashInit(curScope);
+    setTimeout(()=>{ try{ if(window.dashTidy) window.dashTidy(); }catch(_e){} },350);
+  };
+
+  /* ============ OVERRIDE: per-project Overview ============ */
+  window.overviewView=function(boardId){
+    const b=BRDS().find(x=>x.id===boardId);
+    setTimeout(()=>window.dashInit(boardId||null),40);
+    return `<div class="dash-wrap">
+      <div class="dash-top" id="dashTools">
+        <div><h2 class="dash-h">${typeof ic!=='undefined'?ic('eye',18):''} ${b?E(b.name):'Project'} <span style="font-weight:500;color:var(--muted)">· Overview</span></h2>
+          <div class="dash-sub">This project's dashboard</div></div>
+        <div class="dash-tools">
+          <span class="dash-modehint">✎ Drag, resize, remove — then Done</span>
+          <button class="btn" onclick="dashTidy()" title="Auto-arrange widgets into a tidy, gap-free layout">▦ Tidy up</button>
+          <button class="btn" onclick="dashOpenCatalog()">＋ Add widget</button>
+          <button class="btn" id="dashEditBtn" onclick="dashToggleEdit()">✎ Edit layout</button>
+        </div>
+      </div>
+      <div class="grid-stack" id="dashGrid"></div>
+      <div id="dashPicker" style="display:none"></div>
+      <div class="dash-empty" id="dashEmpty" style="display:none">
+        <b>This project's dashboard is empty</b><div class="dw-mute">Add widgets to build its Overview.</div>
+        <button class="btn accent" style="margin-top:12px" onclick="dashOpenCatalog()">＋ Add a widget</button>
+      </div>
+      <div class="dw-scrim" id="dashCatModal">
+        <div class="dw-modal">
+          <div class="dw-mh"><h3>Add a widget</h3><button class="dw-x" onclick="dashHideModal('dashCatModal')">✕</button></div>
+          <div class="dw-mb"><div class="dw-cat" id="dashCatList"></div></div>
+        </div>
+      </div>
+      <div class="dw-scrim" id="dashCfgModal">
+        <div class="dw-modal sm">
+          <div class="dw-mh"><h3 id="dashCfgTitle">Configure</h3><button class="dw-x" onclick="dashHideModal('dashCfgModal')">✕</button></div>
+          <div class="dw-mb" id="dashCfgBody"></div>
+          <div class="dw-mf"><button class="btn" onclick="dashHideModal('dashCfgModal')">Cancel</button><button class="btn accent" onclick="dashCfgSave()">Save widget</button></div>
+        </div>
+      </div>
+    </div>`;
+  };
+
   // close modals on scrim click
   document.addEventListener('click',function(e){ if(e.target.classList&&e.target.classList.contains('dw-scrim')) e.target.classList.remove('on'); });
 })();
-
 </script>
 <script id="wp-js">
 /* ============ WordPress (self-hosted) publishing ============ */
@@ -5636,7 +5729,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     return await r.json();
   }
   window.wpBlogModal=async function(){
-    if(!S.board){toast('Open a board first');return;}
+    if(!S.board){toast('Open a project first');return;}
     toast('Checking WordPress…');
     let st; try{ st=await wpApi({action:'status',board_id:S.board}); }catch(e){ fail(e); return; }
     if(st&&st.connected) wpComposeModal(st); else wpConnectModal();
