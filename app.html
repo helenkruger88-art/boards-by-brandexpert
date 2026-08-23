@@ -481,7 +481,7 @@ function render(){
     <button class="sb-item ${S.view==='settings'?'on':''}" onclick="go('settings')">${ic('gear',16)}<span>Settings</span></button>
   </div>`;
   const sideHead=nav.ws
-    ?`<div class="sb-brand" onclick="go('boards')">${esc(WS.name)} <small>· PROJECTS</small></div>`
+    ?`<div class="sb-brand" onclick="go('boards')">${esc(WS.name)} <small>· HOME</small></div>`
     :`<button class="sb-back" onclick="leaveBoard()">‹ All projects</button>
       <div class="sb-bhead"><span class="sb-sw" style="background:${b?b.color||'var(--accent)':'var(--accent)'}"></span><select class="sb-switch" onchange="switchBoardTo(this.value)">${BOARDS.map(x=>`<option value="${x.id}" ${x.id===S.board?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
   app.innerHTML=`
@@ -535,9 +535,11 @@ function navItems(){
       return {ws:false,groups,items,board:b};
     }
   }
-  const wsItems=[['boards','home','Dashboard'],['today','sun','Today'],['inbox','mail','Inbox']];
-  if((_waAccounts||[]).some(a=>a&&a.status!=='disabled'))wsItems.push(['wa','chat','WhatsApp Usage']);
-  return {ws:true,groups:[{label:null,items:wsItems}],items:wsItems};
+  const wsWork=[['today','sun','Today'],['inbox','mail','Inbox']];
+  if((_waAccounts||[]).some(a=>a&&a.status!=='disabled'))wsWork.push(['wa','chat','WhatsApp Usage']);
+  const wsGroups=[{label:null,items:[['boards','home','Dashboard']]},{label:'My Work',items:wsWork}];
+  const wsItems=wsGroups.reduce((a,g)=>a.concat(g.items),[]);
+  return {ws:true,groups:wsGroups,items:wsItems};
 }
 /* ============ AUTH ============ */
 let _authMode='in';
@@ -733,7 +735,7 @@ function dayBriefPanel(){
   </div>`;
 }
 function boardsSideNav(){
-  return `<div class="sb-sec">Projects</div>
+  return `<div class="sb-grp">Projects</div>
     ${BOARDS.map(b=>`<button class="sb-item" onclick="openBoard('${b.id}')"><span class="sb-dot" style="background:${b.color||'var(--accent)'}"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.private_to?ic('lock',12)+' ':''}${esc(b.name)}</span></button>`).join('')}
     <button class="sb-item" style="color:var(--muted)" onclick="newBoardModal()">${ic('plus',15)}<span>New project</span></button>`;
 }
@@ -4811,6 +4813,14 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
       catch(e){ console.error('dash save',e); }
     },600);
   }
+  // Flush the layout to the server immediately (no debounce) — call before any OAuth
+  // redirect so a just-added widget isn't lost when we navigate away and come back.
+  async function saveNow(){
+    syncPositions();
+    clearTimeout(saveT);
+    try{ await sb.from('bbe_dashboard').upsert({workspace_id:WS.id,user_id:SESSION.user.id,board_id:scopeId(),layout:layout,updated_at:new Date().toISOString()},{onConflict:'workspace_id,user_id,board_id'}); }
+    catch(e){ console.error('dash saveNow',e); }
+  }
   async function loadLayout(){
     try{
       const {data,error}=await sb.from('bbe_dashboard').select('layout').eq('workspace_id',WS.id).eq('user_id',SESSION.user.id).eq('board_id',scopeId()).maybeSingle();
@@ -4891,7 +4901,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   }
   window.dashCalConnect=async function(){
     dtoast('Opening Google…');
-    try{ const j=await calPost('connect'); if(j&&j.url){ location.href=j.url; } else { dtoast(j&&j.error?j.error:'Could not start calendar connect.'); } }
+    try{ await saveNow(); const j=await calPost('connect'); if(j&&j.url){ location.href=j.url; } else { dtoast(j&&j.error?j.error:'Could not start calendar connect.'); } }
     catch(_e){ dtoast('Could not start calendar connect.'); }
   };
   window.dashCalDisconnect=async function(){
@@ -4936,7 +4946,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     }catch(_e){ _dashWeb[board]={state:'disconnected',started:true}; }
     refreshWebWidgets(board);
   }
-  window.dashWebConnect=async function(board){ dtoast('Opening Google…'); try{ const j=await webPost('connect',board); if(j&&j.url) location.href=j.url; else dtoast(j&&j.error?j.error:'Could not start.'); }catch(_e){ dtoast('Could not start.'); } };
+  window.dashWebConnect=async function(board){ dtoast('Opening Google…'); try{ await saveNow(); const j=await webPost('connect',board); if(j&&j.url) location.href=j.url; else dtoast(j&&j.error?j.error:'Could not start.'); }catch(_e){ dtoast('Could not start.'); } };
   window.dashWebDisconnect=async function(board){ try{ await webPost('disconnect',board); }catch(_e){} _dashWeb[board]={state:'disconnected',started:true}; refreshWebWidgets(board); dtoast('Disconnected'); };
   window.dashWebPickGa4=async function(board,pid,name){ if(!pid)return; try{ await webPost('select',board,{ga4_property_id:pid,ga4_property_name:name}); }catch(_e){} delete _dashWeb[board]; webLoad(board); dtoast('Analytics property linked'); };
   window.dashWebPickSite=async function(board,site){ if(!site)return; try{ await webPost('select',board,{sc_site_url:site}); }catch(_e){} delete _dashWeb[board]; webLoad(board); dtoast('Search Console site linked'); };
@@ -5056,7 +5066,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
       else { try{ const s=await fnPost('bbe-ads','stats',board); rec.d=s; }catch(_e){} }
       _dashAds[board]=rec;
     }catch(_e){ _dashAds[board]={state:'disconnected',started:true}; } refreshType('ads',board); }
-  window.dashAdsConnect=async function(board){ dtoast('Opening Meta…'); try{ const j=await fnPost('bbe-ads','connect',board); if(j&&j.url) location.href=j.url; else dtoast(j&&j.error?j.error:'Could not start.'); }catch(_e){ dtoast('Could not start.'); } };
+  window.dashAdsConnect=async function(board){ dtoast('Opening Meta…'); try{ await saveNow(); const j=await fnPost('bbe-ads','connect',board); if(j&&j.url) location.href=j.url; else dtoast(j&&j.error?j.error:'Could not start.'); }catch(_e){ dtoast('Could not start.'); } };
   window.dashAdsDisconnect=async function(board){ try{ await fnPost('bbe-ads','disconnect',board);}catch(_e){} _dashAds[board]={state:'disconnected',started:true}; refreshType('ads',board); dtoast('Disconnected'); };
   window.dashAdsPick=async function(board,acct,name){ if(!acct)return; try{ await fnPost('bbe-ads','select',board,{ad_account_id:acct,ad_account_name:name}); }catch(_e){} delete _dashAds[board]; adsLoad(board); dtoast('Ad account linked'); };
   function adsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No projects yet.</div>`;
@@ -5303,14 +5313,15 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   }
   function newsBody(cfg){
     const url=((cfg&&cfg.url)||'').trim();
-    if(!url) return `<div class="dw-connect" style="padding:14px 6px"><p class="dw-mute">Add any RSS feed URL in ⚙ settings — an industry blog, a client’s site, or a Google News topic feed.</p></div>`;
+    if(!url) return `<div class="dw-connect" style="padding:14px 6px"><p class="dw-mute">Add one or more RSS feed URLs in ⚙ settings — an industry blog, a client’s site, a Google News topic feed. <b>Add several feeds</b> (one per line, or comma-separated) and this widget blends them into one headline stream, newest first.</p></div>`;
     const w=_dashNews[url];
     if(!w||w.state==='loading'){ if(!w)newsLoad(url); return `<div class="dw-srcbadge">📰 News</div><div class="dw-mute" style="padding:10px 0">Loading headlines…</div>`; }
     if(w.state==='error') return `<div class="dw-srcbadge">📰 News</div><div class="dw-mute" style="padding:10px 0">${E(w.err||'Couldn’t load that feed — check the URL is a valid RSS/Atom feed.')}</div>`;
-    const d=w.d||{}, items=(d.items||[]).slice(0,8);
-    if(!items.length) return `<div class="dw-srcbadge">📰 ${E(cfg.title||d.title||'News')}</div><div class="dw-mute" style="padding:10px 0">No items in this feed.</div>`;
-    const rows=items.map(it=>{ const rel=it.date?relTime(new Date(it.date)):''; return `<div class="dw-ag" ${it.link?`onclick="window.open('${encodeURI(it.link)}','_blank')"`:''} style="cursor:${it.link?'pointer':'default'}"><div class="dw-what"><div class="t" style="white-space:normal">${E(it.title||'—')}</div>${rel?`<div class="m">${rel}</div>`:''}</div></div>`; }).join('');
-    return `<div class="dw-srcbadge">📰 ${E(cfg.title||d.title||'News')}</div>${rows}`;
+    const d=w.d||{}, multi=!!d.multi, items=(d.items||[]).slice(0,10);
+    if(!items.length) return `<div class="dw-srcbadge">📰 ${E(cfg.title||d.title||'News')}</div><div class="dw-mute" style="padding:10px 0">No items in these feeds.</div>`;
+    const rows=items.map(it=>{ const rel=it.date?relTime(new Date(it.date)):''; const src=(multi&&it.source)?E(String(it.source).slice(0,32)):''; const meta=[src,rel].filter(Boolean).join(' · '); return `<div class="dw-ag" ${it.link?`onclick="window.open('${encodeURI(it.link)}','_blank')"`:''} style="cursor:${it.link?'pointer':'default'}"><div class="dw-what"><div class="t" style="white-space:normal">${E(it.title||'—')}</div>${meta?`<div class="m">${meta}</div>`:''}</div></div>`; }).join('');
+    const badge=cfg.title?E(cfg.title):(multi?E(d.title||'News'):E(d.title||'News'));
+    return `<div class="dw-srcbadge">📰 ${badge}</div>${rows}`;
   }
 
   /* ---- Site health (bbe-sitehealth) ---- */
@@ -5328,15 +5339,35 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(!w||w.state==='loading'){ if(!w)siteLoad(url); return `<div class="dw-srcbadge">🩺 Site health</div><div class="dw-mute" style="padding:10px 0">Checking ${E(url)}…</div>`; }
     if(w.state==='error') return `<div class="dw-srcbadge">🩺 Site health</div><div class="dw-mute" style="padding:10px 0">${E(w.err||'Couldn’t check that site.')}</div>`;
     const d=w.d||{}, up=d.up, dot=up?'#2f9e5f':'#e5484d';
-    const sd=d.ssl_days_left, sslColor=(sd==null)?'var(--muted)':(sd<14?'#e5484d':sd<30?'#d99512':'#2f9e5f');
+    const sd=d.ssl_days_left, sslColor=(sd==null)?'var(--muted)':(sd<0?'#e5484d':sd<14?'#e5484d':sd<30?'#d99512':'#2f9e5f');
+    // response-time rating so a person knows if it's good
+    const ms=d.ms;
+    const rt=(ms==null)?{lbl:'—',c:'var(--muted)'}
+      :(ms<800)?{lbl:'fast',c:'#2f9e5f'}
+      :(ms<2000)?{lbl:'ok',c:'#2f9e5f'}
+      :(ms<4000)?{lbl:'a bit slow',c:'#d99512'}
+      :{lbl:'slow',c:'#e5484d'};
+    // overall verdict
+    let verdict, vc;
+    if(!up){ verdict='Down — not responding'; vc='#e5484d'; }
+    else if(d.status&&d.status>=400){ verdict='Online, but HTTP '+d.status; vc='#d99512'; }
+    else if(sd!=null&&sd<0){ verdict='Online — SSL expired'; vc='#e5484d'; }
+    else if(sd!=null&&sd<14){ verdict='Online — SSL expiring soon'; vc='#d99512'; }
+    else if(ms!=null&&ms>=4000){ verdict='Online, but slow'; vc='#d99512'; }
+    else { verdict='Healthy'; vc='#2f9e5f'; }
+    const sslLine = (sd==null)
+      ? `<span class="dw-bv" style="width:auto;color:var(--muted)">not found</span>`
+      : `<span class="dw-bv" style="width:auto;color:${sslColor}">${sd<0?'expired':sd+' days left'}</span>`;
     return `<div class="dw-srcbadge">🩺 ${E(d.host||url)}</div>
-      <div style="display:flex;align-items:center;gap:9px;margin:2px 0 8px"><span class="dw-dot" style="background:${dot};width:11px;height:11px"></span><span class="dw-big" style="font-size:20px">${up?'Online':'Down'}</span>${d.status?`<span class="dw-mute">HTTP ${d.status}</span>`:''}</div>
+      <div style="display:flex;align-items:center;gap:9px;margin:2px 0 4px"><span class="dw-dot" style="background:${dot};width:11px;height:11px"></span><span class="dw-big" style="font-size:20px">${up?'Online':'Down'}</span>${d.status?`<span class="dw-mute">HTTP ${d.status}</span>`:''}</div>
+      <div style="font-size:12px;font-weight:600;color:${vc};margin:0 0 8px">${verdict}</div>
       <div class="dw-bars">
-        <div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">Response time</span><span class="dw-bv" style="width:auto">${d.ms!=null?d.ms+' ms':'—'}</span></div>
-        <div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">SSL certificate</span><span class="dw-bv" style="width:auto;color:${sslColor}">${sd==null?'—':(sd<0?'expired':sd+' days left')}</span></div>
+        <div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">Response time</span><span class="dw-bv" style="width:auto">${ms!=null?ms+' ms':'—'} <span style="color:${rt.c};font-weight:600">· ${rt.lbl}</span></span></div>
+        <div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">SSL certificate</span>${sslLine}</div>
+        ${d.ssl_expiry?`<div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">SSL expires</span><span class="dw-bv" style="width:auto">${E(d.ssl_expiry)}</span></div>`:''}
         ${d.ssl_issuer?`<div class="dw-brow"><span class="dw-bn" style="width:auto;flex:1">Issuer</span><span class="dw-bv" style="width:auto;font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${E(d.ssl_issuer)}</span></div>`:''}
       </div>
-      <div class="dw-mute" style="font-size:10px;margin-top:8px">${sd!=null?'SSL from certificate transparency · ':''}checked just now</div>`;
+      <div class="dw-mute" style="font-size:10px;margin-top:8px">${sd!=null?'SSL from certificate transparency logs · ':'SSL not in public CT logs · '}response measured from our server · checked just now</div>`;
   }
 
   /* ---- AI widget (bbe-ai, Claude + tools) ---- */
@@ -5474,9 +5505,9 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         <div class="dw-fld"><label>Watch these tags (optional)</label><input type="text" id="tr_watch" value="${E(((cfg.watch)||[]).join(' '))}" placeholder="#yourbrand #campaign #niche"></div>
         <div class="dw-hint">Surfaces the hashtags you use most across recent posts, and tracks any tags on your watchlist.</div>`;
     } else if(w.type==='news'){ const cfg=w.cfg;
-      s+=`<div class="dw-fld"><label>RSS feed URL</label><input type="text" id="nw_url" value="${E(cfg.url||'')}" placeholder="https://…/feed"></div>
+      s+=`<div class="dw-fld"><label>RSS feed URL(s)</label><textarea id="nw_url" rows="3" style="font-family:inherit" placeholder="https://…/feed&#10;https://another-site.com/rss.xml">${E(cfg.url||'')}</textarea></div>
         <div class="dw-fld"><label>Title (optional)</label><input type="text" id="nw_title" value="${E(cfg.title||'')}" placeholder="Industry news"></div>
-        <div class="dw-hint">Most blogs have a feed at /feed or /rss.xml. For a topic, use a Google News feed: news.google.com/rss/search?q=YOUR+TOPIC</div>`;
+        <div class="dw-hint">Add <b>one feed per line</b> (or comma-separated) to blend several sources into one stream, newest first — up to 6 feeds. Most blogs have a feed at /feed or /rss.xml. For a topic, use a Google News feed: news.google.com/rss/search?q=YOUR+TOPIC</div>`;
     } else if(w.type==='sitehealth'){ const cfg=w.cfg;
       s+=`<div class="dw-fld"><label>Website URL</label><input type="text" id="sh_url" value="${E(cfg.url||'')}" placeholder="example.com"></div>
         <div class="dw-hint">Checks uptime, response time and how many days until the SSL certificate expires.</div>`;
