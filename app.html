@@ -2707,6 +2707,9 @@ async function fbConnect(){
 // connect to THIS board — so an account managing several Pages links the right one.
 async function fbPickStart(board){
   try{
+    // Re-open the board the user connected from (Facebook's return lands on Home) so that,
+    // after they pick a Page, they're back on that project's Content tab — not the home screen.
+    if(board && (typeof S==='undefined' || S.board!==board)){ try{ await openBoardView(board,'content'); }catch(_){} }
     toast('Loading your Facebook Pages…');
     const j=await metaApi({action:'pages',board_id:board});
     if(j.error){toast(j.error);return;}
@@ -3119,9 +3122,10 @@ function inboxConnectsHtml(){
     const canDisc=(pl==='youtube'||pl==='threads');
     icons.push(`<span class="socic" title="${esc(tip)}">${platBadge(pl,24)}${canDisc?`<b class="x" title="Disconnect ${label}" onclick="inboxDisconnect('${pl}')">✕</b>`:''}</span>`);
   }
-  const waAcc=(_waAccounts||[]).filter(a=>a.status!=='disabled');
+  const waAcc=(_waAccounts||[]).filter(a=>a.status!=='disabled'&&(a.board_id===S.board||!a.board_id));
   for(const a of waAcc){
-    icons.push(`<span class="socic" title="WhatsApp · ${esc(a.display_phone||a.business_name||'connected')}">${platBadge('whatsapp',24)}</span>`);
+    const wbad=a.status==='error';
+    icons.push(`<span class="socic" title="WhatsApp · ${esc(a.display_phone||a.business_name||'connected')}${wbad?' — connection error':''}">${platBadge('whatsapp',24)}${canManage()?`<b class="x" style="background:${wbad?'var(--danger)':'var(--ok)'}" title="Disconnect this WhatsApp number" onclick="event.stopPropagation();waDisconnect('${a.id}')">✕</b>`:`<b class="x" style="background:${wbad?'var(--danger)':'var(--ok)'}">${wbad?'!':'✓'}</b>`}</span>`);
   }
   for(const a of (_emailAccts||[])){
     const prov=a.oauth_provider==='microsoft'?'Outlook':((a.oauth_provider==='google'||a.imap_host==='imap.gmail.com')?'Gmail':'Email');
@@ -4164,6 +4168,9 @@ async function authLinkCheck(){
   // TikTok (bbe-tiktok) OAuth return.
   const ttc=q.get('ttconnected');
   if(ttc){const ttr=q.get('tt_r')||'';const ttAcct=q.get('tt_acct')||'';const ttBoard=q.get('tt_board')||'';history.replaceState({},'',location.pathname);setTimeout(()=>{if(ttc==='1'){toast('✅ TikTok connected — you can now post & schedule to it');}else if(ttr==='inuse'){ttInUseModal(ttAcct,ttBoard);}else{toast('TikTok connection didn\'t finish — try again');}},800);}
+  // Threads (bbe-threads) OAuth return.
+  const thc=q.get('thconnected');
+  if(thc){const thBoard=q.get('board')||'';history.replaceState({},'',location.pathname);const openTh=()=>{if(typeof WS!=='undefined'&&WS&&WS.id){if(thc==='1'){toast('✅ Threads connected — you can now post & schedule to it');if(thBoard){try{openBoardView(thBoard,'content');}catch(_){}}}else if(thc==='cancelled'){toast('Threads connection cancelled — no problem, you can connect it any time');}else{toast('Threads connection didn\'t finish — try again');}}else{setTimeout(openTh,300);}};setTimeout(openTh,800);}
   const gm=q.get('gmail');
   if(gm){history.replaceState({},'',location.pathname);const gmEmail=q.get('email')||'';const gmReason=q.get('reason')||'';setTimeout(()=>{if(gm==='connected'){toast('✅ Gmail connected'+(gmEmail?' — '+gmEmail:'')+' — new mail will land in your Inbox');if(typeof loadInbox==='function'){loadInbox().then(()=>{if(typeof render==='function')render();});}}else{toast('Gmail sign-in didn\'t finish'+(gmReason?' ('+gmReason+')':'')+' — please try again');}},800);}
   const msc=q.get('ms');
@@ -4413,6 +4420,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     sales:    {icon:'🛍️', name:'Sales (Shopify)',      desc:'30-day orders, revenue and average order value from your store.', w:4,h:3},
     reviews:  {icon:'⭐', name:'Reviews (Google)',     desc:'Google Business Profile star rating, review count & recent reviews (uses the board’s Google connection).', w:4,h:5},
     ads:      {icon:'📣', name:'Ads (Meta)',           desc:'Facebook/Instagram ad spend, ROAS, purchases & clicks over 30 days.', w:4,h:3},
+    googleads:{icon:'📊', name:'Ads (Google)',         desc:'Google Ads spend, ROAS, conversions & clicks over 30 days.', w:4,h:3},
     weather:  {icon:'⛅', name:'Weather',              desc:'Today’s weather and a 4-day outlook for any city — live, no setup.', w:3,h:3},
     clock:    {icon:'🕐', name:'World clocks',         desc:'Live clocks for the time zones you and your clients work across.', w:4,h:3},
     focus:    {icon:'✨', name:'Daily focus',          desc:'Your one thing for the day, plus a rotating spark of inspiration.', w:4,h:2},
@@ -4487,7 +4495,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   let needSetup = false;    // true when a project has no dashboard yet -> show the picker
   function scopeId(){ return curScope || HOME_SENTINEL; }
   // Widgets whose data is board-specific — on a project dashboard they default to that project.
-  const BOARD_SCOPED = new Set(['analytics','inbox','activity','besttime','toppost','mentions','trends','goal','website','search','email','sales','reviews','ads','ai','posts']);
+  const BOARD_SCOPED = new Set(['analytics','inbox','activity','besttime','toppost','mentions','trends','goal','website','search','email','sales','reviews','ads','googleads','ai','posts']);
   // The project starter template: which widgets to offer, and which are pre-ticked.
   const PICK_GROUPS = [
     ['This project', ['posts','analytics','inbox','activity','toppost','besttime','ads','reviews']],
@@ -4711,6 +4719,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         case 'sales': return salesBody(w.cfg);
         case 'reviews': return reviewsBody(w.cfg);
         case 'ads': return adsBody(w.cfg);
+        case 'googleads': return googleAdsBody(w.cfg);
         case 'weather': return weatherBody(w.cfg);
         case 'clock': return clockBody(w.cfg);
         case 'focus': return focusBody(w);
@@ -4740,6 +4749,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(w.type==='sales') return 'Sales';
     if(w.type==='reviews') return 'Reviews';
     if(w.type==='ads') return 'Ads';
+    if(w.type==='googleads') return 'Google Ads';
     if(w.type==='weather') return w.cfg.city||'Weather';
     if(w.type==='clock') return 'World clocks';
     if(w.type==='focus') return 'Daily focus';
@@ -4800,7 +4810,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(type==='calendar') return {source:'internal'};
     if(type==='inbox') return {board:'all', channel:'all'};
     if(type==='notes') return {text:''};
-    if(['website','search','email','sales','reviews','ads'].includes(type)) return {board:(BRDS()[0]||{}).id||''};
+    if(['website','search','email','sales','reviews','ads','googleads'].includes(type)) return {board:(BRDS()[0]||{}).id||''};
     if(type==='weather') return {city:'Cape Town', lat:-33.9249, lon:18.4241, unit:'c'};
     if(type==='clock') return {zones:[['Cape Town','Africa/Johannesburg'],['London','Europe/London'],['New York','America/New_York']]};
     if(type==='focus') return {text:'', showQuote:true};
@@ -4895,7 +4905,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     const w=addWidget(type); hideModal('dashCatModal');
     if(!editing) window.dashToggleEdit();
     dtoast(CAT[type].name+' added');
-    if(['goal','analytics','calendar','inbox','website','search','email','sales','reviews','ads','weather','clock','countdown','activity','news','besttime','toppost','mentions','trends','sitehealth','ai'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
+    if(['goal','analytics','calendar','inbox','website','search','email','sales','reviews','ads','googleads','weather','clock','countdown','activity','news','besttime','toppost','mentions','trends','sitehealth','ai'].includes(type)) setTimeout(()=>window.dashConfig(w.id),160);
   };
   window.dashNoteInput=function(id,val){ const w=(layout||[]).find(x=>x.id===id); if(w){ w.cfg.text=val; save(); } };
 
@@ -5098,6 +5108,37 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     return `<div class="dw-srcbadge">📣 ${E(w.acctName||'Meta Ads')} · 30d <a href="#" onclick="dashAdsDisconnect('${board}');return false" style="color:var(--muted);margin-left:6px">disconnect</a></div>
       <div class="dw-big">${fmtCur(d.spend)}</div><div class="dw-cap">spend · ${d.roas!=null?Number(d.roas).toFixed(2)+'x ROAS':'—'} · ${numF(d.purchases||0)} purchases · ${numF(d.clicks||0)} clicks</div>`;
   }
+
+  /* --- Ads: Google --- */
+  const _dashGAds={};
+  async function gadsLoad(board){ const c=_dashGAds[board]; if(c&&c.started)return; _dashGAds[board]={state:'loading',started:true};
+    try{ const st=await fnPost('bbe-googleads','status',board); if(!st||!st.connected){_dashGAds[board]={state:'disconnected',started:true};refreshType('googleads',board);return;}
+      if(st.ready===false){ _dashGAds[board]={state:'setup',started:true}; refreshType('googleads',board); return; }
+      const rec={state:'ready',started:true,cid:st.customer_id,cname:st.customer_name};
+      if(!st.customer_id){ try{ const l=await fnPost('bbe-googleads','list',board); if(l&&l.needsSetup){_dashGAds[board]={state:'setup',started:true};refreshType('googleads',board);return;} rec.accts=(l&&l.accounts)||[]; rec.pick=true; }catch(_e){} }
+      else { try{ const s=await fnPost('bbe-googleads','stats',board); rec.d=s; }catch(_e){} }
+      _dashGAds[board]=rec;
+    }catch(_e){ _dashGAds[board]={state:'disconnected',started:true}; } refreshType('googleads',board); }
+  window.dashGAdsConnect=async function(board){ dtoast('Opening Google…'); try{ await saveNow(); const j=await fnPost('bbe-googleads','connect',board); if(j&&j.url) location.href=j.url; else dtoast(j&&j.error?j.error:'Could not start.'); }catch(_e){ dtoast('Could not start.'); } };
+  window.dashGAdsDisconnect=async function(board){ try{ await fnPost('bbe-googleads','disconnect',board);}catch(_e){} _dashGAds[board]={state:'disconnected',started:true}; refreshType('googleads',board); dtoast('Disconnected'); };
+  window.dashGAdsPick=async function(board,cid,name){ if(!cid)return; try{ await fnPost('bbe-googleads','select',board,{customer_id:cid,customer_name:name}); }catch(_e){} delete _dashGAds[board]; gadsLoad(board); dtoast('Ad account linked'); };
+  function googleAdsBody(cfg){ const board=webBoardOf(cfg); if(!board)return `<div class="dw-mute">No projects yet.</div>`;
+    const w=_dashGAds[board];
+    if(!w||w.state==='loading'){ gadsLoad(board); return `<div class="dw-srcbadge">📊 Google Ads</div><div class="dw-mute" style="padding:10px 0">Loading…</div>`; }
+    if(w.state==='disconnected') return `<div class="dw-srcbadge">📊 Google Ads · ${E(boardName(board))}</div><div class="dw-connect"><p class="dw-mute">Connect Google Ads to see spend, clicks &amp; ROAS.</p><button class="btn accent" onclick="dashGAdsConnect('${board}')">Connect Google Ads</button></div>`;
+    if(w.state==='setup') return `<div class="dw-srcbadge">📊 Google Ads</div><div class="dw-mute" style="padding:10px 0">Google Ads is being switched on for the platform — it’ll light up here as soon as it’s approved.</div>`;
+    if(w.pick&&!w.cid){ const opts=(w.accts||[]).map(a=>`<option value="${E(a.id)}">${E(a.name||a.id)}</option>`).join(''); if(!opts) return `<div class="dw-srcbadge">📊 Google Ads</div><div class="dw-mute" style="padding:10px 0">No ad accounts found on this Google login.</div>`; return `<div class="dw-srcbadge">📊 Google Ads · pick account</div><select onchange="dashGAdsPick('${board}',this.value,this.options[this.selectedIndex].text)"><option value="">Choose an account…</option>${opts}</select>`; }
+    const d=w.d||{}; if(d.needsSetup) return `<div class="dw-srcbadge">📊 Google Ads</div><div class="dw-mute" style="padding:10px 0">Google Ads is being switched on — check back shortly.</div>`;
+    if(d.needsPick) return `<div class="dw-srcbadge">📊 Google Ads</div><div class="dw-mute" style="padding:10px 0">Pick an ad account in ⚙ settings.</div>`;
+    if(d.error) return `<div class="dw-srcbadge">📊 ${E(w.cname||'Google Ads')}</div><div class="dw-mute" style="padding:10px 0">${E(d.error)}</div>`;
+    return `<div class="dw-srcbadge">📊 ${E(w.cname||'Google Ads')} · 30d <a href="#" onclick="dashGAdsDisconnect('${board}');return false" style="color:var(--muted);margin-left:6px">disconnect</a></div>
+      <div class="dw-big">${fmtCur(d.spend,d.currency)}</div><div class="dw-cap">spend · ${d.roas!=null?Number(d.roas).toFixed(2)+'x ROAS':'—'} · ${numF(d.conversions||0)} conv · ${numF(d.clicks||0)} clicks</div>`;
+  }
+  // boot handler for Google Ads OAuth return (?gadsconnected=1|err)
+  try{
+    const q=new URLSearchParams(location.search);
+    if(q.has('gadsconnected')){ const ok=q.get('gadsconnected')==='1'; setTimeout(()=>dtoast(ok?'✅ Google Ads connected — pick your account':'Google Ads connect failed'),600); Object.keys(_dashGAds).forEach(k=>delete _dashGAds[k]); q.delete('gadsconnected'); history.replaceState(null,'',location.pathname+(q.toString()?'?'+q.toString():'')); }
+  }catch(_e){}
 
   /* --- Reviews: Google Business Profile (reuses this project's Google web connection) --- */
   function starStr(n){ n=Math.max(0,Math.min(5,Math.round(Number(n)||0))); return '★★★★★'.slice(0,n)+'☆☆☆☆☆'.slice(0,5-n); }
@@ -5523,7 +5564,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
       s+=`<div class="dw-fld"><label>Board</label><select id="i_board">${boardOpts(w.cfg.board)}</select></div>
         <div class="dw-fld"><label>Channel</label><select id="i_channel">${CHANNELS.map(([k,l])=>`<option value="${k}" ${(w.cfg.channel||'all')===k?'selected':''}>${E(l)}</option>`).join('')}</select></div>
         <div class="dw-hint">Combine everything into one inbox, or add a widget per inbox — pick one channel and/or one board each.</div>`;
-    } else if(['website','search','email','sales','reviews','ads'].includes(w.type)){
+    } else if(['website','search','email','sales','reviews','ads','googleads'].includes(w.type)){
       s+=`<div class="dw-fld"><label>Which board?</label><select id="wb_board">${boardOptsSpecific(w.cfg.board)}</select></div>
         <div class="dw-hint">Each board connects its own account. Connect it from the tile itself.</div>`;
     } else if(w.type==='weather'){ const cfg=w.cfg;
@@ -5608,7 +5649,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     if(w.type==='analytics'){ w.cfg.platform=document.getElementById('a_platform').value; w.cfg.board=document.getElementById('a_board').value; }
     if(w.type==='calendar') w.cfg.source=document.querySelector('#c_src button.on').dataset.v;
     if(w.type==='inbox'){ w.cfg.board=document.getElementById('i_board').value; w.cfg.channel=document.getElementById('i_channel').value; }
-    if(['website','search','email','sales','reviews','ads'].includes(w.type)){ const wb=document.getElementById('wb_board'); if(wb) w.cfg.board=wb.value; }
+    if(['website','search','email','sales','reviews','ads','googleads'].includes(w.type)){ const wb=document.getElementById('wb_board'); if(wb) w.cfg.board=wb.value; }
     if(w.type==='weather'){
       const seg=document.querySelector('#wx_unit button.on'); w.cfg.unit=seg?seg.dataset.v:'c';
       const city=(document.getElementById('wx_city').value||'').trim();
