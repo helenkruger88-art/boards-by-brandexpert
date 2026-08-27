@@ -2326,9 +2326,9 @@ function contentView(){
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${cells}</div>
     <div style="margin-top:16px">
       <div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.05em;margin-bottom:8px">COMING UP</div>
-      ${upcoming.map(p=>`<div class="task-row" style="--c:${PLAT[p.platform][1]}" onclick="postModal('${p.id}')">
-        <span class="pill" style="background:${PLAT[p.platform][1]};flex:none">${PLAT[p.platform][0]}</span>
-        <div class="t"><b>${esc(p.caption.split('\\n')[0].slice(0,70)||'(no caption yet)')}</b>
+      ${upcoming.map(p=>`<div class="task-row" style="--c:${(PLAT[p.platform]||PLAT.other)[1]}" onclick="postModal('${p.id}')">
+        <span class="pill" style="background:${(PLAT[p.platform]||PLAT.other)[1]};flex:none">${(PLAT[p.platform]||PLAT.other)[0]}</span>
+        <div class="t"><b>${esc((p.caption||'').split('\\n')[0].slice(0,70)||'(no caption yet)')}</b>
           <span>${p.post_date} · ${(p.post_time||'').slice(0,5)} · ${p.status}</span></div>
         <button class="btn ghost sm" onclick="event.stopPropagation();copyCaption('${p.id}')">Copy</button>
       </div>`).join('')||'<div class="empty">Nothing scheduled — click a day on the calendar to plan a post.</div>'}
@@ -3271,8 +3271,8 @@ function emailShowForm(accounts){
       </details>
     </div>`:''}
     <div style="font-weight:800;font-size:12.5px;margin:2px 0 7px;color:var(--muted)">Or connect directly</div>
-    <button class="btn" style="width:100%;justify-content:center;gap:9px;padding:11px;border:1px solid var(--line);background:#fff;color:#3c4043;font-weight:600;font-size:13.5px" onclick="gmailConnect()"><svg width="17" height="17" viewBox="0 0 48 48" style="flex:none"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.4 13.3 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16.4z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.2C1 16.5 0 20.1 0 24s1 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.1-5.5c-2 1.3-4.6 2.1-8.4 2.1-6.3 0-11.6-3.8-13.5-9.1l-7.9 6.2C6.5 42.6 14.6 48 24 48z"/></svg>Sign in with Google (Gmail)</button>
-    <button class="btn" style="width:100%;justify-content:center;gap:9px;padding:11px;border:1px solid var(--line);background:#fff;color:#3c4043;font-weight:600;font-size:13.5px;margin-top:8px" onclick="msConnect()"><svg width="17" height="17" viewBox="0 0 23 23" style="flex:none"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>Sign in with Microsoft (Outlook)</button>
+    <div style="font-size:11.5px;color:var(--muted);margin:0 0 9px;line-height:1.55;background:#F6FBF7;border:1px solid var(--line);border-radius:9px;padding:9px 11px">Using <b style="color:var(--ink)">Gmail</b>? Use the <b style="color:var(--ink)">forwarding</b> option above — it takes a minute, needs no password, and pulls your mail in reliably.</div>
+    <button class="btn" style="width:100%;justify-content:center;gap:9px;padding:11px;border:1px solid var(--line);background:#fff;color:#3c4043;font-weight:600;font-size:13.5px" onclick="msConnect()"><svg width="17" height="17" viewBox="0 0 23 23" style="flex:none"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>Sign in with Microsoft (Outlook)</button>
     <details style="margin:10px 0 0"><summary style="cursor:pointer;font-size:12.5px;color:var(--muted);font-weight:600">Other mailbox with a password (IMAP)</summary>
       <div style="font-size:12px;color:var(--muted);margin:8px 0 8px;line-height:1.5">For Outlook, cPanel or custom domains. Note: some hosts block outside access or need an app password — if it won’t connect, use forwarding above, it always works.</div>
       <label>Email address</label><input id="em-addr" type="email" placeholder="you@yourcompany.com" autocomplete="off">
@@ -3651,8 +3651,8 @@ function inboxListHtml(){
       <div style="font-size:13.5px;font-weight:${(isE||isR)?'700':'400'};margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)||'(no content)'}</div>
       ${open?`<div style="font-size:13px;margin-top:5px;white-space:pre-wrap;word-break:break-word">${esc(P.body)||'(no text)'}</div>`:(isE&&P.body?`<div style="font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(P.body.slice(0,120))}${P.body.length>120?'…':''}</div>`:'')}
       </div>
-      ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11.5px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
-      ${i.platform==='whatsapp'?`<div style="display:flex;gap:6px;margin-top:6px"><input id="wa-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12.5px;padding:5px 9px;border:1px solid var(--line);border-radius:7px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${i.author_external_id||''}')"><button class="btn accent sm" style="flex:none" onclick="waReply('${i.id}','${i.author_external_id||''}')">Send</button></div>`:''}
+      ${/^https?:\/\//i.test(i.permalink||'')?`<a href="${esc(i.permalink)}" target="_blank" rel="noopener" style="font-size:11.5px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
+      ${i.platform==='whatsapp'?`<div style="display:flex;gap:6px;margin-top:6px"><input id="wa-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12.5px;padding:5px 9px;border:1px solid var(--line);border-radius:7px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${(i.author_external_id||'').replace(/[^0-9+]/g,'')}')"><button class="btn accent sm" style="flex:none" onclick="waReply('${i.id}','${(i.author_external_id||'').replace(/[^0-9+]/g,'')}')">Send</button></div>`:''}
       ${inboxReplyBox(i,'soc-reply-')}
     </div>
     <div style="display:flex;gap:6px;flex:none">
@@ -3692,9 +3692,9 @@ function boardInboxBody(boardId){
     <div style="display:flex;gap:5px;align-items:center;margin-top:4px">
       ${i.status!=='answered'?`<button class="btn ghost sm" style="padding:2px 7px;font-size:11px" onclick="inboxSet('${i.id}','answered')">✓ Done</button>`:'<span style="font-size:10.5px;color:var(--ok);font-weight:700">answered</span>'}
       <button class="btn ghost sm" style="padding:2px 7px;font-size:11px;color:var(--muted)" onclick="inboxSet('${i.id}','dismissed')">Dismiss</button>
-      ${i.permalink?`<a href="${i.permalink}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
+      ${/^https?:\/\//i.test(i.permalink||'')?`<a href="${esc(i.permalink)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent);font-weight:700">Open ↗</a>`:''}
     </div>
-    ${i.platform==='whatsapp'?`<div style="display:flex;gap:5px;margin-top:5px"><input id="wab-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${i.author_external_id||''}','wab-reply-')"><button class="btn accent sm" style="padding:2px 9px;font-size:11px" onclick="waReply('${i.id}','${i.author_external_id||''}','wab-reply-')">Send</button></div>`:''}
+    ${i.platform==='whatsapp'?`<div style="display:flex;gap:5px;margin-top:5px"><input id="wab-reply-${i.id}" placeholder="Reply on WhatsApp…" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key==='Enter')waReply('${i.id}','${(i.author_external_id||'').replace(/[^0-9+]/g,'')}','wab-reply-')"><button class="btn accent sm" style="padding:2px 9px;font-size:11px" onclick="waReply('${i.id}','${(i.author_external_id||'').replace(/[^0-9+]/g,'')}','wab-reply-')">Send</button></div>`:''}
     ${inboxReplyBox(i,'socb-reply-')}
   </div>`;}).join('');
 }
@@ -5335,7 +5335,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     rows=rows.slice(0,12);
     if(!rows.length) return head+`<div class="dw-mute" style="padding:10px 0">${kw?'No mentions matching that keyword yet.':'No mentions yet. Comments and messages from your connected accounts show up here — add a keyword in ⚙ to track a specific term.'}</div>`;
     const list=rows.map(r=>{ const plat=PLATS()[r.platform]||['','#8a887e']; const rel=relTime(new Date(r.received_at));
-      return `<div class="dw-ag" ${r.permalink?`onclick="window.open('${encodeURI(r.permalink)}','_blank')"`:''} style="cursor:${r.permalink?'pointer':'default'}"><div class="dw-what"><div class="t"><span class="dw-dot" style="background:${plat[1]||'#8a887e'}"></span> ${E(r.author_name||'Someone')}</div><div class="m" style="white-space:normal">${E((r.text||'').slice(0,90))}</div></div><div class="dw-mute" style="font-size:10px;margin-left:auto;flex:0 0 auto">${rel}</div></div>`; }).join('');
+      return `<div class="dw-ag" ${/^https?:\/\//i.test(r.permalink||'')?`onclick="window.open('${encodeURI(r.permalink).replace(/'/g,'%27')}','_blank')"`:''} style="cursor:${r.permalink?'pointer':'default'}"><div class="dw-what"><div class="t"><span class="dw-dot" style="background:${plat[1]||'#8a887e'}"></span> ${E(r.author_name||'Someone')}</div><div class="m" style="white-space:normal">${E((r.text||'').slice(0,90))}</div></div><div class="dw-mute" style="font-size:10px;margin-left:auto;flex:0 0 auto">${rel}</div></div>`; }).join('');
     return head+list;
   }
 
