@@ -5693,10 +5693,10 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   /* ============ GRIDSTACK LIB LOADER ============ */
   function ensureLib(cb){
     if(window.GridStack) return cb();
-    if(!document.getElementById('gs-css')){ const l=document.createElement('link'); l.id='gs-css'; l.rel='stylesheet'; l.href='https://cdnjs.cloudflare.com/ajax/libs/gridstack.js/10.3.1/gridstack.min.css'; document.head.appendChild(l); }
+    if(!document.getElementById('gs-css')){ const l=document.createElement('link'); l.id='gs-css'; l.rel='stylesheet'; l.href='https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css'; l.integrity='sha512-GEMqAs1Ai2iirp6QhD4N5Qt7tDn1RGgF1CY2xp57LrX3vqTDehSC88IOFewV/L84htjbN7aazcK10FyzH+eXSA=='; l.crossOrigin='anonymous'; document.head.appendChild(l); }
     let s=document.getElementById('gs-js');
     if(s){ s.addEventListener('load',cb); return; }
-    s=document.createElement('script'); s.id='gs-js'; s.src='https://cdnjs.cloudflare.com/ajax/libs/gridstack.js/10.3.1/gridstack-all.min.js';
+    s=document.createElement('script'); s.id='gs-js'; s.src='https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js'; s.integrity='sha512-X49wbrHlo7n7LXH7jbzFZ+UHQStMZfrYZl1ikEL7P3sMrbPgz60IfV6NTPgtxCYDlD9wz4ksNxufnmlpIrFqJA=='; s.crossOrigin='anonymous';
     s.onload=cb; s.onerror=()=>{ const g=document.getElementById('dashGrid'); if(g) g.innerHTML='<div class="dw-mute" style="padding:24px">Couldn’t load the dashboard engine. Check your connection and refresh.</div>'; };
     document.head.appendChild(s);
   }
