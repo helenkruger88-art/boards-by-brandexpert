@@ -4433,7 +4433,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     mentions: {icon:'👂', name:'Mentions',             desc:'What people are saying — mentions & conversations across your connected accounts.', w:4,h:4},
     trends:   {icon:'#️⃣', name:'Hashtags',             desc:'Your most-used hashtags plus a watchlist of tags to keep an eye on.', w:4,h:4},
     sitehealth:{icon:'🩺', name:'Site health',         desc:'Uptime, response time and SSL-certificate expiry for a website.', w:4,h:3},
-    ai:       {icon:'🤖', name:'AI widget',            desc:'Describe anything and AI builds the tile — a routine, live stock/crypto prices, or a summary of your own data.', w:4,h:4}
+    ai:       {icon:'🤖', name:'AI widget',            desc:'Describe anything and AI builds the tile — a routine, live info from the web (stocks, crypto, rates, news), or a summary of your own data.', w:4,h:4}
   };
   const GOAL_SRC = {
     revenue:    {label:'Revenue (this month)',        metric:'revenue',    fmt:money},
@@ -4447,7 +4447,22 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
   const CHANNELS = [['all','All channels'],['facebook','Facebook'],['instagram','Instagram'],['whatsapp','WhatsApp'],['email','Email'],['linkedin','LinkedIn']];
   // WMO weather codes -> [label, emoji]
   const WMO = {0:['Clear sky','☀️'],1:['Mainly clear','🌤️'],2:['Partly cloudy','⛅'],3:['Overcast','☁️'],45:['Fog','🌫️'],48:['Rime fog','🌫️'],51:['Light drizzle','🌦️'],53:['Drizzle','🌦️'],55:['Heavy drizzle','🌦️'],56:['Freezing drizzle','🌧️'],57:['Freezing drizzle','🌧️'],61:['Light rain','🌦️'],63:['Rain','🌧️'],65:['Heavy rain','🌧️'],66:['Freezing rain','🌧️'],67:['Freezing rain','🌧️'],71:['Light snow','🌨️'],73:['Snow','🌨️'],75:['Heavy snow','❄️'],77:['Snow grains','🌨️'],80:['Rain showers','🌦️'],81:['Rain showers','🌧️'],82:['Violent showers','⛈️'],85:['Snow showers','🌨️'],86:['Snow showers','🌨️'],95:['Thunderstorm','⛈️'],96:['Thunderstorm + hail','⛈️'],99:['Thunderstorm + hail','⛈️']};
-  const COMMON_TZ = [['Cape Town','Africa/Johannesburg'],['London','Europe/London'],['New York','America/New_York'],['Los Angeles','America/Los_Angeles'],['Chicago','America/Chicago'],['Toronto','America/Toronto'],['São Paulo','America/Sao_Paulo'],['Dubai','Asia/Dubai'],['Mumbai','Asia/Kolkata'],['Singapore','Asia/Singapore'],['Hong Kong','Asia/Hong_Kong'],['Tokyo','Asia/Tokyo'],['Sydney','Australia/Sydney'],['Paris','Europe/Paris'],['Berlin','Europe/Berlin'],['Nairobi','Africa/Nairobi'],['Lagos','Africa/Lagos'],['Auckland','Pacific/Auckland']];
+  const COMMON_TZ = [
+    // Africa
+    ['Cape Town','Africa/Johannesburg'],['Johannesburg','Africa/Johannesburg'],['Nairobi','Africa/Nairobi'],['Lagos','Africa/Lagos'],['Cairo','Africa/Cairo'],['Casablanca','Africa/Casablanca'],['Accra','Africa/Accra'],['Windhoek','Africa/Windhoek'],['Addis Ababa','Africa/Addis_Ababa'],['Tunis','Africa/Tunis'],
+    // Europe
+    ['Lisbon','Europe/Lisbon'],['London','Europe/London'],['Dublin','Europe/Dublin'],['Madrid','Europe/Madrid'],['Paris','Europe/Paris'],['Amsterdam','Europe/Amsterdam'],['Brussels','Europe/Brussels'],['Berlin','Europe/Berlin'],['Zurich','Europe/Zurich'],['Rome','Europe/Rome'],['Vienna','Europe/Vienna'],['Prague','Europe/Prague'],['Stockholm','Europe/Stockholm'],['Oslo','Europe/Oslo'],['Copenhagen','Europe/Copenhagen'],['Helsinki','Europe/Helsinki'],['Warsaw','Europe/Warsaw'],['Athens','Europe/Athens'],['Bucharest','Europe/Bucharest'],['Istanbul','Europe/Istanbul'],['Moscow','Europe/Moscow'],
+    // Middle East
+    ['Dubai','Asia/Dubai'],['Abu Dhabi','Asia/Dubai'],['Riyadh','Asia/Riyadh'],['Doha','Asia/Qatar'],['Tel Aviv','Asia/Jerusalem'],['Tehran','Asia/Tehran'],
+    // Asia
+    ['Karachi','Asia/Karachi'],['Mumbai','Asia/Kolkata'],['New Delhi','Asia/Kolkata'],['Colombo','Asia/Colombo'],['Dhaka','Asia/Dhaka'],['Bangkok','Asia/Bangkok'],['Jakarta','Asia/Jakarta'],['Singapore','Asia/Singapore'],['Kuala Lumpur','Asia/Kuala_Lumpur'],['Manila','Asia/Manila'],['Hong Kong','Asia/Hong_Kong'],['Shanghai','Asia/Shanghai'],['Beijing','Asia/Shanghai'],['Taipei','Asia/Taipei'],['Seoul','Asia/Seoul'],['Tokyo','Asia/Tokyo'],
+    // Oceania
+    ['Perth','Australia/Perth'],['Adelaide','Australia/Adelaide'],['Brisbane','Australia/Brisbane'],['Melbourne','Australia/Melbourne'],['Sydney','Australia/Sydney'],['Auckland','Pacific/Auckland'],['Fiji','Pacific/Fiji'],['Honolulu','Pacific/Honolulu'],
+    // Americas
+    ['Los Angeles','America/Los_Angeles'],['Vancouver','America/Vancouver'],['Denver','America/Denver'],['Phoenix','America/Phoenix'],['Chicago','America/Chicago'],['Mexico City','America/Mexico_City'],['New York','America/New_York'],['Toronto','America/Toronto'],['Bogotá','America/Bogota'],['Lima','America/Lima'],['Santiago','America/Santiago'],['Buenos Aires','America/Argentina/Buenos_Aires'],['São Paulo','America/Sao_Paulo'],['Rio de Janeiro','America/Sao_Paulo'],
+    // Reference
+    ['UTC','UTC']
+  ];
   const QUOTES = [
     ['Content builds relationships. Relationships build trust. Trust drives revenue.','Andrew Davis'],
     ['Marketing is no longer about the stuff you make, but the stories you tell.','Seth Godin'],
@@ -5483,10 +5498,10 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
     });
     closeUl(); return html;
   }
-  const AI_TOOL_LBL={get_stock_quote:'stocks',get_crypto_price:'crypto',get_my_data:'your data'};
+  const AI_TOOL_LBL={get_stock_quote:'stocks',get_crypto_price:'crypto',get_my_data:'your data',web_search:'web'};
   function aiBody(w){
     const cfg=w.cfg||{};
-    if(!cfg.prompt) return `<div class="dw-connect" style="padding:14px 6px"><p class="dw-mute">Describe anything and AI builds this tile — a daily routine, live stock or crypto prices, or a summary of your own data.</p><button class="btn accent" onclick="dashConfig('${w.id}')">Describe it</button></div>`;
+    if(!cfg.prompt) return `<div class="dw-connect" style="padding:14px 6px"><p class="dw-mute">Describe anything and AI builds this tile — a daily routine, live info from the web (stocks, crypto, rates, news), or a summary of your own data.</p><button class="btn accent" onclick="dashConfig('${w.id}')">Describe it</button></div>`;
     if(_aiBusy[w.id]) return `<div class="dw-srcbadge">🤖 ${E(cfg.title||'AI')}</div><div class="dw-mute" style="padding:10px 0">Thinking…</div>`;
     if(cfg._err&&!cfg._content) return `<div class="dw-srcbadge">🤖 AI</div><div class="dw-mute" style="padding:10px 0">${E(cfg._err)}</div><div style="margin-top:8px"><button class="btn ghost sm" onclick="dashAiGen('${w.id}')">↻ Try again</button></div>`;
     if(!cfg._content){ setTimeout(()=>dashAiGen(w.id),40); return `<div class="dw-srcbadge">🤖 ${E(cfg.title||'AI')}</div><div class="dw-mute" style="padding:10px 0">Generating…</div>`; }
@@ -5616,7 +5631,7 @@ body:not(.dash-editing) .grid-stack>.grid-stack-item>.ui-resizable-handle{displa
         <div class="dw-fld"><label>Refresh</label><div class="dw-seg" id="ai_auto">
           <button data-v="0" class="${!cfg.auto?'on':''}">Manual</button>
           <button data-v="1" class="${cfg.auto?'on':''}">Daily</button></div></div>
-        <div class="dw-hint">AI can write any content, pull live stock &amp; crypto prices, and summarise your own Boards data. Manual = a refresh button; Daily = regenerates once a day. This uses your AI credits, so keep refreshes reasonable.</div>`;
+        <div class="dw-hint">AI can write any content, look things up live on the web (stocks, crypto, exchange rates, news &amp; facts), and summarise your own Boards data. Manual = a refresh button; Daily = regenerates once a day. This uses your AI credits, so keep refreshes reasonable.</div>`;
     } else {
       s+=`<div class="dw-hint">No other settings — the header and colour above are all yours.</div>`;
     }
