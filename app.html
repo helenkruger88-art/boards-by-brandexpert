@@ -3175,7 +3175,7 @@ function inboxConnectsHtml(){
     icons.push(`<span class="socic" title="${prov} connected: ${esc(a.email)}${bad?' — connection error, open Email setup':' — receiving mail'}" onclick="openEmailConnect()" style="cursor:pointer${bad?';outline:1.5px solid var(--danger);outline-offset:1px;border-radius:6px':''}">${platBadge('email',24)}${bad?'<b class="x" style="background:var(--danger)">!</b>':'<b class="x" style="background:var(--ok)">✓</b>'}</span>`);
   }
   if(WS&&WS.inbox_handle){
-    icons.push(`<span class="socic" title="Forwarding address: ${esc(WS.inbox_handle)}@in.brandexpert.co.za — click to copy, then forward your mail here" onclick="copyEmailInbox()" style="cursor:pointer">${platBadge('email',24)}</span>`);
+    icons.push(`<span class="socic" title="This project's forwarding address: ${esc(boardInboxAddr(S.board))} — click to copy, then forward this project's mail here" onclick="copyEmailInbox()" style="cursor:pointer">${platBadge('email',24)}</span>`);
   }
   for(const s of (_reviewSrcs||[])){
     const bad=s.status==='error';
@@ -3209,9 +3209,10 @@ async function inboxDisconnect(pl){
     await loadInboxConnects(); toast('Disconnected');
   }catch(e){fail(e);}
 }
+function boardInboxAddr(boardId){ if(!WS||!WS.inbox_handle)return ''; const b=BOARDS.find(x=>x.id===boardId); const slug=b&&b.inbox_slug?b.inbox_slug:''; return WS.inbox_handle+(slug?'+'+slug:'')+'@in.brandexpert.co.za'; }
 function copyEmailInbox(){
-  if(!WS||!WS.inbox_handle)return;
-  const addr=WS.inbox_handle+'@in.brandexpert.co.za';
+  const addr=boardInboxAddr(S.board)||(WS&&WS.inbox_handle?WS.inbox_handle+'@in.brandexpert.co.za':'');
+  if(!addr)return;
   try{navigator.clipboard.writeText(addr);toast('Email address copied: '+addr);}catch(_){toast(addr);}
 }
 /* ---- Connect your own mailbox over IMAP ---- */
@@ -3280,7 +3281,7 @@ async function msConnect(){
 let _emDetect=null;
 async function openEmailConnect(){ _emDetect=null; const accs=await emailApi({action:'list'}); emailShowForm((accs&&accs.accounts)||[]); }
 function emailShowForm(accounts){
-  const fwd=(WS&&WS.inbox_handle)?WS.inbox_handle+'@in.brandexpert.co.za':'';
+  const fwd=boardInboxAddr(S.board);
   const acctRow=a=>{
     const prov=a.oauth_provider==='microsoft'?'Microsoft':((a.oauth_provider==='google'||a.imap_host==='imap.gmail.com')?'Google':'IMAP');
     const bad=a.status==='error';
@@ -3294,8 +3295,8 @@ function emailShowForm(accounts){
   openModal(`<h3>Email setup</h3>
     ${accounts.length?`<label>Connected mailboxes</label>${accounts.map(acctRow).join('')}<div style="height:12px"></div>`:'<div style="font-size:13px;color:var(--muted);margin:2px 0 12px;line-height:1.5">Get your email landing in this project’s Inbox. Pick whichever is easiest — forwarding needs no password and works everywhere.</div>'}
     ${fwd?`<div style="border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-bottom:12px;background:#F6FBF7">
-      <div style="font-weight:800;font-size:13px;margin-bottom:3px">Easiest — forward your mail here (no password)</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">Works with any provider. In your email account settings, add a forwarding rule to this address — new mail then lands here automatically:</div>
+      <div style="font-weight:800;font-size:13px;margin-bottom:3px">Easiest — forward this project’s mail here (no password)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">Each project has its own address, so mail forwarded here lands in <b>this project only</b>. In your email account settings, add a forwarding rule to this address:</div>
       <div style="display:flex;gap:7px;align-items:center">
         <code style="flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(fwd)}</code>
         <button class="btn ghost sm" onclick="copyEmailInbox()">Copy</button>
@@ -3723,7 +3724,7 @@ function boardInboxHtml(boardId){
   </div>`;
 }
 function boardInboxBody(boardId){
-  const rows=(_inbox||[]).filter(i=>(i.board_id===boardId||(!i.board_id&&(i.platform==='whatsapp'||i.platform==='email')))&&i.status!=='dismissed');
+  const rows=(_inbox||[]).filter(i=>(i.board_id===boardId||(!i.board_id&&i.platform==='whatsapp'))&&i.status!=='dismissed');
   if(!rows.length)return '<div class="empty" style="padding:20px 8px;text-align:center;font-size:12px">No messages yet.<br>New comments on this project&rsquo;s connected pages will land here.</div>';
   return rows.map(i=>{const P=emlParts(i);const open=_inboxOpen.has(i.id);const isE=i.platform==='email';const isR=i.kind==='review';const title=isE?(P.subj||'(no subject)'):P.body;return `<div style="border-left:3px solid ${(PLAT[i.platform]||PLAT.other)[1]};padding:7px 9px;margin-bottom:7px;background:var(--panel,#F4F3EE);border-radius:7px">
     <div onclick="inboxToggle('${i.id}')" style="cursor:pointer">
