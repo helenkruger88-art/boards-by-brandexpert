@@ -318,6 +318,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const Rand=v=>'R'+Number(v||0).toLocaleString('en-ZA',{maximumFractionDigits:0});
 const saDate=()=>new Date(Date.now()+2*3600*1000).toISOString().slice(0,10);
+const saTime=()=>new Date(Date.now()+2*3600*1000).toISOString().slice(11,16);
 function tint(hex,pct){const n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;
   const m=c=>Math.round(c+(255-c)*(1-pct/100)); return `rgb(${m(r)},${m(g)},${m(b)})`;}
 function ago(ts){const s=(Date.now()-new Date(ts))/1e3;
@@ -2436,32 +2437,24 @@ function postModal(id,dateStr){
     <input type="file" id="po-file" accept="image/*,video/mp4,video/quicktime" multiple style="display:none" onchange="uploadPostMedia(this.files)">
     <button type="button" class="btn ghost sm" onclick="document.getElementById('po-file').click()">＋ Add images / video</button>
     <span id="po-upl" style="font-size:11.5px;color:var(--muted);margin-left:8px"></span>
-    <div style="display:flex;gap:10px">
-      <div style="flex:1"><label>Date</label><input type="date" id="po-date" value="${p?p.post_date:(dateStr||saDate())}" onchange="postBtnSync()"></div>
-      <div style="width:110px"><label>Time</label><input type="time" id="po-time" value="${p?(p.post_time||'09:00').slice(0,5):'09:00'}" onchange="postBtnSync()"></div>
+    <div id="po-when" ${p?'':'hidden'} style="display:flex;gap:10px">
+      <div style="flex:1"><label>Date</label><input type="date" id="po-date" value="${p?p.post_date:(dateStr||saDate())}"></div>
+      <div style="width:110px"><label>Time</label><input type="time" id="po-time" value="${p?(p.post_time||'09:00').slice(0,5):'09:00'}"></div>
     </div>
     ${p&&p.postpeer_id?`<div id="po-stats" style="display:flex;gap:14px;flex-wrap:wrap;background:var(--panel,#F4F3EE);border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:var(--muted)">Loading stats…${(()=>{setTimeout(()=>postStats(p.id),80);return '';})()}</div>`:''}
-    ${p&&p.status==='failed'&&p.stats&&p.stats._sched?`<div style="background:#FDECEA;border:1px solid #F5C6CB;border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:#8A1C1C">⚠ Auto-post failed: ${esc(p.stats._sched.last_error||'unknown error')}. Fix the issue, set the status back to Approved, then Auto-post again.</div>`:''}
+    ${p&&p.status==='failed'&&p.stats&&p.stats._sched?`<div style="background:#FDECEA;border:1px solid #F5C6CB;border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:#8A1C1C">⚠ Auto-post failed: ${esc(p.stats._sched.last_error||'unknown error')}. Fix the issue, then press ↗ Post now to try immediately, or 📅 Schedule to queue it again.</div>`:''}
     ${p&&p.platform==='tiktok'&&p.status==='posted'?`<div style="background:#FFF7E6;border:1px solid #F0D9A8;border-radius:9px;padding:9px 12px;margin:4px 0 2px;font-size:12px;color:#8a5a00;line-height:1.5">📥 <b>Uploaded to TikTok as a draft.</b> Open the TikTok app (signed in as your connected account) → Notifications / Inbox, or ＋ Create → Drafts → confirm the caption and tap Post. TikTok doesn't let apps publish directly until its Direct Post audit is approved.</div>`:''}
-    <label>Status</label>
-    <select id="po-status" onchange="postBtnSync()">
-      <option value="draft" ${!p||p.status==='draft'?'selected':''}>Draft</option>
-      <option value="approved" ${p&&p.status==='approved'?'selected':''}>Approved — ready to post</option>
-      <option value="scheduled" ${p&&p.status==='scheduled'?'selected':''}>Scheduled — waiting to auto-post</option>
-      <option value="posted" ${p&&p.status==='posted'?'selected':''}>${p&&p.platform==='tiktok'?'Uploaded — draft on TikTok':'Posted'}</option>
-      ${p&&p.status==='failed'?`<option value="failed" selected>Failed — needs attention</option>`:''}
-    </select>
+    <input type="hidden" id="po-status" value="${p?p.status:'draft'}">
     <div class="row">
       ${p?`<button class="btn ghost" style="margin-right:auto;color:var(--danger)" onclick="delPost('${p.id}')">${ic('trash',13)}</button>`:''}
       ${p?`<button class="btn ghost" onclick="copyCaption('${p.id}')">Copy caption</button>`:''}
       ${p?`<button class="btn ghost" onclick="dupModal('${p.id}')" title="Create copies of this post for other platforms — tweak each caption before it goes out">⧉ Also post on…</button>`:''}
-      ${canManage()&&paidAI()&&(!p||p.status!=='posted')?`<button class="btn ghost" onclick="postNowComposer(${p?`'${p.id}'`:'null'})" title="Publish right now — Facebook, Instagram & Threads go live; TikTok uploads to your inbox as a draft to caption & publish in the app">↗ Post now</button>`:''}
-      ${p&&paidAI()&&p.status!=='posted'&&p.platform!=='other'&&['youtube','linkedin'].includes(p.platform)?`<button class="btn ghost" onclick="publishPost('${p.id}')" title="Register this post to auto-post at its date/time">⏱ Auto-post</button>`:''}
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn accent" id="po-save" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save':'Add to calendar'}</button>
+      <button class="btn ghost" id="po-save" onclick="savePost(${p?`'${p.id}'`:'null'})">${p?'Save changes':'Save draft'}</button>
+      ${(!p||p.status!=='posted')?`<button class="btn ghost" id="po-sched" onclick="schedFlow(${p?`'${p.id}'`:'null'})" title="Pick a date &amp; time and it posts itself">📅 Schedule</button>`:''}
+      ${canManage()&&paidAI()&&(!p||p.status!=='posted')?`<button class="btn accent" id="po-now" onclick="postNowComposer(${p?`'${p.id}'`:'null'})" title="Publish right now — works for every connected platform">↗ Post now</button>`:''}
     </div>
-    <div id="po-hint" style="font-size:11.5px;color:var(--muted);margin:9px 2px 0;line-height:1.45;text-align:right"></div>`);
-  setTimeout(postBtnSync,20);
+    <div id="po-hint" style="font-size:11.5px;color:var(--muted);margin:9px 2px 0;line-height:1.45;text-align:right">${p&&p.status==='scheduled'?'Scheduled for '+(p.post_time||'09:00').slice(0,5)+' on '+p.post_date+'.':(p?'':'Save it as a draft, pick 📅 Schedule to set a date &amp; time, or ↗ Post now to publish immediately.')}</div>`);
 }
 function postBtnSync(){
   const sel=document.getElementById('po-status'); if(!sel)return;
@@ -2532,7 +2525,8 @@ async function savePost(id){
   try{
     if(id){const {error}=await sb.from('bbe_posts').update(row).eq('id',id);if(error)throw error;}
     else{const {error}=await sb.from('bbe_posts').insert(row);if(error)throw error;}
-    closeModal();await loadBoard();render();toast(id?'Post updated':'On the calendar');
+    closeModal();await loadBoard();render();
+    toast(id?'Changes saved':(row.status==='scheduled'?'On the calendar':'Saved as a draft'));
   }catch(e){fail(e);}
 }
 // Publish IMMEDIATELY from the composer — works on a brand-new (unsaved) post too.
@@ -2543,8 +2537,48 @@ async function postNowComposer(existingId){
   const caption=$('po-cap').value.trim();
   const media=_postMedia.filter(m=>m&&m.url);
   const nm=(PLAT[platform]||PLAT.other)[0];
+  // YouTube uploads DIRECTLY through our own OAuth app (bbe-youtube-post → youtube.upload).
+  if(platform==='youtube'){
+    const vid=media.find(m=>m.type==='video');
+    if(!vid){toast('YouTube needs a video attached — add one under Images / video first.');return;}
+    if(!confirm('Upload this video to your YouTube channel now?'))return;
+    const rowY={workspace_id:WS.id,board_id:S.board,platform:'youtube',caption,media_note:$('po-media').value.trim(),
+      post_date:$('po-date').value||saDate(),post_time:($('po-time').value||saTime()),created_by:SESSION.user.id,media:_postMedia};
+    let idY=existingId||null;
+    try{
+      if(idY){const {error}=await sb.from('bbe_posts').update(rowY).eq('id',idY);if(error)throw error;}
+      else{const {data,error}=await sb.from('bbe_posts').insert(rowY).select('id').single();if(error)throw error;idY=data.id;}
+    }catch(e){fail(e);return;}
+    try{
+      toast('Uploading to YouTube…');
+      const j=await ytPostApi({action:'publish',board_id:S.board,caption,video_url:vid.url,privacy:'public'});
+      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',idY);
+      closeModal();await loadBoard();render();
+      toast('Uploaded to YouTube — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
+    }catch(e){fail(e);}
+    return;
+  }
+  // Other non-native platforms (LinkedIn, etc.) publish through the scheduler
+  // (the same path the app already uses).
   if(!['facebook','instagram','threads','tiktok'].includes(platform)){
-    toast('Post now works for Facebook, Instagram, Threads and TikTok. For '+nm+', set the status to Scheduled instead.');return;
+    if(!confirm('Publish this to '+nm+' now?'))return;
+    const row0={workspace_id:WS.id,board_id:S.board,platform,caption,media_note:$('po-media').value.trim(),
+      post_date:$('po-date').value||saDate(),post_time:($('po-time').value||saTime()),created_by:SESSION.user.id,media:_postMedia};
+    let id0=existingId||null;
+    try{
+      if(id0){const {error}=await sb.from('bbe_posts').update(row0).eq('id',id0);if(error)throw error;}
+      else{const {data,error}=await sb.from('bbe_posts').insert(row0).select('id').single();if(error)throw error;id0=data.id;}
+    }catch(e){fail(e);return;}
+    try{
+      toast('Publishing to '+nm+'…');
+      const j=await socialApi({action:'publish',post_id:id0});
+      if(j&&j.error==='NO_ACCOUNTS'){toast(j.message||('Connect '+nm+' first'));return;}
+      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      closeModal();await loadBoard();render();
+      toast(j&&j.scheduled?('⏱ '+nm+' upload is processing in the background — it will appear shortly'):('Posted to '+nm+' — live now'));
+    }catch(e){fail(e);}
+    return;
   }
   if(platform==='tiktok'&&!media.find(m=>m.type==='video')){toast('TikTok needs a video attached — add one under Images / video first.');return;}
   if(platform==='instagram'&&!media.find(m=>m.type==='image'||m.type==='video')){toast('Instagram needs an image or video attached first.');return;}
@@ -2589,6 +2623,54 @@ async function postNowComposer(existingId){
     else toast('Posted to '+nm+' — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
   }catch(e){fail(e);}
 }
+// Two-step Schedule: first press reveals the date/time, second press commits.
+function schedFlow(id){
+  const wrap=$('po-when'), btn=$('po-sched');
+  if(wrap&&wrap.hasAttribute('hidden')){
+    wrap.removeAttribute('hidden');
+    const d=$('po-date'); if(d&&!d.value)d.value=saDate();
+    if(btn){btn.textContent='✓ Confirm schedule';btn.classList.remove('ghost');btn.classList.add('accent');}
+    const hint=$('po-hint'); if(hint)hint.textContent='Pick the date and time above, then press ✓ Confirm schedule.';
+    if(d)d.focus();
+    return;
+  }
+  scheduleComposer(id);
+}
+// Save the post as scheduled and register it so it auto-posts at the set time.
+// Reuses the same publish paths the app already uses per platform.
+async function scheduleComposer(existingId){
+  const platform=$('po-plat').value;
+  const nm=(PLAT[platform]||PLAT.other)[0];
+  const caption=$('po-cap').value.trim();
+  const media=_postMedia.filter(m=>m&&m.url);
+  if(!$('po-date').value){toast('Pick a date to schedule');return;}
+  if(platform==='youtube'&&!media.find(m=>m.type==='video')){toast('YouTube needs a video attached to schedule.');return;}
+  if(platform==='tiktok'&&!media.find(m=>m.type==='video')){toast('TikTok needs a video attached to schedule.');return;}
+  if(platform==='instagram'&&!media.find(m=>m.type==='image'||m.type==='video')){toast('Instagram needs an image or video to schedule.');return;}
+  const row={workspace_id:WS.id,board_id:S.board,platform,caption,media_note:$('po-media').value.trim(),
+    post_date:$('po-date').value,post_time:($('po-time').value||'09:00'),status:'scheduled',created_by:SESSION.user.id,media:_postMedia};
+  let id=existingId||null;
+  try{
+    if(id){const {error}=await sb.from('bbe_posts').update(row).eq('id',id);if(error)throw error;}
+    else{const {data,error}=await sb.from('bbe_posts').insert(row).select('id').single();if(error)throw error;id=data.id;}
+  }catch(e){fail(e);return;}
+  const when=(row.post_time||'09:00').slice(0,5)+' on '+row.post_date;
+  // Facebook / Instagram / Threads / TikTok auto-post from a cron once status is 'scheduled'.
+  // YouTube also auto-posts from a cron (bbe-youtube-post run_due), uploading directly
+  // via youtube.upload at the set time — no PostPeer registration needed.
+  if(['facebook','instagram','threads','tiktok','youtube'].includes(platform)){
+    closeModal();await loadBoard();render();
+    toast('⏱ Scheduled — it posts itself at '+when);return;
+  }
+  // LinkedIn / others register with the PostPeer scheduler.
+  try{
+    const j=await socialApi({action:'publish',post_id:id});
+    if(j&&j.error==='NO_ACCOUNTS'){toast(j.message||('Connect '+nm+' first'));return;}
+    if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+    closeModal();await loadBoard();render();
+    toast('⏱ Scheduled — '+nm+' posts itself at '+when);
+  }catch(e){fail(e);}
+}
 async function delPost(id){
   const p=(cur.posts||[]).find(x=>x.id===id);
   try{await sb.from('bbe_posts').delete().eq('id',id);const copy={...p};cur.posts=cur.posts.filter(x=>x.id!==id);closeModal();render();
@@ -2608,7 +2690,7 @@ let _directNames={}; // platform -> connected account name/handle (best effort, 
 // These platforms post ONLY through our own apps (bbe-meta / bbe-threads / bbe-tiktok),
 // tracked in bbe_platform_links. A leftover PostPeer "account" for one of them can no longer
 // post, so we never treat PostPeer as the source of truth for these — only a direct link counts.
-const DIRECT_SET=['facebook','instagram','threads','tiktok'];
+const DIRECT_SET=['facebook','instagram','threads','tiktok','youtube'];
 // Is `pl` connected for THIS board in a way that can actually post right now?
 function platConnected(pl){
   if(DIRECT_SET.includes(pl))return (_directPlatforms||[]).includes(pl);
@@ -2697,6 +2779,7 @@ async function directDisconnect(pl){
     let j;
     if(pl==='tiktok')j=await ttApi({action:'disconnect',board_id:S.board});
     else if(pl==='threads')j=await thApi({action:'disconnect',board_id:S.board});
+    else if(pl==='youtube')j=await ytPostApi({action:'disconnect',board_id:S.board});
     else if(metaPair)j=await metaApi({action:'disconnect',board_id:S.board});
     else return;
     if(j&&j.error){toast(j.message||j.error);return;}
@@ -2717,11 +2800,12 @@ async function connectSocial(platform){
   // so a later publishPost() finds the matching direct link.
   if(platform==='threads'){ return thConnect(); }
   if(platform==='tiktok'){ return ttConnect(); }
-  // YouTube posting + analytics stay on PostPeer (avoids Google's CASA security
-  // assessment, which is only triggered by uploading through our own server).
-  // YouTube COMMENTS come through Brand Expert separately via the by-handle reader
-  // (see the Inbox "Connect YouTube" affordance -> ytConnect). LinkedIn / X / anything
-  // else also keeps the existing PostPeer path untouched.
+  // YouTube posts DIRECTLY through our own OAuth app (bbe-youtube-post) using the
+  // youtube.upload scope — the consent screen shows exactly the scopes we request,
+  // and publishPost()/postNowComposer() upload straight to the connected channel.
+  // (YouTube COMMENTS still come through the by-handle reader separately -> ytConnect.)
+  if(platform==='youtube'){ return ytPostConnect(); }
+  // LinkedIn / X / anything else keeps the existing PostPeer path untouched.
   try{
     const j=await socialApi({action:'connect',platform,board_id:S.board});
     if(j.error){toast(j.message||j.error);return;}
@@ -3152,6 +3236,8 @@ async function loadDirectLinks(){
   try{const j=await thApi({action:'links'}); const l=((j&&j.links)||[]).find(x=>x.board_id===board); if(l){set.add('threads'); if(nmeOf(l))names.threads=nmeOf(l);}}catch(_){}
   // TikTok (bbe-tiktok).
   try{const j=await ttApi({action:'links'}); const l=((j&&j.links)||[]).find(x=>x.board_id===board); if(l){set.add('tiktok'); if(nmeOf(l))names.tiktok=nmeOf(l);}}catch(_){}
+  // YouTube (bbe-youtube-post — direct youtube.upload OAuth).
+  try{const j=await ytPostApi({action:'links'}); const l=((j&&j.links)||[]).find(x=>x.board_id===board); if(l){set.add('youtube'); if(nmeOf(l))names.youtube=nmeOf(l);}}catch(_){}
   _directPlatforms=[...set];
   _directNames=names;
 }
