@@ -2422,6 +2422,7 @@ function calShift(n){
   _calMonth=d.toISOString().slice(0,7); render();
 }
 function postModal(id,dateStr){
+  _ytLocalFile=null; // reset any previously-picked YouTube video
   const p=id?(cur.posts||[]).find(x=>x.id===id):null;
   const _pb=BOARDS.find(x=>x.id===S.board);
   openModal(`<h3>${p?'Edit post':'New post'} <span style="font-weight:500;font-size:12.5px;color:var(--muted)">· ${esc(_pb?_pb.name:'')}</span></h3>
@@ -2499,13 +2500,36 @@ async function scoreDraft(pid){
   if(out)out.innerHTML=`<div style="margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--panel,#F4F3EE)"><div style="display:flex;align-items:center;gap:8px"><b style="color:${col};font-size:16px">${sc}/100</b><span style="font-size:12px">${esc(v.verdict||'')}</span>${r.cached?'<span style="font-size:10px;color:var(--muted)">· cached</span>':''}</div>${tips?`<ul style="margin:6px 0 0;padding-left:18px;font-size:11.5px;color:var(--muted)">${tips}</ul>`:''}</div>`;
 }
 let _postMedia=[];
+// For YouTube, the video is uploaded straight from the browser to YouTube (no size
+// cap, never stored in Supabase). We keep the local File here until Post now runs.
+let _ytLocalFile=null;
 function mediaThumb(m,ix){
   return `<span style="position:relative;display:inline-block">${m.type==='image'?`<img src="${m.url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`:`<span style="display:flex;width:64px;height:64px;border-radius:8px;background:var(--panel,#F4F3EE);align-items:center;justify-content:center;font-size:22px;border:1px solid var(--line)">🎬</span>`}
   <button type="button" onclick="_postMedia.splice(${ix},1);document.getElementById('po-thumbs').innerHTML=_postMedia.map(mediaThumb).join('')" style="position:absolute;top:-6px;right:-6px;background:var(--ink,#23241f);color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;line-height:1">✕</button></span>`;
 }
 async function uploadPostMedia(files){
   const st=document.getElementById('po-upl');
+  const platform=($('po-plat')&&$('po-plat').value)||'';
   for(const f of files){
+    // YouTube videos upload straight from the browser to YouTube on Post now — keep the
+    // File locally, don't push it to Supabase storage, and don't apply the 50MB cap.
+    if(platform==='youtube'&&f.type.startsWith('video')){
+      _ytLocalFile=f;
+      _postMedia=_postMedia.filter(m=>!m.local); // one YouTube video at a time
+      let url='';
+      // Store small videos too, so they can be SCHEDULED (the cron uploads them later).
+      // Large ones stay local-only and publish immediately via the browser (no size cap).
+      if(f.size<=50*1024*1024){
+        st.textContent='Preparing '+f.name+'…';
+        try{
+          const path=WS.id+'/'+Date.now()+'-'+f.name.replace(/[^\w.\-]+/g,'_');
+          const {error}=await sb.storage.from('post-media').upload(path,f,{upsert:true});
+          if(!error){const {data}=sb.storage.from('post-media').getPublicUrl(path);url=data.publicUrl;}
+        }catch(_){}
+      }
+      _postMedia.push({type:'video',url,local:true,name:f.name,size:f.size});
+      continue;
+    }
     if(f.size>50*1024*1024){toast(f.name+' is over 50MB');continue;}
     st.textContent='Uploading '+f.name+'…';
     const path=WS.id+'/'+Date.now()+'-'+f.name.replace(/[^\w.\-]+/g,'_');
@@ -2529,6 +2553,31 @@ async function savePost(id){
     toast(id?'Changes saved':(row.status==='scheduled'?'On the calendar':'Saved as a draft'));
   }catch(e){fail(e);}
 }
+// Stream a File straight to a YouTube RESUMABLE session URL, in chunks, from the
+// browser. No size cap — the bytes never touch our server or storage. onProgress(done,total)
+// is called as it goes. Returns the new video id.
+async function ytResumableUpload(file, sessionUrl, onProgress){
+  const CH=8*1024*1024; // 8MB chunks (a multiple of 256KB, per YouTube's resumable spec)
+  const total=file.size; let start=0, videoId=null;
+  while(start<total){
+    const end=Math.min(start+CH,total);
+    const chunk=file.slice(start,end);
+    let res;
+    try{ res=await fetch(sessionUrl,{method:'PUT',headers:{'Content-Range':'bytes '+start+'-'+(end-1)+'/'+total},body:chunk}); }
+    catch(e){ throw new Error('Network error during upload — check your connection and try again.'); }
+    if(res.status===308){ // Resume Incomplete: keep going (use the server's Range if given)
+      const range=res.headers.get('Range'); const m=range&&range.match(/bytes=0-(\d+)/);
+      start=m?Number(m[1])+1:end;
+      if(onProgress)onProgress(Math.min(start,total),total);
+    } else if(res.ok){ // 200/201 = done
+      const data=await res.json().catch(()=>({})); videoId=data.id||null;
+      if(onProgress)onProgress(total,total); break;
+    } else {
+      const t=await res.text().catch(()=> ''); throw new Error('YouTube upload failed ('+res.status+') '+t.slice(0,200));
+    }
+  }
+  return videoId;
+}
 // Publish IMMEDIATELY from the composer — works on a brand-new (unsaved) post too.
 // Facebook / Instagram / Threads go live now; TikTok uploads the video to the
 // creator's TikTok inbox as a DRAFT (Content Posting API) to caption & publish in-app.
@@ -2537,26 +2586,40 @@ async function postNowComposer(existingId){
   const caption=$('po-cap').value.trim();
   const media=_postMedia.filter(m=>m&&m.url);
   const nm=(PLAT[platform]||PLAT.other)[0];
-  // YouTube uploads DIRECTLY through our own OAuth app (bbe-youtube-post → youtube.upload).
+  // YouTube uploads DIRECTLY from the browser to YouTube — the server mints a resumable
+  // session (holding the OAuth token) and the file streams straight to Google. No size cap.
   if(platform==='youtube'){
-    const vid=media.find(m=>m.type==='video');
-    if(!vid){toast('YouTube needs a video attached — add one under Images / video first.');return;}
+    const localItem=_postMedia.find(m=>m&&m.local&&m.type==='video');
+    const urlItem=_postMedia.find(m=>m&&m.url&&m.type==='video');
+    if(!localItem&&!urlItem){toast('YouTube needs a video attached — add one under Images / video first.');return;}
     if(!confirm('Upload this video to your YouTube channel now?'))return;
+    const up=$('po-upl');
+    const setPct=(d,t)=>{ if(up)up.textContent='Uploading to YouTube… '+Math.floor(d/t*100)+'%'; };
+    let file=null;
+    try{
+      if(localItem&&_ytLocalFile){ file=_ytLocalFile; }
+      else if(urlItem){ if(up)up.textContent='Fetching video…'; const rr=await fetch(urlItem.url); file=await rr.blob(); }
+    }catch(e){ fail(e); return; }
+    if(!file){toast('Could not read the video file — re-attach it and try again.');return;}
     const rowY={workspace_id:WS.id,board_id:S.board,platform:'youtube',caption,media_note:$('po-media').value.trim(),
-      post_date:$('po-date').value||saDate(),post_time:($('po-time').value||saTime()),created_by:SESSION.user.id,media:_postMedia};
+      post_date:$('po-date').value||saDate(),post_time:($('po-time').value||saTime()),created_by:SESSION.user.id,
+      media:_postMedia.filter(m=>m&&m.url)};
     let idY=existingId||null;
     try{
       if(idY){const {error}=await sb.from('bbe_posts').update(rowY).eq('id',idY);if(error)throw error;}
       else{const {data,error}=await sb.from('bbe_posts').insert(rowY).select('id').single();if(error)throw error;idY=data.id;}
     }catch(e){fail(e);return;}
     try{
-      toast('Uploading to YouTube…');
-      const j=await ytPostApi({action:'publish',board_id:S.board,caption,video_url:vid.url,privacy:'public'});
-      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
-      await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',idY);
+      if(up)up.textContent='Starting upload…';
+      const sj=await ytPostApi({action:'upload_session',board_id:S.board,caption,privacy:'public',content_type:(file.type||'video/*'),content_length:(file.size||0)});
+      if(!sj||!sj.session_url){toast('⚠ '+((sj&&(sj.message||sj.error))||'Could not start the upload'));if(up)up.textContent='';return;}
+      const vid=await ytResumableUpload(file,sj.session_url,setPct);
+      const permalink=vid?('https://www.youtube.com/watch?v='+vid):null;
+      await sb.from('bbe_posts').update({status:'posted',post_url:permalink}).eq('id',idY);
+      if(up)up.textContent=''; _ytLocalFile=null;
       closeModal();await loadBoard();render();
-      toast('Uploaded to YouTube — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
-    }catch(e){fail(e);}
+      toast('Uploaded to YouTube — live now',permalink?'Open ↗':null,permalink?()=>window.open(permalink,'_blank'):null);
+    }catch(e){ if(up)up.textContent=''; fail(e); }
     return;
   }
   // Other non-native platforms (LinkedIn, etc.) publish through the scheduler
@@ -2644,7 +2707,11 @@ async function scheduleComposer(existingId){
   const caption=$('po-cap').value.trim();
   const media=_postMedia.filter(m=>m&&m.url);
   if(!$('po-date').value){toast('Pick a date to schedule');return;}
-  if(platform==='youtube'&&!media.find(m=>m.type==='video')){toast('YouTube needs a video attached to schedule.');return;}
+  if(platform==='youtube'&&!media.find(m=>m.type==='video')){
+    if(_postMedia.find(m=>m&&m.local&&m.type==='video')){toast('Large videos can only be published immediately with ↗ Post now. To schedule a YouTube post, attach a video under 50MB.');}
+    else{toast('YouTube needs a video attached to schedule.');}
+    return;
+  }
   if(platform==='tiktok'&&!media.find(m=>m.type==='video')){toast('TikTok needs a video attached to schedule.');return;}
   if(platform==='instagram'&&!media.find(m=>m.type==='image'||m.type==='video')){toast('Instagram needs an image or video to schedule.');return;}
   const row={workspace_id:WS.id,board_id:S.board,platform,caption,media_note:$('po-media').value.trim(),
