@@ -2586,21 +2586,18 @@ async function postNowComposer(existingId){
   const caption=$('po-cap').value.trim();
   const media=_postMedia.filter(m=>m&&m.url);
   const nm=(PLAT[platform]||PLAT.other)[0];
-  // YouTube uploads DIRECTLY from the browser to YouTube — the server mints a resumable
-  // session (holding the OAuth token) and the file streams straight to Google. No size cap.
+  // YouTube uploads through our own server (bbe-youtube-post → youtube.upload). The server
+  // fetches the stored video and uploads it to the channel — reliable, no browser CORS.
   if(platform==='youtube'){
-    const localItem=_postMedia.find(m=>m&&m.local&&m.type==='video');
-    const urlItem=_postMedia.find(m=>m&&m.url&&m.type==='video');
-    if(!localItem&&!urlItem){toast('YouTube needs a video attached — add one under Images / video first.');return;}
+    const vid=media.find(m=>m.type==='video'&&m.url);
+    const localBig=_postMedia.find(m=>m&&m.local&&m.type==='video'&&!m.url);
+    if(!vid){
+      if(localBig){toast('For now YouTube needs a video under 50MB — attach a shorter clip and try again.');}
+      else{toast('YouTube needs a video attached — add one under Images / video first.');}
+      return;
+    }
     if(!confirm('Upload this video to your YouTube channel now?'))return;
-    const up=$('po-upl');
-    const setPct=(d,t)=>{ if(up)up.textContent='Uploading to YouTube… '+Math.floor(d/t*100)+'%'; };
-    let file=null;
-    try{
-      if(localItem&&_ytLocalFile){ file=_ytLocalFile; }
-      else if(urlItem){ if(up)up.textContent='Fetching video…'; const rr=await fetch(urlItem.url); file=await rr.blob(); }
-    }catch(e){ fail(e); return; }
-    if(!file){toast('Could not read the video file — re-attach it and try again.');return;}
+    const up=$('po-upl'); if(up)up.textContent='Uploading to YouTube…';
     const rowY={workspace_id:WS.id,board_id:S.board,platform:'youtube',caption,media_note:$('po-media').value.trim(),
       post_date:$('po-date').value||saDate(),post_time:($('po-time').value||saTime()),created_by:SESSION.user.id,
       media:_postMedia.filter(m=>m&&m.url)};
@@ -2608,17 +2605,14 @@ async function postNowComposer(existingId){
     try{
       if(idY){const {error}=await sb.from('bbe_posts').update(rowY).eq('id',idY);if(error)throw error;}
       else{const {data,error}=await sb.from('bbe_posts').insert(rowY).select('id').single();if(error)throw error;idY=data.id;}
-    }catch(e){fail(e);return;}
+    }catch(e){if(up)up.textContent='';fail(e);return;}
     try{
-      if(up)up.textContent='Starting upload…';
-      const sj=await ytPostApi({action:'upload_session',board_id:S.board,caption,privacy:'public',content_type:(file.type||'video/*'),content_length:(file.size||0)});
-      if(!sj||!sj.session_url){toast('⚠ '+((sj&&(sj.message||sj.error))||'Could not start the upload'));if(up)up.textContent='';return;}
-      const vid=await ytResumableUpload(file,sj.session_url,setPct);
-      const permalink=vid?('https://www.youtube.com/watch?v='+vid):null;
-      await sb.from('bbe_posts').update({status:'posted',post_url:permalink}).eq('id',idY);
+      const j=await ytPostApi({action:'publish',board_id:S.board,caption,video_url:vid.url,privacy:'public'});
+      if(j&&j.error){if(up)up.textContent='';toast('⚠ '+(j.message||j.error));return;}
+      await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',idY);
       if(up)up.textContent=''; _ytLocalFile=null;
       closeModal();await loadBoard();render();
-      toast('Uploaded to YouTube — live now',permalink?'Open ↗':null,permalink?()=>window.open(permalink,'_blank'):null);
+      toast('Uploaded to YouTube — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
     }catch(e){ if(up)up.textContent=''; fail(e); }
     return;
   }
