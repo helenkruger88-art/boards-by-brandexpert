@@ -2578,6 +2578,31 @@ async function ytResumableUpload(file, sessionUrl, onProgress){
   }
   return videoId;
 }
+// Upload a video straight from the browser to YouTube, ANY size — the bytes never touch
+// our server. The browser itself STARTS the resumable session (so Google returns the CORS
+// headers for our origin), using a short-lived access token minted by our edge function
+// for the board's connected channel (owner/admin only, ~1hr, this channel only).
+// Returns {id, permalink}. Throws on any failure so the caller can fall back.
+async function ytDirectUpload(file, opts, onProgress){
+  const tk=await ytPostApi({action:'upload_token',board_id:opts.board_id});
+  if(!tk||tk.error||!tk.access_token) throw new Error((tk&&(tk.message||tk.error))||'Could not get an upload token.');
+  const title=(opts.title||opts.caption||file.name||'Untitled').split('\n')[0].slice(0,100);
+  const meta={snippet:{title,description:opts.caption||''},status:{privacyStatus:opts.privacy||'public'}};
+  // Browser STARTS the resumable session -> Google replies with CORS headers for our origin.
+  let init;
+  try{
+    init=await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tk.access_token,'Content-Type':'application/json; charset=UTF-8',
+        'X-Upload-Content-Type':file.type||'video/*','X-Upload-Content-Length':String(file.size)},
+      body:JSON.stringify(meta)});
+  }catch(e){ throw new Error('Network error starting the upload — check your connection and try again.'); }
+  if(!init.ok){ const t=await init.text().catch(()=> ''); throw new Error('YouTube rejected the upload ('+init.status+') '+t.slice(0,200)); }
+  const sessionUrl=init.headers.get('Location')||init.headers.get('location');
+  if(!sessionUrl) throw new Error('YouTube did not return an upload session URL.');
+  const videoId=await ytResumableUpload(file,sessionUrl,onProgress);
+  return {id:videoId, permalink:videoId?('https://youtu.be/'+videoId):null};
+}
 // Publish IMMEDIATELY from the composer — works on a brand-new (unsaved) post too.
 // Facebook / Instagram / Threads go live now; TikTok uploads the video to the
 // creator's TikTok inbox as a DRAFT (Content Posting API) to caption & publish in-app.
@@ -2586,18 +2611,17 @@ async function postNowComposer(existingId){
   const caption=$('po-cap').value.trim();
   const media=_postMedia.filter(m=>m&&m.url);
   const nm=(PLAT[platform]||PLAT.other)[0];
-  // YouTube uploads through our own server (bbe-youtube-post → youtube.upload). The server
-  // fetches the stored video and uploads it to the channel — reliable, no browser CORS.
+  // YouTube: the video uploads STRAIGHT FROM THE BROWSER to the channel (any size — the
+  // bytes never touch our server or storage). The browser starts the resumable session
+  // itself with a short-lived token from bbe-youtube-post (→ youtube.upload scope). If the
+  // direct upload can't run (no local File, or it fails) and we have a stored video ≤50MB,
+  // we fall back to the server-side publish.
   if(platform==='youtube'){
-    const vid=media.find(m=>m.type==='video'&&m.url);
-    const localBig=_postMedia.find(m=>m&&m.local&&m.type==='video'&&!m.url);
-    if(!vid){
-      if(localBig){toast('For now YouTube needs a video under 50MB — attach a shorter clip and try again.');}
-      else{toast('YouTube needs a video attached — add one under Images / video first.');}
-      return;
-    }
+    const vid=media.find(m=>m.type==='video'&&m.url);           // stored (≤50MB) copy, if any
+    const localFile=_ytLocalFile||null;                          // the picked File, any size
+    if(!localFile&&!vid){ toast('YouTube needs a video attached — add one under Images / video first.'); return; }
     if(!confirm('Upload this video to your YouTube channel now?'))return;
-    const up=$('po-upl'); if(up)up.textContent='Uploading to YouTube…';
+    const up=$('po-upl');
     const rowY={workspace_id:WS.id,board_id:S.board,platform:'youtube',caption,media_note:$('po-media').value.trim(),
       post_date:$('po-date').value||saDate(),post_time:($('po-time').value||saTime()),created_by:SESSION.user.id,
       media:_postMedia.filter(m=>m&&m.url)};
@@ -2606,14 +2630,32 @@ async function postNowComposer(existingId){
       if(idY){const {error}=await sb.from('bbe_posts').update(rowY).eq('id',idY);if(error)throw error;}
       else{const {data,error}=await sb.from('bbe_posts').insert(rowY).select('id').single();if(error)throw error;idY=data.id;}
     }catch(e){if(up)up.textContent='';fail(e);return;}
-    try{
-      const j=await ytPostApi({action:'publish',board_id:S.board,caption,video_url:vid.url,privacy:'public'});
-      if(j&&j.error){if(up)up.textContent='';toast('⚠ '+(j.message||j.error));return;}
-      await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',idY);
-      if(up)up.textContent=''; _ytLocalFile=null;
-      closeModal();await loadBoard();render();
-      toast('Uploaded to YouTube — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
-    }catch(e){ if(up)up.textContent=''; fail(e); }
+    const setPct=(done,total)=>{ if(up)up.textContent='Uploading to YouTube… '+Math.round(done/total*100)+'%'; };
+    let result=null;
+    // 1) Preferred: direct browser → YouTube upload (no size cap).
+    if(localFile){
+      try{
+        if(up)up.textContent='Uploading to YouTube… 0%';
+        result=await ytDirectUpload(localFile,{board_id:S.board,caption,privacy:'public'},setPct);
+      }catch(e){
+        // Fall back to the server path only if we also have a stored (≤50MB) copy.
+        if(!vid){ if(up)up.textContent=''; toast('⚠ '+(e.message||'Upload failed')); return; }
+      }
+    }
+    // 2) Fallback: server-side publish from the stored video (≤50MB).
+    if(!result&&vid){
+      try{
+        if(up)up.textContent='Uploading to YouTube…';
+        const j=await ytPostApi({action:'publish',board_id:S.board,caption,video_url:vid.url,privacy:'public'});
+        if(j&&j.error){if(up)up.textContent='';toast('⚠ '+(j.message||j.error));return;}
+        result={id:null,permalink:(j&&j.permalink)||null};
+      }catch(e){ if(up)up.textContent=''; fail(e); return; }
+    }
+    if(!result){ if(up)up.textContent=''; toast('Could not upload to YouTube — please try again.'); return; }
+    try{ await sb.from('bbe_posts').update({status:'posted',post_url:result.permalink||null}).eq('id',idY); }catch(_){}
+    if(up)up.textContent=''; _ytLocalFile=null;
+    closeModal();await loadBoard();render();
+    toast('Uploaded to YouTube — live now',result.permalink?'Open ↗':null,result.permalink?()=>window.open(result.permalink,'_blank'):null);
     return;
   }
   // Other non-native platforms (LinkedIn, etc.) publish through the scheduler
