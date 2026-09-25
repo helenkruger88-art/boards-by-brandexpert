@@ -2427,7 +2427,11 @@ function postModal(id,dateStr){
   const _pb=BOARDS.find(x=>x.id===S.board);
   openModal(`<h3>${p?'Edit post':'New post'} <span style="font-weight:500;font-size:12.5px;color:var(--muted)">· ${esc(_pb?_pb.name:'')}</span></h3>
     <label>Platform</label>
-    <select id="po-plat">${Object.entries(PLAT).map(([k,[n]])=>`<option value="${k}" ${p&&p.platform===k?'selected':''}>${n}</option>`).join('')}</select>
+    <select id="po-plat" onchange="var r=document.getElementById('po-privacy-row');if(r)r.style.display=this.value==='youtube'?'':'none'">${Object.entries(PLAT).map(([k,[n]])=>`<option value="${k}" ${p&&p.platform===k?'selected':''}>${n}</option>`).join('')}</select>
+    <div id="po-privacy-row" style="display:${p&&p.platform==='youtube'?'':'none'}">
+      <label>YouTube visibility</label>
+      <select id="po-privacy"><option value="public">Public</option><option value="unlisted" selected>Unlisted</option><option value="private">Private</option></select>
+    </div>
     <label>Caption ${paidAI()?`<button type="button" style="float:right;color:var(--accent);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0" onclick="draftAI()">✦ Draft with AI</button>`:''}</label>
     <textarea id="po-cap" rows="6" placeholder="Write it yourself — or tell the AI what the post is about and press ✦">${p?esc(p.caption):''}</textarea>
     ${paidAI()?`<div style="margin:4px 0 2px"><button type="button" class="btn ghost sm" onclick="scoreDraft(${p?`'${p.id}'`:'null'})" title="Predict how this will do versus your account's own history. First check per saved draft is free; re-checks use a credit.">✦ Predict performance</button><span id="po-score"></span></div>`:''}
@@ -2621,6 +2625,7 @@ async function postNowComposer(existingId){
     const localFile=_ytLocalFile||null;                          // the picked File, any size
     if(!localFile&&!vid){ toast('YouTube needs a video attached — add one under Images / video first.'); return; }
     if(!confirm('Upload this video to your YouTube channel now?'))return;
+    const ytPriv=($('po-privacy')&&$('po-privacy').value)||'unlisted';
     const up=$('po-upl');
     const rowY={workspace_id:WS.id,board_id:S.board,platform:'youtube',caption,media_note:$('po-media').value.trim(),
       post_date:$('po-date').value||saDate(),post_time:($('po-time').value||saTime()),created_by:SESSION.user.id,
@@ -2636,7 +2641,7 @@ async function postNowComposer(existingId){
     if(localFile){
       try{
         if(up)up.textContent='Uploading to YouTube… 0%';
-        result=await ytDirectUpload(localFile,{board_id:S.board,caption,privacy:'public'},setPct);
+        result=await ytDirectUpload(localFile,{board_id:S.board,caption,privacy:ytPriv},setPct);
       }catch(e){
         // Fall back to the server path only if we also have a stored (≤50MB) copy.
         if(!vid){ if(up)up.textContent=''; toast('⚠ '+(e.message||'Upload failed')); return; }
@@ -2646,7 +2651,7 @@ async function postNowComposer(existingId){
     if(!result&&vid){
       try{
         if(up)up.textContent='Uploading to YouTube…';
-        const j=await ytPostApi({action:'publish',board_id:S.board,caption,video_url:vid.url,privacy:'public'});
+        const j=await ytPostApi({action:'publish',board_id:S.board,caption,video_url:vid.url,privacy:ytPriv});
         if(j&&j.error){if(up)up.textContent='';toast('⚠ '+(j.message||j.error));return;}
         result={id:null,permalink:(j&&j.permalink)||null};
       }catch(e){ if(up)up.textContent=''; fail(e); return; }
@@ -2655,7 +2660,7 @@ async function postNowComposer(existingId){
     try{ await sb.from('bbe_posts').update({status:'posted',post_url:result.permalink||null}).eq('id',idY); }catch(_){}
     if(up)up.textContent=''; _ytLocalFile=null;
     closeModal();await loadBoard();render();
-    toast('Uploaded to YouTube — live now',result.permalink?'Open ↗':null,result.permalink?()=>window.open(result.permalink,'_blank'):null);
+    toast('Uploaded to YouTube — it may take a minute to finish processing',result.permalink?'Open ↗':null,result.permalink?()=>window.open(result.permalink,'_blank'):null);
     return;
   }
   // Other non-native platforms (LinkedIn, etc.) publish through the scheduler
