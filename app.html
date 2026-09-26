@@ -2798,7 +2798,7 @@ let _directNames={}; // platform -> connected account name/handle (best effort, 
 // These platforms post ONLY through our own apps (bbe-meta / bbe-threads / bbe-tiktok),
 // tracked in bbe_platform_links. A leftover PostPeer "account" for one of them can no longer
 // post, so we never treat PostPeer as the source of truth for these — only a direct link counts.
-const DIRECT_SET=['facebook','instagram','threads','tiktok','youtube'];
+const DIRECT_SET=['facebook','instagram','threads','tiktok','youtube','pinterest'];
 // Is `pl` connected for THIS board in a way that can actually post right now?
 function platConnected(pl){
   if(DIRECT_SET.includes(pl))return (_directPlatforms||[]).includes(pl);
@@ -2888,6 +2888,7 @@ async function directDisconnect(pl){
     if(pl==='tiktok')j=await ttApi({action:'disconnect',board_id:S.board});
     else if(pl==='threads')j=await thApi({action:'disconnect',board_id:S.board});
     else if(pl==='youtube')j=await ytPostApi({action:'disconnect',board_id:S.board});
+    else if(pl==='pinterest')j=await pinApi({action:'disconnect',board_id:S.board});
     else if(metaPair)j=await metaApi({action:'disconnect',board_id:S.board});
     else return;
     if(j&&j.error){toast(j.message||j.error);return;}
@@ -2913,6 +2914,8 @@ async function connectSocial(platform){
   // and publishPost()/postNowComposer() upload straight to the connected channel.
   // (YouTube COMMENTS still come through the by-handle reader separately -> ytConnect.)
   if(platform==='youtube'){ return ytPostConnect(); }
+  // Pinterest posts DIRECTLY through our own Pinterest OAuth app (bbe-pinterest).
+  if(platform==='pinterest'){ return pinConnect(); }
   // LinkedIn / X / anything else keeps the existing PostPeer path untouched.
   try{
     const j=await socialApi({action:'connect',platform,board_id:S.board});
@@ -3112,6 +3115,18 @@ async function ytPostConnect(){
   if(!S.board){toast('Open a project first');return;}
   try{const j=await ytPostApi({action:'connect',board_id:S.board});
   if(j&&j.url){location.href=j.url;}else{toast((j&&(j.message||j.error))||'Could not start YouTube connect');}
+  }catch(e){fail(e);}
+}
+// Pinterest (bbe-pinterest) — our own Pinterest OAuth app. Full-page redirect; returns to ?pinconnected=1.
+async function pinApi(body){
+  const {data:{session}}=await sb.auth.getSession();
+  const r=await fetch(`${SUPABASE_URL}/functions/v1/bbe-pinterest`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,Authorization:'Bearer '+session.access_token},body:JSON.stringify({workspace_id:WS.id,...body})});
+  return await r.json();
+}
+async function pinConnect(){
+  if(!S.board){toast('Open a project first');return;}
+  try{const j=await pinApi({action:'connect',board_id:S.board});
+  if(j&&j.url){location.href=j.url;}else{toast((j&&(j.message||j.error))||'Could not start Pinterest connect');}
   }catch(e){fail(e);}
 }
 // TikTok connect (Login Kit v2) — full-page redirect; returns to ?ttconnected=1.
@@ -3346,6 +3361,8 @@ async function loadDirectLinks(){
   try{const j=await ttApi({action:'links'}); const l=((j&&j.links)||[]).find(x=>x.board_id===board); if(l){set.add('tiktok'); if(nmeOf(l))names.tiktok=nmeOf(l);}}catch(_){}
   // YouTube (bbe-youtube-post — direct youtube.upload OAuth).
   try{const j=await ytPostApi({action:'links'}); const l=((j&&j.links)||[]).find(x=>x.board_id===board); if(l){set.add('youtube'); if(nmeOf(l))names.youtube=nmeOf(l);}}catch(_){}
+  // Pinterest (bbe-pinterest — direct OAuth).
+  try{const j=await pinApi({action:'links'}); const l=((j&&j.links)||[]).find(x=>x.board_id===board); if(l){set.add('pinterest'); if(nmeOf(l))names.pinterest=nmeOf(l);}}catch(_){}
   _directPlatforms=[...set];
   _directNames=names;
 }
@@ -4382,6 +4399,55 @@ function subscribeRealtime(){
     rtT=setTimeout(()=>{if($('overlay').classList.contains('open'))return;refresh();},600);
   }).subscribe();
 }
+/* ============ ONBOARDING TOUR (first-run walkthrough) ============ */
+const TOUR=[
+  {e:'👋',t:'Welcome to Boards',b:'Boards by Brand Expert is your home for planning, creating and publishing social content — all in one place. Here\'s a 30-second tour of what you can do. Take it, or skip and dive right in.'},
+  {e:'🗂️',t:'Projects',b:'Each client or brand lives in its own <b>project</b> (board), listed in the left sidebar. Every project keeps its own posts, connected channels, inbox and team — switch between them any time.'},
+  {e:'🧭',t:'Plan',b:'Use the <b>Plan</b> canvas to sketch a campaign as a visual flow — map out your ideas, then turn any step into a real task or a scheduled post.'},
+  {e:'🗓️',t:'Content &amp; Calendar',b:'The <b>Content</b> tab is your social calendar. Draft posts (with AI help), pick a date and time, and they publish automatically to your connected channels — or save them as drafts to review.'},
+  {e:'🔗',t:'Channels',b:'Under <b>Content → Channels</b>, connect Facebook, Instagram, YouTube, TikTok, Threads, Pinterest, LinkedIn and X — then post to all of them from one screen.'},
+  {e:'💬',t:'Inbox',b:'Comments, DMs and emails from your connected accounts land in the <b>Inbox</b>, so you and your team can read and reply without leaving the app.'},
+  {e:'📈',t:'Analytics',b:'Track reach, engagement and follower growth across every channel in <b>Analytics</b> — refreshed daily so you always know what\'s working.'},
+  {e:'👥',t:'Team, Files &amp; Money',b:'Invite teammates, keep shared files and links, and track each project\'s budget and spend — all from the project menu.'},
+  {e:'🎉',t:'You\'re all set',b:'That\'s the tour! Have a look around and start building. You can reopen this any time from the <b>?</b> button in the bottom-right corner.'},
+];
+let _tourStep=0;
+function renderTour(){
+  const s=TOUR[_tourStep], n=TOUR.length, last=_tourStep===n-1;
+  const dots=TOUR.map((_,i)=>`<span style="width:7px;height:7px;border-radius:50%;background:${i===_tourStep?'var(--accent,#C75B12)':'rgba(0,0,0,.15)'};display:inline-block"></span>`).join(' ');
+  let ov=document.getElementById('bbe-tour');
+  if(!ov){ov=document.createElement('div');ov.id='bbe-tour';document.body.appendChild(ov);}
+  ov.setAttribute('style','position:fixed;inset:0;z-index:99999;background:rgba(20,20,18,.55);display:flex;align-items:center;justify-content:center;padding:20px');
+  ov.innerHTML=`<div style="background:var(--bg,#fff);max-width:440px;width:100%;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px 26px 20px">
+    <div style="font-size:40px;line-height:1;margin-bottom:10px">${s.e}</div>
+    <h3 style="margin:0 0 8px;font-size:19px;color:var(--ink,#23241f)">${s.t}</h3>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:var(--muted,#6b6960)">${s.b}</p>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px">${dots}<span style="flex:1"></span><span style="font-size:12px;color:var(--muted,#8a887e)">${_tourStep+1} / ${n}</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="endTour()" style="background:none;border:none;color:var(--muted,#8a887e);font-size:13px;cursor:pointer;padding:8px 4px">Skip tour</button>
+      <span style="flex:1"></span>
+      ${_tourStep>0?`<button onclick="tourNav(-1)" style="background:none;border:1px solid var(--line-strong,#d8d6cf);border-radius:10px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink,#23241f)">Back</button>`:''}
+      <button onclick="${last?'endTour()':'tourNav(1)'}" style="background:var(--accent,#C75B12);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:700;cursor:pointer">${last?'Get started':'Next'}</button>
+    </div>
+  </div>`;
+}
+function tourNav(d){_tourStep=Math.max(0,Math.min(TOUR.length-1,_tourStep+d));renderTour();}
+function startTour(){_tourStep=0;renderTour();}
+function endTour(){try{localStorage.setItem('bbe_tour_v1','1');}catch(_){}const el=document.getElementById('bbe-tour');if(el)el.remove();}
+window.startTour=startTour;window.tourNav=tourNav;window.endTour=endTour;
+function ensureTourButton(){
+  if(document.getElementById('bbe-tour-btn'))return;
+  const b=document.createElement('button');
+  b.id='bbe-tour-btn';b.title='Take a tour of Boards';b.textContent='?';
+  b.setAttribute('style','position:fixed;right:16px;bottom:16px;z-index:9000;width:38px;height:38px;border-radius:50%;border:none;background:var(--accent,#C75B12);color:#fff;font-size:19px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)');
+  b.onclick=startTour;document.body.appendChild(b);
+}
+function maybeStartTour(){
+  ensureTourButton();
+  try{ if(localStorage.getItem('bbe_tour_v1')) return; }catch(_){ return; }
+  if(typeof WS==='undefined'||!WS) return; // wait until a workspace is loaded
+  setTimeout(startTour,700);
+}
 async function boot(){
   try{
     await loadWs();
@@ -4390,6 +4456,7 @@ async function boot(){
       chatInit().then(render).catch(()=>{});
       waApi({action:'links'}).then(w=>{_waAccounts=(w&&w.ok)?(w.accounts||[]):(_waAccounts||[]);render();}).catch(()=>{});}
     render();
+    try{maybeStartTour();}catch(_){}
   }catch(e){fail(e);render();}
 }
 let _linkToken=null;
@@ -4404,6 +4471,9 @@ async function authLinkCheck(){
   // Direct YouTube posting (bbe-youtube-post) OAuth return.
   const ytc=q.get('ytconnected');
   if(ytc){history.replaceState({},'',location.pathname);setTimeout(()=>toast(ytc==='err'?'YouTube connection failed — try again':'✅ YouTube channel connected — you can now post & schedule to it'),800);}
+  // Pinterest (bbe-pinterest) OAuth return.
+  const pinc=q.get('pinconnected');
+  if(pinc){history.replaceState({},'',location.pathname);setTimeout(()=>toast(pinc==='err'?'Pinterest connection failed — try again':'✅ Pinterest connected — you can now pin from this project'),800);}
   // TikTok (bbe-tiktok) OAuth return.
   const ttc=q.get('ttconnected');
   if(ttc){const ttr=q.get('tt_r')||'';const ttAcct=q.get('tt_acct')||'';const ttBoard=q.get('tt_board')||'';history.replaceState({},'',location.pathname);setTimeout(()=>{if(ttc==='1'){toast('✅ TikTok connected — you can now post & schedule to it');}else if(ttr==='inuse'){ttInUseModal(ttAcct,ttBoard);}else{toast('TikTok connection didn\'t finish — try again');}},800);}
