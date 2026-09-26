@@ -2511,6 +2511,40 @@ function mediaThumb(m,ix){
   return `<span style="position:relative;display:inline-block">${m.type==='image'?`<img src="${m.url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`:`<span style="display:flex;width:64px;height:64px;border-radius:8px;background:var(--panel,#F4F3EE);align-items:center;justify-content:center;font-size:22px;border:1px solid var(--line)">🎬</span>`}
   <button type="button" onclick="_postMedia.splice(${ix},1);document.getElementById('po-thumbs').innerHTML=_postMedia.map(mediaThumb).join('')" style="position:absolute;top:-6px;right:-6px;background:var(--ink,#23241f);color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;line-height:1">✕</button></span>`;
 }
+// iPhones save photos as HEIC — browsers can't preview it and Pinterest / Meta / most
+// platforms reject it. Convert HEIC/HEIF to JPEG in the browser before upload so the
+// thumbnail shows and every platform accepts the image.
+let _heicLibP=null;
+function ensureHeicLib(){
+  if(window.heic2any)return Promise.resolve();
+  if(_heicLibP)return _heicLibP;
+  const SRCS=[
+    'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js',
+    'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js',
+  ];
+  const load=(i)=>new Promise((res,rej)=>{
+    if(window.heic2any)return res();
+    if(i>=SRCS.length)return rej(new Error('heic load failed'));
+    const s=document.createElement('script');
+    s.src=SRCS[i];
+    s.onload=()=>window.heic2any?res():load(i+1).then(res,rej);
+    s.onerror=()=>load(i+1).then(res,rej);
+    document.head.appendChild(s);
+  });
+  _heicLibP=load(0);
+  return _heicLibP;
+}
+function isHeic(f){ return /image\/hei[cf]/i.test(f.type||'')||/\.(heic|heif)$/i.test(f.name||''); }
+async function toUploadable(f){
+  if(!isHeic(f))return f;
+  try{
+    await ensureHeicLib();
+    let out=await window.heic2any({blob:f,toType:'image/jpeg',quality:0.9});
+    if(Array.isArray(out))out=out[0];
+    const nm=(f.name||'image').replace(/\.(heic|heif)$/i,'')+'.jpg';
+    return new File([out],nm,{type:'image/jpeg'});
+  }catch(_){ return f; }   // fall back to the original if conversion fails
+}
 async function uploadPostMedia(files){
   const st=document.getElementById('po-upl');
   const platform=($('po-plat')&&$('po-plat').value)||'';
@@ -2535,12 +2569,13 @@ async function uploadPostMedia(files){
       continue;
     }
     if(f.size>50*1024*1024){toast(f.name+' is over 50MB');continue;}
-    st.textContent='Uploading '+f.name+'…';
-    const path=WS.id+'/'+Date.now()+'-'+f.name.replace(/[^\w.\-]+/g,'_');
-    const {error}=await sb.storage.from('post-media').upload(path,f,{upsert:true});
+    st.textContent=(isHeic(f)?'Converting ':'Uploading ')+f.name+'…';
+    const uf=await toUploadable(f);
+    const path=WS.id+'/'+Date.now()+'-'+uf.name.replace(/[^\w.\-]+/g,'_');
+    const {error}=await sb.storage.from('post-media').upload(path,uf,{upsert:true});
     if(error){toast('Upload failed: '+error.message);continue;}
     const {data}=sb.storage.from('post-media').getPublicUrl(path);
-    _postMedia.push({type:f.type.startsWith('video')?'video':'image',url:data.publicUrl});
+    _postMedia.push({type:uf.type.startsWith('video')?'video':'image',url:data.publicUrl});
   }
   st.textContent='';
   document.getElementById('po-thumbs').innerHTML=_postMedia.map(mediaThumb).join('');
@@ -2682,7 +2717,7 @@ async function postNowComposer(existingId){
       toast('Pinning to Pinterest…');
       const j=await pinApi({action:'publish',board_id:S.board,pin_board_id:pinBoard.id,
         title:((caption.split('\n')[0]||'').trim()).slice(0,100),description:caption,image_url:img.url});
-      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      if(j&&j.error){toast('⚠ '+(j.message||j.error)+(j.detail?(' — '+j.detail):''));return;}
       await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',idP);
       closeModal();await loadBoard();render();
       toast('Pinned to Pinterest — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
@@ -4152,7 +4187,7 @@ async function publishPost(id){
       toast('Pinning to Pinterest…');
       const j=await pinApi({action:'publish',board_id:S.board,pin_board_id:pinBoard.id,
         title:((p.caption.split('\n')[0]||'').trim()).slice(0,100),description:p.caption,image_url:img.url});
-      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      if(j&&j.error){toast('⚠ '+(j.message||j.error)+(j.detail?(' — '+j.detail):''));return;}
       await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',id);
       closeModal();await loadBoard();render();
       toast('Pinned to Pinterest — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
