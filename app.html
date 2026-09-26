@@ -2519,8 +2519,9 @@ function ensureHeicLib(){
   if(window.heic2any)return Promise.resolve();
   if(_heicLibP)return _heicLibP;
   const SRCS=[
-    'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js',
     'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js',
+    'https://unpkg.com/heic2any@0.0.4/dist/heic2any.min.js',
   ];
   const load=(i)=>new Promise((res,rej)=>{
     if(window.heic2any)return res();
@@ -2537,13 +2538,13 @@ function ensureHeicLib(){
 function isHeic(f){ return /image\/hei[cf]/i.test(f.type||'')||/\.(heic|heif)$/i.test(f.name||''); }
 async function toUploadable(f){
   if(!isHeic(f))return f;
-  try{
-    await ensureHeicLib();
-    let out=await window.heic2any({blob:f,toType:'image/jpeg',quality:0.9});
-    if(Array.isArray(out))out=out[0];
-    const nm=(f.name||'image').replace(/\.(heic|heif)$/i,'')+'.jpg';
-    return new File([out],nm,{type:'image/jpeg'});
-  }catch(_){ return f; }   // fall back to the original if conversion fails
+  // Throws if the library can't load or the photo can't be decoded — the caller
+  // surfaces a clear message and skips the upload rather than pushing an unusable HEIC.
+  await ensureHeicLib();
+  let out=await window.heic2any({blob:f,toType:'image/jpeg',quality:0.9});
+  if(Array.isArray(out))out=out[0];
+  const nm=(f.name||'image').replace(/\.(heic|heif)$/i,'')+'.jpg';
+  return new File([out],nm,{type:'image/jpeg'});
 }
 async function uploadPostMedia(files){
   const st=document.getElementById('po-upl');
@@ -2569,8 +2570,11 @@ async function uploadPostMedia(files){
       continue;
     }
     if(f.size>50*1024*1024){toast(f.name+' is over 50MB');continue;}
-    st.textContent=(isHeic(f)?'Converting ':'Uploading ')+f.name+'…';
-    const uf=await toUploadable(f);
+    st.textContent=(isHeic(f)?'Converting '+f.name+'…':'Uploading '+f.name+'…');
+    let uf;
+    try{ uf=await toUploadable(f); }
+    catch(err){ st.textContent=''; toast('Couldn\'t convert '+(f.name||'this HEIC photo')+' — please upload a JPG or PNG instead (on iPhone: Settings → Camera → Formats → Most Compatible).'); continue; }
+    st.textContent='Uploading '+uf.name+'…';
     const path=WS.id+'/'+Date.now()+'-'+uf.name.replace(/[^\w.\-]+/g,'_');
     const {error}=await sb.storage.from('post-media').upload(path,uf,{upsert:true});
     if(error){toast('Upload failed: '+error.message);continue;}
