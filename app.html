@@ -2663,6 +2663,32 @@ async function postNowComposer(existingId){
     toast('Uploaded to YouTube — it may take a minute to finish processing',result.permalink?'Open ↗':null,result.permalink?()=>window.open(result.permalink,'_blank'):null);
     return;
   }
+  // Pinterest pins DIRECTLY through our own Pinterest app (bbe-pinterest). Needs an
+  // image and a chosen Pinterest board to pin to.
+  if(platform==='pinterest'){
+    const img=media.find(m=>m.type==='image');
+    if(!img){toast('Pinterest needs an image — add one under Images / video first.');return;}
+    const pinBoard=await pinPickBoard();
+    if(!pinBoard)return;                                  // cancelled or no boards
+    if(!confirm('Pin this to your "'+pinBoard.name+'" Pinterest board now?'))return;
+    const rowP={workspace_id:WS.id,board_id:S.board,platform:'pinterest',caption,media_note:$('po-media').value.trim(),
+      post_date:$('po-date').value||saDate(),post_time:($('po-time').value||saTime()),created_by:SESSION.user.id,media:_postMedia};
+    let idP=existingId||null;
+    try{
+      if(idP){const {error}=await sb.from('bbe_posts').update(rowP).eq('id',idP);if(error)throw error;}
+      else{const {data,error}=await sb.from('bbe_posts').insert(rowP).select('id').single();if(error)throw error;idP=data.id;}
+    }catch(e){fail(e);return;}
+    try{
+      toast('Pinning to Pinterest…');
+      const j=await pinApi({action:'publish',board_id:S.board,pin_board_id:pinBoard.id,
+        title:((caption.split('\n')[0]||'').trim()).slice(0,100),description:caption,image_url:img.url});
+      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',idP);
+      closeModal();await loadBoard();render();
+      toast('Pinned to Pinterest — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
+    }catch(e){fail(e);}
+    return;
+  }
   // Other non-native platforms (LinkedIn, etc.) publish through the scheduler
   // (the same path the app already uses).
   if(!['facebook','instagram','threads','tiktok'].includes(platform)){
@@ -2755,6 +2781,7 @@ async function scheduleComposer(existingId){
   }
   if(platform==='tiktok'&&!media.find(m=>m.type==='video')){toast('TikTok needs a video attached to schedule.');return;}
   if(platform==='instagram'&&!media.find(m=>m.type==='image'||m.type==='video')){toast('Instagram needs an image or video to schedule.');return;}
+  if(platform==='pinterest'){toast('Scheduled Pinterest pins are coming soon — use ↗ Post now to pin immediately for now.');return;}
   const row={workspace_id:WS.id,board_id:S.board,platform,caption,media_note:$('po-media').value.trim(),
     post_date:$('po-date').value,post_time:($('po-time').value||'09:00'),status:'scheduled',created_by:SESSION.user.id,media:_postMedia};
   let id=existingId||null;
@@ -3128,6 +3155,38 @@ async function pinConnect(){
   try{const j=await pinApi({action:'connect',board_id:S.board});
   if(j&&j.url){location.href=j.url;}else{toast((j&&(j.message||j.error))||'Could not start Pinterest connect');}
   }catch(e){fail(e);}
+}
+// Fetch this project's connected Pinterest boards and let the user pick which one
+// to pin to. Returns {id,name} or null if cancelled. Cached per board load.
+let _pinBoardCache=null;
+async function pinPickBoard(){
+  let boards=_pinBoardCache;
+  if(!boards){
+    toast('Loading your Pinterest boards…');
+    const j=await pinApi({action:'boards',board_id:S.board});
+    if(j&&j.error){toast('⚠ '+(j.message||j.error));return null;}
+    boards=(j&&j.boards)||[];
+    _pinBoardCache=boards;
+  }
+  if(!boards.length){toast('You have no Pinterest boards yet — create one on Pinterest first, then try again.');return null;}
+  if(boards.length===1)return boards[0];
+  return await new Promise(resolve=>{
+    const ov=document.createElement('div');
+    ov.setAttribute('style','position:fixed;inset:0;z-index:100000;background:rgba(20,20,18,.55);display:flex;align-items:center;justify-content:center;padding:20px');
+    const opts=boards.map(b=>`<button data-id="${String(b.id).replace(/"/g,'&quot;')}" style="display:block;width:100%;text-align:left;padding:11px 14px;margin:5px 0;border:1px solid var(--line-strong,#d8d6cf);border-radius:10px;background:var(--bg,#fff);font-size:14px;cursor:pointer;color:var(--ink,#23241f)">${String(b.name||'Board').replace(/</g,'&lt;')}</button>`).join('');
+    ov.innerHTML=`<div style="background:var(--bg,#fff);max-width:380px;width:100%;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:22px">
+      <h3 style="margin:0 0 4px;font-size:17px;color:var(--ink,#23241f)">Pin to which board?</h3>
+      <p style="margin:0 0 14px;font-size:13px;color:var(--muted,#6b6960)">Choose the Pinterest board this pin should go to.</p>
+      <div style="max-height:320px;overflow:auto">${opts}</div>
+      <div style="text-align:right;margin-top:12px"><button id="pin-pick-cancel" style="background:none;border:none;color:var(--muted,#8a887e);font-size:13px;cursor:pointer;padding:8px 4px">Cancel</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{
+      const b=e.target.closest('button[data-id]');
+      if(b){const id=b.getAttribute('data-id');ov.remove();resolve(boards.find(x=>String(x.id)===id)||null);return;}
+      if(e.target.id==='pin-pick-cancel'||e.target===ov){ov.remove();resolve(null);}
+    });
+  });
 }
 // TikTok connect (Login Kit v2) — full-page redirect; returns to ?ttconnected=1.
 async function ttConnect(){
@@ -4082,6 +4141,23 @@ async function publishPost(id){
       toast('✓ Uploaded to your TikTok inbox as a draft — open the TikTok app to add a caption and publish it.');
       return;
     }
+    // Pinterest pins DIRECTLY through our own app (bbe-pinterest). Post-now pins right away
+    // (needs an image + a chosen board); scheduled Pinterest pins aren't wired yet.
+    if(p.platform==='pinterest'){
+      if(!postNow){toast('Scheduled Pinterest pins are coming soon — open the post and use ↗ Post now to pin it immediately.');return;}
+      const img=media.find(m=>m.type==='image');
+      if(!img){toast('Pinterest needs an image attached to pin.');return;}
+      const pinBoard=await pinPickBoard();
+      if(!pinBoard)return;
+      toast('Pinning to Pinterest…');
+      const j=await pinApi({action:'publish',board_id:S.board,pin_board_id:pinBoard.id,
+        title:((p.caption.split('\n')[0]||'').trim()).slice(0,100),description:p.caption,image_url:img.url});
+      if(j&&j.error){toast('⚠ '+(j.message||j.error));return;}
+      await sb.from('bbe_posts').update({status:'posted',post_url:(j&&j.permalink)||null}).eq('id',id);
+      closeModal();await loadBoard();render();
+      toast('Pinned to Pinterest — live now',(j&&j.permalink)?'Open ↗':null,(j&&j.permalink)?()=>window.open(j.permalink,'_blank'):null);
+      return;
+    }
     // Future Facebook / Instagram / Threads / TikTok posts schedule NATIVELY through
     // our own apps (no PostPeer): we mark the post 'scheduled' and a cron publishes it at the set time.
     // (YouTube is NOT here — it schedules through PostPeer via the path below.)
@@ -4401,14 +4477,14 @@ function subscribeRealtime(){
 }
 /* ============ ONBOARDING TOUR (first-run walkthrough) ============ */
 const TOUR=[
-  {e:'👋',t:'Welcome to Boards',b:'Boards by Brand Expert is your home for planning, creating and publishing social content — all in one place. Here\'s a 30-second tour of what you can do. Take it, or skip and dive right in.'},
-  {e:'🗂️',t:'Projects',b:'Each client or brand lives in its own <b>project</b> (board), listed in the left sidebar. Every project keeps its own posts, connected channels, inbox and team — switch between them any time.'},
-  {e:'🧭',t:'Plan',b:'Use the <b>Plan</b> canvas to sketch a campaign as a visual flow — map out your ideas, then turn any step into a real task or a scheduled post.'},
-  {e:'🗓️',t:'Content &amp; Calendar',b:'The <b>Content</b> tab is your social calendar. Draft posts (with AI help), pick a date and time, and they publish automatically to your connected channels — or save them as drafts to review.'},
-  {e:'🔗',t:'Channels',b:'Under <b>Content → Channels</b>, connect Facebook, Instagram, YouTube, TikTok, Threads, Pinterest, LinkedIn and X — then post to all of them from one screen.'},
-  {e:'💬',t:'Inbox',b:'Comments, DMs and emails from your connected accounts land in the <b>Inbox</b>, so you and your team can read and reply without leaving the app.'},
-  {e:'📈',t:'Analytics',b:'Track reach, engagement and follower growth across every channel in <b>Analytics</b> — refreshed daily so you always know what\'s working.'},
-  {e:'👥',t:'Team, Files &amp; Money',b:'Invite teammates, keep shared files and links, and track each project\'s budget and spend — all from the project menu.'},
+  {e:'👋',t:'Welcome to Boards',b:'Boards by Brand Expert is your workspace for running any kind of project — a launch, an event, an ongoing client account, whatever the work is. Plan it, manage it, and keep everything and everyone in one place. And when a project needs marketing, that\'s built right in. Here\'s a 30-second tour — take it, or skip and dive right in.'},
+  {e:'🗂️',t:'Projects',b:'Every client or piece of work lives in its own <b>project</b> (board), listed in the left sidebar. Each one keeps its own plan, tasks, files, team and budget — switch between them any time.'},
+  {e:'🧭',t:'Plan',b:'Use the <b>Plan</b> canvas to map a project out visually — sketch the steps, ideas and how they connect, then turn any step into a real task or a scheduled item.'},
+  {e:'🗓️',t:'Content &amp; Calendar',b:'The <b>Content</b> tab is your project calendar. Schedule the work, draft deliverables (with AI help), and pick dates and times. For projects that involve social, posts can publish automatically to your connected channels — or save anything as a draft to review first.'},
+  {e:'🔗',t:'Marketing &amp; Channels',b:'When a project includes marketing, you can connect social accounts — Facebook, Instagram, YouTube, TikTok, Threads, Pinterest, LinkedIn and X — under <b>Content → Channels</b>, and post to all of them from one screen. Not every project needs this, so it\'s there for the ones that do.'},
+  {e:'💬',t:'Inbox',b:'Comments, DMs and emails from any connected accounts land in the <b>Inbox</b>, so you and your team can read and reply without leaving the app.'},
+  {e:'📈',t:'Analytics',b:'For projects with connected channels, <b>Analytics</b> tracks reach, engagement and growth across all of them — refreshed daily so you always know what\'s working.'},
+  {e:'👥',t:'Team, Files &amp; Budget',b:'Invite teammates, keep shared files and links, and track each project\'s budget and spend — all from the project menu, whatever kind of work it is.'},
   {e:'🎉',t:'You\'re all set',b:'That\'s the tour! Have a look around and start building. You can reopen this any time from the <b>?</b> button in the bottom-right corner.'},
 ];
 let _tourStep=0;
