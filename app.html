@@ -3197,36 +3197,54 @@ async function pinConnect(){
   if(j&&j.url){location.href=j.url;}else{toast((j&&(j.message||j.error))||'Could not start Pinterest connect');}
   }catch(e){fail(e);}
 }
-// Fetch this project's connected Pinterest boards and let the user pick which one
-// to pin to. Returns {id,name} or null if cancelled. Cached per board load.
-let _pinBoardCache=null;
+// Let the user pick a Pinterest board to pin to, or create a new one on the spot.
+// Returns {id,name} or null if cancelled. Always re-fetches (no stale empty cache).
 async function pinPickBoard(){
-  let boards=_pinBoardCache;
-  if(!boards){
-    toast('Loading your Pinterest boards…');
-    const j=await pinApi({action:'boards',board_id:S.board});
-    if(j&&j.error){toast('⚠ '+(j.message||j.error));return null;}
-    boards=(j&&j.boards)||[];
-    _pinBoardCache=boards;
-  }
-  if(!boards.length){toast('You have no Pinterest boards yet — create one on Pinterest first, then try again.');return null;}
-  if(boards.length===1)return boards[0];
+  if(!S.board){toast('Open a project first');return null;}
+  toast('Loading your Pinterest boards…');
+  let boards;
+  try{ const j=await pinApi({action:'boards',board_id:S.board}); if(j&&j.error){toast('⚠ '+(j.message||j.error)+(j.detail?(' — '+j.detail):''));return null;} boards=(j&&j.boards)||[]; }
+  catch(e){ fail(e); return null; }
   return await new Promise(resolve=>{
     const ov=document.createElement('div');
     ov.setAttribute('style','position:fixed;inset:0;z-index:100000;background:rgba(20,20,18,.55);display:flex;align-items:center;justify-content:center;padding:20px');
-    const opts=boards.map(b=>`<button data-id="${String(b.id).replace(/"/g,'&quot;')}" style="display:block;width:100%;text-align:left;padding:11px 14px;margin:5px 0;border:1px solid var(--line-strong,#d8d6cf);border-radius:10px;background:var(--bg,#fff);font-size:14px;cursor:pointer;color:var(--ink,#23241f)">${String(b.name||'Board').replace(/</g,'&lt;')}</button>`).join('');
-    ov.innerHTML=`<div style="background:var(--bg,#fff);max-width:380px;width:100%;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:22px">
-      <h3 style="margin:0 0 4px;font-size:17px;color:var(--ink,#23241f)">Pin to which board?</h3>
-      <p style="margin:0 0 14px;font-size:13px;color:var(--muted,#6b6960)">Choose the Pinterest board this pin should go to.</p>
-      <div style="max-height:320px;overflow:auto">${opts}</div>
-      <div style="text-align:right;margin-top:12px"><button id="pin-pick-cancel" style="background:none;border:none;color:var(--muted,#8a887e);font-size:13px;cursor:pointer;padding:8px 4px">Cancel</button></div>
-    </div>`;
+    let busy=false;
+    const close=(val)=>{ov.remove();resolve(val);};
+    const draw=()=>{
+      const opts=boards.length
+        ? boards.map(b=>`<button data-id="${String(b.id).replace(/"/g,'&quot;')}" style="display:block;width:100%;text-align:left;padding:11px 14px;margin:5px 0;border:1px solid var(--line-strong,#d8d6cf);border-radius:10px;background:var(--bg,#fff);font-size:14px;cursor:pointer;color:var(--ink,#23241f)">${String(b.name||'Board').replace(/</g,'&lt;')}</button>`).join('')
+        : `<p style="margin:2px 0 10px;font-size:13px;color:var(--muted,#6b6960)">No boards on this account yet — create your first one below.</p>`;
+      ov.innerHTML=`<div style="background:var(--bg,#fff);max-width:400px;width:100%;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:22px">
+        <h3 style="margin:0 0 4px;font-size:17px;color:var(--ink,#23241f)">Pin to which board?</h3>
+        <p style="margin:0 0 14px;font-size:13px;color:var(--muted,#6b6960)">Choose a Pinterest board, or create a new one.</p>
+        <div style="max-height:290px;overflow:auto">${opts}</div>
+        <div style="display:flex;gap:7px;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+          <input id="pin-newb" placeholder="New board name…" style="flex:1;padding:9px 11px;font-size:13.5px;border:1px solid var(--line-strong,#d8d6cf);border-radius:10px">
+          <button id="pin-newb-go" style="background:var(--accent,#C75B12);color:#fff;border:none;border-radius:10px;padding:9px 15px;font-size:13.5px;font-weight:700;cursor:pointer;flex:none">${busy?'…':'＋ Create'}</button>
+        </div>
+        <div style="text-align:right;margin-top:10px"><button id="pin-pick-cancel" style="background:none;border:none;color:var(--muted,#8a887e);font-size:13px;cursor:pointer;padding:8px 4px">Cancel</button></div>
+      </div>`;
+    };
+    const createBoard=async()=>{
+      if(busy)return;
+      const inp=ov.querySelector('#pin-newb'), name=(inp&&inp.value||'').trim();
+      if(!name){toast('Type a board name first');return;}
+      busy=true; draw();
+      try{
+        const j=await pinApi({action:'create_board',board_id:S.board,name});
+        if(j&&j.error){busy=false;draw();toast('⚠ '+(j.message||j.error)+(j.detail?(' — '+j.detail):''));return;}
+        close({id:String(j.id),name:j.name||name});
+      }catch(e){busy=false;draw();fail(e);}
+    };
+    draw();
     document.body.appendChild(ov);
     ov.addEventListener('click',e=>{
       const b=e.target.closest('button[data-id]');
-      if(b){const id=b.getAttribute('data-id');ov.remove();resolve(boards.find(x=>String(x.id)===id)||null);return;}
-      if(e.target.id==='pin-pick-cancel'||e.target===ov){ov.remove();resolve(null);}
+      if(b){close(boards.find(x=>String(x.id)===b.getAttribute('data-id'))||null);return;}
+      if(e.target.id==='pin-newb-go'){createBoard();return;}
+      if(e.target.id==='pin-pick-cancel'||e.target===ov){close(null);}
     });
+    ov.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target&&e.target.id==='pin-newb'){e.preventDefault();createBoard();} });
   });
 }
 // TikTok connect (Login Kit v2) — full-page redirect; returns to ?ttconnected=1.
